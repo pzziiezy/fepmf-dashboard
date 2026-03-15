@@ -1,0 +1,12 @@
+{
+  "name": "fepmf-dashboard",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "node api/jira.js",
+    "build": "echo 'static build'"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.2"
+  }
+}
