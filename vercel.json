@@ -1,4 +1,5 @@
 {
+  "outputDirectory": ".",
   "rewrites": [
     { "source": "/api/jira", "destination": "/api/jira.js" },
     { "source": "/(.*)", "destination": "/index.html" }
