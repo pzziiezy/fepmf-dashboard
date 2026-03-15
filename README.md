@@ -4,7 +4,7 @@ Dashboard สำหรับ PO/PM ดู Progress ของ Issues ใน FEPMF
 
 ## วิธี Deploy บน Vercel (ไม่ต้องใช้ Terminal)
 
-### Step 1 — Upload ขึ้น GitHub
+### Step 1 — Upload ขึ้น GitHub ก่อน
 1. เข้า https://github.com → login → กด **"New repository"**
 2. ตั้งชื่อ `fepmf-dashboard` → กด **"Create repository"**
 3. กด **"uploading an existing file"**
