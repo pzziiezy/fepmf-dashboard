@@ -3,7 +3,7 @@ export default async function handler(req, res) {
 
   const EMAIL = process.env.JIRA_EMAIL
   const TOKEN = process.env.JIRA_API_TOKEN
-  const BASE = 'https://dgtbigc.atlassian.net/rest/api/3'
+  const BASE = 'https://api.atlassian.com/ex/jira/a7d03eec-4d39-4f31-b491-3abab9fe9f51/rest/api/3'
 
   if (!EMAIL || !TOKEN) {
     return res.status(500).json({ error: 'Missing env vars' })
