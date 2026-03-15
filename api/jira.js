@@ -1,14 +1,12 @@
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET')
 
-  const CLOUD = 'a7d03eec-4d39-4f31-b491-3abab9fe9f51'
-  const BASE = `https://api.atlassian.com/ex/jira/${CLOUD}/rest/api/3`
   const EMAIL = process.env.JIRA_EMAIL
   const TOKEN = process.env.JIRA_API_TOKEN
+  const BASE = 'https://dgtbigc.atlassian.net/rest/api/3'
 
   if (!EMAIL || !TOKEN) {
-    return res.status(500).json({ error: 'Missing JIRA_EMAIL or JIRA_API_TOKEN env vars' })
+    return res.status(500).json({ error: 'Missing env vars' })
   }
 
   const auth = Buffer.from(`${EMAIL}:${TOKEN}`).toString('base64')
