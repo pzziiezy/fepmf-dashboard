@@ -1,0 +1,53 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:      #0F1117;
+  --bg2:     #161B25;
+  --bg3:     #1E2535;
+  --bg4:     #242B3D;
+  --border:  #2A3448;
+  --border2: #3A4560;
+  --text:    #E8EDF8;
+  --text2:   #8A9BC4;
+  --text3:   #4A5878;
+  --blue:    #4F8EF7;
+  --blue2:   #2D5DB8;
+  --blue-bg: #1A2744;
+  --green:   #3DD68C;
+  --green-bg:#0E2A1E;
+  --amber:   #F7B84F;
+  --amber-bg:#2A1E0A;
+  --red:     #F75F5F;
+  --red-bg:  #2A0E0E;
+  --purple:  #9B7EF7;
+  --purple-bg:#1E1A2A;
+  --teal:    #4FDEF7;
+  --cyan:    #4FC8F7;
+  --font: 'IBM Plex Sans Thai', sans-serif;
+  --mono: 'IBM Plex Mono', monospace;
+  --radius: 10px;
+  --radius2: 14px;
+}
+
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; line-height: 1.5; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg2); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+a { color: var(--blue); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+button { font-family: var(--font); cursor: pointer; }
+input, select { font-family: var(--font); }
+
+/* Animations */
+@keyframes spin   { to { transform: rotate(360deg); } }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes pulse  { 0%,100% { opacity:1; } 50% { opacity:.35; } }
+
+.animate-in { animation: fadeIn .25s ease both; }
+.spin { animation: spin .7s linear infinite; }
+.pulse { animation: pulse 2s ease infinite; }
