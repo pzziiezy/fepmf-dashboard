@@ -9,6 +9,7 @@ export default async function handler(req, res) {
   const EMAIL = process.env.JIRA_EMAIL
   const TOKEN = process.env.JIRA_API_TOKEN
   const BASE = 'https://dgtbigc.atlassian.net/rest/api/3'
+  // Jira Cloud removed /search for some tenants. Use /search/jql instead.
 
   if (!EMAIL || !TOKEN) {
     return res.status(500).json({ error: 'Missing env vars: JIRA_EMAIL or JIRA_API_TOKEN' })
@@ -46,7 +47,7 @@ export default async function handler(req, res) {
       if (extra.expand) body.expand = extra.expand
       if (extra.fieldsByKeys) body.fieldsByKeys = true
 
-      const d = await fetchJira('/search', { method: 'POST', body: JSON.stringify(body) })
+      const d = await fetchJira('/search/jql', { method: 'POST', body: JSON.stringify(body) })
       const issues = d.issues || []
       all = all.concat(issues)
       if (!issues.length || all.length >= (d.total || 0)) break
