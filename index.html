@@ -235,9 +235,9 @@ function childProg(children){
 }
 
 async function fetchAPI(params){
-  const q=new URLSearchParams(params)
-  const r=await fetch(`/api/jira?${q}`)
-  const d=await r.json()
+  const q = new URLSearchParams(params)
+  const r = await fetch(`/api/dashboard?${q}`)
+  const d = await r.json()
   if(d.error) throw new Error(d.error)
   return d
 }
