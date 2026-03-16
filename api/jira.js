@@ -39,35 +39,33 @@ export default async function handler(req, res) {
   }
 
   async function fetchAll(jql, fields = []) {
-    let start = 0
-    let all = []
+  let start = 0
+  let all = []
 
-    while (true) {
-      const p = new URLSearchParams({
-        jql,
-        startAt: String(start),
-        maxResults: '100'
-      })
+  while (true) {
+    const p = new URLSearchParams({
+      jql,
+      startAt: String(start),
+      maxResults: '100'
+    })
 
-      if (fields.length) {
-        p.set('fields', fields.join(','))
-      }
-
-      const d = await fetchJira(`/search?${p.toString()}`)
-      const issues = d.issues || []
-
-      all = [...all, ...issues]
-
-      if (!issues.length || all.length >= (d.total || 0)) break
-
-      start += 100
-
-      // กัน loop ยาวเกิน
-      if (start > 2000) break
+    if (fields.length) {
+      p.set('fields', fields.join(','))
     }
 
-    return all
+    const d = await fetchJira(`/search/jql?${p.toString()}`)
+    const issues = d.issues || []
+
+    all = [...all, ...issues]
+
+    if (!issues.length || all.length >= (d.total || 0)) break
+
+    start += 100
+    if (start > 2000) break
   }
+
+  return all
+}
 
   try {
     const { action = 'fepmf', keys = '', key = '' } = req.query
