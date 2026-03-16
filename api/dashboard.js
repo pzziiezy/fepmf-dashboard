@@ -58,6 +58,24 @@ export default async function handler(req, res) {
     return all
   }
 
+
+
+  async function fetchIssuesByKeys(keys, fields = []) {
+    const uniqKeys = uniq(keys)
+    const batches = []
+    for (let i = 0; i < uniqKeys.length; i += 50) {
+      batches.push(uniqKeys.slice(i, i + 50))
+    }
+    const out = []
+    for (const batch of batches) {
+      if (!batch.length) continue
+      const jql = `key in (${quoteValues(batch)}) ORDER BY updated DESC`
+      const rows = await fetchAllByJql(jql, fields)
+      out.push(...rows)
+    }
+    return out
+  }
+
   function lower(v) {
     return String(v || '').toLowerCase()
   }
@@ -585,7 +603,7 @@ export default async function handler(req, res) {
     let level1IssuesRaw = []
     const level1Keys = [...level1KeySet]
     if (level1Keys.length) {
-      level1IssuesRaw = await fetchAllByJql(`key in (${quoteValues(level1Keys)}) ORDER BY updated DESC`, baseFields)
+      level1IssuesRaw = await fetchIssuesByKeys(level1Keys, baseFields)
     }
 
     const level1RawMap = new Map(level1IssuesRaw.map(i => [i.key, i]))
@@ -601,7 +619,7 @@ export default async function handler(req, res) {
     let level2IssuesRaw = []
     const level2Keys = [...level2KeySet]
     if (level2Keys.length) {
-      level2IssuesRaw = await fetchAllByJql(`key in (${quoteValues(level2Keys)}) ORDER BY updated DESC`, baseFields)
+      level2IssuesRaw = await fetchIssuesByKeys(level2Keys, baseFields)
     }
 
     const allRawMap = new Map()
@@ -748,7 +766,7 @@ export default async function handler(req, res) {
       blockedChildren: allChildren.filter(x => x.statusGroup === 'blocked').length,
       parentsNoChild: parentRows.filter(r => r.childrenCount === 0).length,
       parentsNoTest: parentRows.filter(r => r.testCaseCount === 0).length,
-      parentsBlocked: parentRows.filter(r => r.blockedByCount > 0).length,
+      parentsBlocked: parentRows.filter(r => r.riskFlags.includes('blocked')).length,
       staleChildren: allChildren.filter(x => (x.updatedDaysAgo ?? 0) >= 7 && x.statusGroup !== 'done').length,
       avgProgress: parentRows.length ? Math.round(parentRows.reduce((sum, r) => sum + r.progressPercent, 0) / parentRows.length) : 0
     }
