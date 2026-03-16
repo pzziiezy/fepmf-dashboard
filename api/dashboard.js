@@ -34,25 +34,28 @@ export default async function handler(req, res) {
   }
 
   async function fetchAllByJql(jql, fields = [], extra = {}) {
-    let start = 0
+    let nextPageToken = undefined
     let all = []
+    let guard = 0
 
     while (true) {
       const body = {
         jql,
-        startAt: start,
         maxResults: 100,
         fields
       }
-      if (extra.expand) body.expand = extra.expand
+      if (nextPageToken) body.nextPageToken = nextPageToken
+      if (extra.expand) body.expand = Array.isArray(extra.expand) ? extra.expand.join(',') : String(extra.expand)
       if (extra.fieldsByKeys) body.fieldsByKeys = true
+      if (extra.properties) body.properties = extra.properties
+      if (extra.reconcileIssues) body.reconcileIssues = extra.reconcileIssues
 
       const d = await fetchJira('/search/jql', { method: 'POST', body: JSON.stringify(body) })
       const issues = d.issues || []
       all = all.concat(issues)
-      if (!issues.length || all.length >= (d.total || 0)) break
-      start += 100
-      if (start > 5000) break
+      nextPageToken = d.nextPageToken
+      guard += 1
+      if (!issues.length || d.isLast || !nextPageToken || guard > 100) break
     }
     return all
   }
