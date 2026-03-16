@@ -3,183 +3,462 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FEPMF Executive Dashboard</title>
+  <title>FEPMF Portfolio Executive Dashboard</title>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --bg: #f4f7fb;
+      --panel: rgba(255,255,255,0.92);
+      --panel-strong: #ffffff;
+      --line: #e4eaf3;
+      --line-soft: #edf2f8;
+      --text: #0f172a;
+      --muted: #64748b;
+      --muted-2: #94a3b8;
+      --blue: #2563eb;
+      --blue-soft: #dbeafe;
+      --green: #15803d;
+      --green-soft: #dcfce7;
+      --amber: #b45309;
+      --amber-soft: #fef3c7;
+      --red: #b91c1c;
+      --red-soft: #fee2e2;
+      --purple: #6d28d9;
+      --purple-soft: #ede9fe;
+      --slate: #334155;
+      --slate-soft: #e2e8f0;
+      --shadow: 0 12px 36px rgba(15, 23, 42, 0.07);
+      --radius: 18px;
+      --radius-sm: 12px;
+    }
+
     * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
     body {
       margin: 0;
       font-family: "IBM Plex Sans Thai", sans-serif;
-      background: #f5f7fb;
-      color: #1f2937;
+      background:
+        radial-gradient(circle at top left, rgba(37,99,235,.06), transparent 28%),
+        radial-gradient(circle at top right, rgba(16,185,129,.05), transparent 24%),
+        var(--bg);
+      color: var(--text);
     }
-    .wrap {
-      max-width: 1440px;
+
+    .app {
+      max-width: 1600px;
       margin: 0 auto;
-      padding: 24px;
+      padding: 28px;
     }
-    .topbar {
+
+    .header {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
       gap: 16px;
-      margin-bottom: 20px;
+      margin-bottom: 18px;
     }
-    .title {
-      font-size: 28px;
-      font-weight: 700;
-      color: #0f172a;
-      margin: 0;
-    }
-    .subtitle {
-      margin-top: 6px;
-      color: #64748b;
-      font-size: 14px;
-    }
-    .actions {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-    .sync {
-      font-size: 13px;
-      color: #64748b;
-    }
-    .btn {
-      border: 1px solid #cbd5e1;
-      background: white;
-      color: #0f172a;
-      border-radius: 10px;
-      padding: 10px 14px;
-      cursor: pointer;
-      font-weight: 600;
-    }
-    .btn:hover {
-      background: #f8fafc;
-    }
-    .toolbar {
-      display: grid;
-      grid-template-columns: 1.2fr 220px 220px;
-      gap: 12px;
-      margin-bottom: 20px;
-    }
-    .input, .select {
-      width: 100%;
-      border: 1px solid #dbe3ef;
-      background: white;
-      border-radius: 12px;
-      padding: 12px 14px;
-      font-size: 14px;
-      color: #0f172a;
-      outline: none;
-    }
-    .input:focus, .select:focus {
-      border-color: #3b82f6;
-      box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
-    }
-    .cards {
-      display: grid;
-      grid-template-columns: repeat(6, 1fr);
-      gap: 14px;
-      margin-bottom: 20px;
-    }
-    .card {
-      background: white;
-      border: 1px solid #e2e8f0;
-      border-radius: 16px;
-      padding: 16px;
-      box-shadow: 0 6px 20px rgba(15,23,42,0.04);
-    }
-    .card .label {
-      font-size: 12px;
-      color: #64748b;
-      text-transform: uppercase;
-      letter-spacing: .4px;
-      margin-bottom: 8px;
-      font-weight: 600;
-    }
-    .card .value {
-      font-size: 30px;
-      font-weight: 700;
-      color: #0f172a;
-      line-height: 1;
-    }
-    .card .sub {
-      margin-top: 8px;
-      font-size: 12px;
-      color: #64748b;
-    }
-    .layout {
-      display: grid;
-      grid-template-columns: 1.8fr 1fr;
-      gap: 16px;
-    }
-    .panel {
-      background: white;
-      border: 1px solid #e2e8f0;
-      border-radius: 18px;
-      box-shadow: 0 6px 20px rgba(15,23,42,0.04);
-      overflow: hidden;
-    }
-    .panel-head {
-      padding: 16px 18px;
-      border-bottom: 1px solid #edf2f7;
-      display: flex;
-      justify-content: space-between;
+
+    .eyebrow {
+      display: inline-flex;
       align-items: center;
       gap: 8px;
+      background: rgba(255,255,255,0.8);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 600;
+      margin-bottom: 12px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
     }
+
+    .title {
+      margin: 0;
+      font-size: 32px;
+      line-height: 1.1;
+      font-weight: 700;
+      letter-spacing: -.02em;
+    }
+
+    .subtitle {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 14px;
+      max-width: 840px;
+      line-height: 1.6;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      align-items: center;
+    }
+
+    .meta-chip,
+    .btn,
+    .chip-btn {
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.92);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+
+    .meta-chip {
+      padding: 10px 14px;
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .btn {
+      padding: 11px 15px;
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: .18s ease;
+    }
+
+    .btn:hover, .chip-btn:hover {
+      transform: translateY(-1px);
+      border-color: #bfd0ee;
+      background: #fff;
+    }
+
+    .btn-primary {
+      background: linear-gradient(180deg, #eff6ff, #dbeafe);
+      border-color: #bfdbfe;
+      color: #1d4ed8;
+    }
+
+    .grid-hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(320px, .8fr);
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+      overflow: hidden;
+    }
+
+    .panel-head {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--line-soft);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
     .panel-title {
       font-size: 16px;
       font-weight: 700;
-      color: #0f172a;
+      color: var(--text);
+      margin: 0;
     }
+
     .panel-sub {
+      margin-top: 4px;
       font-size: 13px;
-      color: #64748b;
+      color: var(--muted);
     }
-    .table-wrap {
+
+    .hero-summary {
+      padding: 18px 20px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+
+    .hero-metric {
+      border: 1px solid var(--line-soft);
+      background: linear-gradient(180deg, #fff, #f8fbff);
+      border-radius: 16px;
+      padding: 16px;
+      min-height: 110px;
+    }
+
+    .hero-metric .label,
+    .kpi .label,
+    .mini-stat .label {
+      font-size: 12px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .hero-metric .value,
+    .kpi .value {
+      font-size: 30px;
+      line-height: 1;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .hero-metric .sub,
+    .kpi .sub {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .hero-aside {
+      padding: 18px 20px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .mini-stat {
+      border: 1px solid var(--line-soft);
+      border-radius: 16px;
+      padding: 14px 16px;
+      background: linear-gradient(180deg, #fff, #fbfcff);
+    }
+
+    .mini-stat .row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: baseline;
+    }
+
+    .mini-stat .value {
+      font-size: 28px;
+      font-weight: 700;
+    }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+
+    .kpi {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      padding: 16px;
+      min-height: 124px;
+    }
+
+    .filters {
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .filter-grid {
+      display: grid;
+      grid-template-columns: 1.4fr repeat(5, minmax(150px, 1fr));
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    .control {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .control label {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      color: var(--muted);
+      padding: 0 2px;
+    }
+
+    .input,
+    .select {
+      width: 100%;
+      min-height: 46px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: #fff;
+      padding: 11px 14px;
+      font-size: 14px;
+      color: var(--text);
+      outline: none;
+      transition: .18s ease;
+    }
+
+    .select[multiple] {
+      min-height: 112px;
+      padding: 8px;
+    }
+
+    .input:focus,
+    .select:focus {
+      border-color: #93c5fd;
+      box-shadow: 0 0 0 4px rgba(37,99,235,.10);
+    }
+
+    .filter-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+
+    .active-filters {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .active-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      background: #eef4ff;
+      color: #1d4ed8;
+      font-size: 12px;
+      font-weight: 700;
+      border: 1px solid #cfe0ff;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) minmax(320px, .95fr);
+      gap: 16px;
+      align-items: start;
+    }
+
+    .portfolio-head {
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid var(--line-soft);
+      flex-wrap: wrap;
+    }
+
+    .portfolio-stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 8px 10px;
+      background: #f8fbff;
+      border: 1px solid var(--line-soft);
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .table-shell {
       overflow: auto;
+      max-height: calc(100vh - 210px);
     }
+
     table {
       width: 100%;
-      border-collapse: collapse;
+      border-collapse: separate;
+      border-spacing: 0;
     }
-    th, td {
-      padding: 14px 16px;
-      border-bottom: 1px solid #f1f5f9;
-      text-align: left;
-      vertical-align: top;
-      font-size: 14px;
-    }
-    th {
-      font-size: 12px;
-      color: #64748b;
-      text-transform: uppercase;
-      letter-spacing: .4px;
-      background: #f8fafc;
+
+    thead th {
       position: sticky;
       top: 0;
-      z-index: 1;
-    }
-    tr:hover td {
-      background: #fafcff;
-    }
-    .key {
-      font-weight: 700;
-      color: #2563eb;
-      text-decoration: none;
-    }
-    .summary {
-      font-weight: 600;
-      color: #0f172a;
-      margin-bottom: 6px;
-    }
-    .muted {
-      color: #64748b;
+      z-index: 3;
+      background: #f8fbff;
+      border-bottom: 1px solid var(--line-soft);
+      padding: 14px 16px;
+      text-align: left;
       font-size: 12px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 700;
+      white-space: nowrap;
     }
+
+    tbody td {
+      padding: 14px 16px;
+      border-bottom: 1px solid #eef3f9;
+      vertical-align: top;
+      font-size: 14px;
+      background: rgba(255,255,255,0.72);
+    }
+
+    tbody tr.parent-row:hover td,
+    tbody tr.child-row:hover td {
+      background: #fbfdff;
+    }
+
+    .row-toggle {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--text);
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .issue-cell {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .issue-main {
+      min-width: 280px;
+    }
+
+    .issue-key {
+      color: var(--blue);
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    .issue-key:hover { text-decoration: underline; }
+
+    .summary {
+      margin-top: 2px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.45;
+    }
+
+    .meta-line {
+      margin-top: 8px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
     .badge {
       display: inline-flex;
       align-items: center;
@@ -188,151 +467,450 @@
       padding: 6px 10px;
       font-size: 12px;
       font-weight: 700;
+      line-height: 1;
       white-space: nowrap;
     }
-    .b-blue { background: #dbeafe; color: #1d4ed8; }
-    .b-green { background: #dcfce7; color: #166534; }
-    .b-amber { background: #fef3c7; color: #92400e; }
-    .b-red { background: #fee2e2; color: #b91c1c; }
-    .b-slate { background: #e2e8f0; color: #334155; }
-    .b-purple { background: #ede9fe; color: #6d28d9; }
+
+    .b-blue   { background: var(--blue-soft); color: #1d4ed8; }
+    .b-green  { background: var(--green-soft); color: #166534; }
+    .b-amber  { background: var(--amber-soft); color: #92400e; }
+    .b-red    { background: var(--red-soft); color: var(--red); }
+    .b-purple { background: var(--purple-soft); color: var(--purple); }
+    .b-slate  { background: var(--slate-soft); color: var(--slate); }
+
+    .progress-block {
+      min-width: 170px;
+    }
+
+    .progress-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
     .progress {
       width: 100%;
       height: 10px;
-      background: #e2e8f0;
       border-radius: 999px;
+      background: #e8eef7;
       overflow: hidden;
-      margin-bottom: 6px;
+      position: relative;
     }
+
     .progress > div {
       height: 100%;
-      background: linear-gradient(90deg, #60a5fa, #2563eb);
       border-radius: 999px;
+      background: linear-gradient(90deg, #60a5fa, #2563eb);
     }
-    .risk-list {
+
+    .muted {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .counts-list,
+    .risk-list,
+    .owner-stack,
+    .child-meta-grid {
       display: flex;
       flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .owner-stack {
+      flex-direction: column;
       gap: 6px;
+      min-width: 150px;
     }
-    .section {
-      padding: 16px 18px;
-      border-top: 1px solid #f1f5f9;
+
+    .owner-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text);
     }
+
+    .owner-row .label {
+      min-width: 50px;
+      color: var(--muted);
+      font-weight: 700;
+      font-size: 12px;
+      text-transform: uppercase;
+    }
+
+    .child-container {
+      background: linear-gradient(180deg, #fcfdff, #f8fbff);
+    }
+
+    .child-wrap {
+      padding: 0 16px 18px 62px;
+    }
+
+    .child-card {
+      border: 1px solid var(--line-soft);
+      border-radius: 16px;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    .child-card-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line-soft);
+      flex-wrap: wrap;
+      background: #fbfdff;
+    }
+
+    .child-table th,
+    .child-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid #eff4fa;
+      font-size: 13px;
+      background: #fff;
+    }
+
+    .child-table th {
+      position: static;
+      background: #f8fbff;
+      font-size: 11px;
+    }
+
+    .child-table tr:last-child td { border-bottom: none; }
+
+    .health-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    .dot-green { background: #22c55e; }
+    .dot-amber { background: #f59e0b; }
+    .dot-red { background: #ef4444; }
+    .dot-slate { background: #94a3b8; }
+
+    .side-stack {
+      display: grid;
+      gap: 16px;
+    }
+
+    .section-body {
+      padding: 16px 18px 18px;
+    }
+
     .mini-list {
       display: grid;
       gap: 10px;
     }
+
     .mini-item {
-      border: 1px solid #eef2f7;
-      background: #fafcff;
-      border-radius: 12px;
-      padding: 12px;
+      border: 1px solid var(--line-soft);
+      background: linear-gradient(180deg, #fff, #fbfdff);
+      border-radius: 14px;
+      padding: 12px 14px;
     }
-    .mini-item .head {
+
+    .mini-head {
       display: flex;
       justify-content: space-between;
+      align-items: center;
       gap: 8px;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
     }
-    .mini-item .k {
+
+    .mini-title {
+      font-size: 14px;
       font-weight: 700;
-      color: #2563eb;
-      text-decoration: none;
-      font-size: 13px;
+      color: var(--text);
     }
-    .mini-item .t {
-      font-size: 13px;
-      color: #0f172a;
+
+    .workload-row,
+    .heat-row {
+      display: grid;
+      grid-template-columns: 88px 1fr 48px;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .workload-row:last-child,
+    .heat-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .workload-bar,
+    .heat-bar {
+      width: 100%;
+      height: 12px;
+      border-radius: 999px;
+      background: #eef3fa;
+      overflow: hidden;
+      border: 1px solid #e8eef7;
+    }
+
+    .workload-bar > div,
+    .heat-bar > div {
+      height: 100%;
+      border-radius: 999px;
+    }
+
+    .heat-grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    .forecast-box {
+      display: grid;
+      gap: 10px;
+    }
+
+    .forecast-item {
+      border: 1px solid var(--line-soft);
+      border-radius: 14px;
+      padding: 12px 14px;
+      background: linear-gradient(180deg, #fff, #fbfdff);
+    }
+
+    .empty,
+    .loading,
+    .error {
+      padding: 28px 18px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    .error { color: var(--red); }
+
+    .hint {
+      color: var(--muted-2);
+      font-size: 12px;
       line-height: 1.5;
     }
-    .empty {
-      padding: 24px;
-      text-align: center;
-      color: #94a3b8;
-    }
-    .loading {
-      padding: 80px 24px;
-      text-align: center;
-      color: #64748b;
-      font-size: 15px;
-    }
-    @media (max-width: 1200px) {
-      .cards { grid-template-columns: repeat(3, 1fr); }
+
+    .hidden { display: none !important; }
+
+    @media (max-width: 1380px) {
+      .filter-grid { grid-template-columns: 1fr 1fr 1fr; }
+      .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+      .hero-summary { grid-template-columns: repeat(2, 1fr); }
       .layout { grid-template-columns: 1fr; }
+      .table-shell { max-height: none; }
     }
-    @media (max-width: 800px) {
-      .toolbar { grid-template-columns: 1fr; }
-      .cards { grid-template-columns: repeat(2, 1fr); }
-      .topbar { flex-direction: column; }
+
+    @media (max-width: 900px) {
+      .app { padding: 18px; }
+      .header { flex-direction: column; }
+      .grid-hero { grid-template-columns: 1fr; }
+      .filter-grid,
+      .hero-summary,
+      .kpi-grid { grid-template-columns: 1fr; }
+      .child-wrap { padding-left: 16px; }
+      thead th:nth-child(4),
+      thead th:nth-child(5),
+      thead th:nth-child(6),
+      tbody td:nth-child(4),
+      tbody td:nth-child(5),
+      tbody td:nth-child(6) {
+        display: none;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="topbar">
+  <div class="app">
+    <div class="header">
       <div>
-        <h1 class="title">FEPMF Executive Dashboard</h1>
-        <div class="subtitle">Front-End Project Management Framework สำหรับมุมมองผู้บริหาร / PO / PM</div>
+        <div class="eyebrow">Portfolio / Executive / Product Owner View</div>
+        <h1 class="title">FEPMF Portfolio Executive Dashboard</h1>
+        <div class="subtitle">
+          ออกแบบใหม่เพื่อให้ผู้บริหารกวาดตาแล้วเห็นภาพรวมทันที: สุขภาพพอร์ต, ความเสี่ยง, ภาระงานของ Squad,
+          ความคืบหน้าของ Parent FEPMF และรายละเอียด Child FED แบบ drill-down โดยยังใช้แหล่งข้อมูลเดิมจาก <code>/api/dashboard</code>
+        </div>
       </div>
-      <div class="actions">
-        <div class="sync" id="syncTime">กำลังโหลด...</div>
-        <button class="btn" onclick="loadDashboard()">Refresh</button>
+      <div class="header-actions">
+        <div class="meta-chip" id="syncTime">กำลังโหลด...</div>
+        <button class="btn" id="expandAllBtn">Expand All</button>
+        <button class="btn btn-primary" id="refreshBtn">Refresh</button>
       </div>
     </div>
 
-    <div class="toolbar">
-      <input id="searchInput" class="input" placeholder="ค้นหา FEPMF key, summary, child, linked item..." oninput="applyFilters()">
-      <select id="squadFilter" class="select" onchange="applyFilters()">
-        <option value="">ทุก Squad</option>
-        <option value="KEPLER">KEPLER</option>
-        <option value="MIDAS">MIDAS</option>
-        <option value="NEBULA">NEBULA</option>
-      </select>
-      <select id="riskFilter" class="select" onchange="applyFilters()">
-        <option value="">ทุกสถานะความเสี่ยง</option>
-        <option value="blocked">Blocked</option>
-        <option value="no_test_case">No Test Case</option>
-        <option value="stale_child">Stale Child</option>
-        <option value="no_child">No Child</option>
-      </select>
-    </div>
-
-    <div class="cards" id="summaryCards"></div>
-
-    <div class="layout">
+    <div class="grid-hero">
       <div class="panel">
         <div class="panel-head">
           <div>
-            <div class="panel-title">Portfolio Overview</div>
-            <div class="panel-sub" id="resultCount">-</div>
+            <div class="panel-title">Executive Snapshot</div>
+            <div class="panel-sub">ภาพรวมแบบสรุปสำหรับผู้บริหาร</div>
+          </div>
+          <div class="pill" id="portfolioHealth">Portfolio Health: -</div>
+        </div>
+        <div class="hero-summary" id="heroSummary">
+          <div class="loading">กำลังคำนวณภาพรวม...</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <div class="panel-title">Action Focus</div>
+            <div class="panel-sub">จุดที่ควรจับตาในรอบนี้</div>
           </div>
         </div>
-        <div class="table-wrap" id="portfolioWrap">
+        <div class="hero-aside" id="heroAside">
+          <div class="loading">กำลังวิเคราะห์...</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="kpi-grid" id="summaryCards"></div>
+
+    <div class="panel filters">
+      <div class="panel-head" style="padding: 0 0 14px 0; border-bottom: 1px solid var(--line-soft); margin-bottom: 14px;">
+        <div>
+          <div class="panel-title">Interactive Filters</div>
+          <div class="panel-sub">เลือกหลายค่าได้ในแต่ละตัวกรองเพื่อสำรวจพอร์ตแบบ interactive</div>
+        </div>
+      </div>
+
+      <div class="filter-grid">
+        <div class="control">
+          <label for="searchInput">Search</label>
+          <input id="searchInput" class="input" placeholder="ค้นหา key, summary, squad, assignee, sprint, linked item..." />
+        </div>
+
+        <div class="control">
+          <label for="parentStatusFilter">Parent Status</label>
+          <select id="parentStatusFilter" class="select" multiple></select>
+        </div>
+
+        <div class="control">
+          <label for="childStatusFilter">Child Status</label>
+          <select id="childStatusFilter" class="select" multiple></select>
+        </div>
+
+        <div class="control">
+          <label for="squadFilter">Squad</label>
+          <select id="squadFilter" class="select" multiple></select>
+        </div>
+
+        <div class="control">
+          <label for="sprintFilter">Sprint</label>
+          <select id="sprintFilter" class="select" multiple></select>
+        </div>
+
+        <div class="control">
+          <label for="assigneeFilter">Assignee</label>
+          <select id="assigneeFilter" class="select" multiple></select>
+        </div>
+      </div>
+
+      <div class="filter-grid" style="margin-top: 12px; grid-template-columns: repeat(3, minmax(180px, 1fr));">
+        <div class="control">
+          <label for="riskFilter">Risk Indicator</label>
+          <select id="riskFilter" class="select" multiple>
+            <option value="blocked">Blocked</option>
+            <option value="no_test_case">No Test Case</option>
+            <option value="stale_child">Stale Child</option>
+            <option value="no_child">No Child</option>
+          </select>
+        </div>
+
+        <div class="control">
+          <label for="healthFilter">Portfolio Health</label>
+          <select id="healthFilter" class="select">
+            <option value="">ทุกสถานะ</option>
+            <option value="healthy">Healthy</option>
+            <option value="watch">Watch</option>
+            <option value="critical">Critical</option>
+          </select>
+        </div>
+
+        <div class="control">
+          <label for="sortFilter">Sort By</label>
+          <select id="sortFilter" class="select">
+            <option value="risk_desc">Risk มากสุดก่อน</option>
+            <option value="progress_asc">Progress น้อยสุดก่อน</option>
+            <option value="progress_desc">Progress มากสุดก่อน</option>
+            <option value="updated_desc">อัปเดตล่าสุดก่อน</option>
+            <option value="key_asc">Issue Key A-Z</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="filter-actions">
+        <div class="active-filters" id="activeFilters"></div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <button class="btn" id="clearFiltersBtn">Clear Filters</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="layout">
+      <div class="panel">
+        <div class="portfolio-head">
+          <div>
+            <div class="panel-title">Portfolio Table</div>
+            <div class="panel-sub" id="resultCount">-</div>
+          </div>
+          <div class="portfolio-stats">
+            <div class="pill" id="visibleRiskCount">Risk Items: -</div>
+            <div class="pill" id="visibleProgressAvg">Avg Progress: -</div>
+            <div class="pill" id="visibleSquadMix">Squads: -</div>
+          </div>
+        </div>
+        <div class="table-shell" id="portfolioWrap">
           <div class="loading">กำลังโหลดข้อมูลจาก Jira...</div>
         </div>
       </div>
 
-      <div>
+      <div class="side-stack">
         <div class="panel">
           <div class="panel-head">
             <div>
-              <div class="panel-title">Squad Summary</div>
-              <div class="panel-sub">มุมมองภาพรวมตามทีมพัฒนา</div>
+              <div class="panel-title">Squad Workload</div>
+              <div class="panel-sub">ภาระงานเทียบกับปริมาณ Child ของแต่ละทีม</div>
             </div>
           </div>
-          <div class="section" id="squadSummary"></div>
+          <div class="section-body" id="squadWorkload"></div>
         </div>
 
-        <div style="height:16px"></div>
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">Risk Heatmap</div>
+              <div class="panel-sub">ความหนาแน่นของความเสี่ยงตาม Squad</div>
+            </div>
+          </div>
+          <div class="section-body" id="riskHeatmap"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">Delivery Forecast</div>
+              <div class="panel-sub">คาดการณ์เบื้องต้นจาก progress และ risk ที่เห็น</div>
+            </div>
+          </div>
+          <div class="section-body" id="deliveryForecast"></div>
+        </div>
 
         <div class="panel">
           <div class="panel-head">
             <div>
               <div class="panel-title">Executive Insights</div>
-              <div class="panel-sub">สิ่งที่ควรจับตา</div>
+              <div class="panel-sub">รายการที่ควรเข้า review ก่อน</div>
             </div>
           </div>
-          <div class="section">
+          <div class="section-body">
             <div class="mini-list" id="insightsList"></div>
           </div>
         </div>
@@ -343,22 +921,57 @@
   <script>
     let dashboardData = null;
     let filteredParents = [];
+    const expandedParents = new Set();
 
     function esc(v) {
       return String(v ?? '')
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function toArray(v) {
+      return Array.isArray(v) ? v : [];
+    }
+
+    function uniq(arr) {
+      return [...new Set(toArray(arr).filter(Boolean))];
+    }
+
+    function selectedValues(id) {
+      return Array.from(document.getElementById(id).selectedOptions || []).map(o => o.value).filter(Boolean);
+    }
+
+    function lower(v) {
+      return String(v || '').toLowerCase();
+    }
+
+    function number(v) {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function avg(arr) {
+      if (!arr.length) return 0;
+      return arr.reduce((s, x) => s + x, 0) / arr.length;
+    }
+
+    function daysAgoLabel(days) {
+      const n = number(days);
+      if (!n) return 'วันนี้';
+      if (n === 1) return '1 วัน';
+      return `${n} วัน`;
     }
 
     function badgeClass(status) {
-      const s = String(status || '').toLowerCase();
-      if (s.includes('done') || s.includes('deliver')) return 'b-green';
-      if (s.includes('uat') || s.includes('test') || s.includes('sit')) return 'b-purple';
-      if (s.includes('progress') || s.includes('develop')) return 'b-blue';
+      const s = lower(status);
+      if (s.includes('done') || s.includes('deliver') || s.includes('resolved') || s.includes('closed')) return 'b-green';
+      if (s.includes('uat') || s.includes('sit') || s.includes('test')) return 'b-purple';
+      if (s.includes('progress') || s.includes('develop') || s.includes('implement') || s.includes('doing')) return 'b-blue';
       if (s.includes('block')) return 'b-red';
-      if (s.includes('plan') || s.includes('prd') || s.includes('idea')) return 'b-amber';
+      if (s.includes('plan') || s.includes('prd') || s.includes('idea') || s.includes('open') || s.includes('todo')) return 'b-amber';
       return 'b-slate';
     }
 
@@ -373,211 +986,690 @@
       return `<span class="badge ${item[1]}">${item[0]}</span>`;
     }
 
+    function healthOfParent(row) {
+      const flags = toArray(row.riskFlags);
+      const progress = number(row.progressPercent);
+      const blocked = flags.includes('blocked');
+      const noChild = flags.includes('no_child');
+      if (blocked || noChild || progress < 25 && flags.length >= 2) return 'critical';
+      if (flags.length || progress < 60) return 'watch';
+      return 'healthy';
+    }
+
+    function healthBadge(health) {
+      const map = {
+        healthy: ['Healthy', 'b-green', 'dot-green'],
+        watch: ['Watch', 'b-amber', 'dot-amber'],
+        critical: ['Critical', 'b-red', 'dot-red']
+      };
+      const [label, badge, dot] = map[health] || ['Unknown', 'b-slate', 'dot-slate'];
+      return { label, badge, dot };
+    }
+
+    function forecastOfParent(row) {
+      const progress = number(row.progressPercent);
+      const risks = toArray(row.riskFlags).length;
+      if (progress >= 85 && risks === 0) return 'On Track';
+      if (progress >= 60 && risks <= 1) return 'Likely On Track';
+      if (progress >= 35 && risks <= 2) return 'Needs Attention';
+      return 'At Risk';
+    }
+
+    function forecastBadgeLabel(label) {
+      if (label === 'On Track' || label === 'Likely On Track') return 'b-green';
+      if (label === 'Needs Attention') return 'b-amber';
+      return 'b-red';
+    }
+
+    function inferParentSprint(row) {
+      const explicit = row?.parent?.sprint;
+      if (explicit) return explicit;
+      const childSprints = uniq(toArray(row.children).map(x => x.sprint));
+      if (!childSprints.length) return '-';
+      if (childSprints.length === 1) return childSprints[0];
+      return `${childSprints[0]} +${childSprints.length - 1}`;
+    }
+
+    function inferDominantAssignee(row) {
+      if (row?.parent?.assignee) return row.parent.assignee;
+      const counts = {};
+      toArray(row.children).forEach(c => {
+        const a = c.assignee || '';
+        if (!a) return;
+        counts[a] = (counts[a] || 0) + 1;
+      });
+      const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+      return sorted[0]?.[0] || '-';
+    }
+
+    function formatRiskList(row) {
+      const flags = toArray(row.riskFlags);
+      if (!flags.length) return `<span class="badge b-green">Healthy</span>`;
+      return flags.map(riskBadge).join('');
+    }
+
+    function childTestCount(row, child) {
+      const tests = toArray(row.testCases);
+      return tests.filter(t => {
+        const text = `${lower(t.summary)} ${lower(t.key)}`;
+        return text.includes(lower(child.key));
+      }).length;
+    }
+
+    function safeDateRank(v) {
+      const t = new Date(v || '').getTime();
+      return Number.isFinite(t) ? t : 0;
+    }
+
     async function fetchDashboard() {
-      const r = await fetch('/api/dashboard');
-      const d = await r.json();
-      if (d.error) throw new Error(d.error);
-      return d;
+      const response = await fetch('/api/dashboard');
+      const data = await response.json();
+      if (!response.ok || data.error) {
+        throw new Error(data.error || `HTTP ${response.status}`);
+      }
+      return data;
+    }
+
+    function fillSelect(id, values, placeholder) {
+      const el = document.getElementById(id);
+      const prev = selectedValues(id);
+      const list = uniq(values).sort((a, b) => String(a).localeCompare(String(b), 'th'));
+      el.innerHTML = list.length
+        ? list.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('')
+        : `<option value="">${esc(placeholder || 'ไม่มีข้อมูล')}</option>`;
+      if (list.length) {
+        Array.from(el.options).forEach(opt => {
+          opt.selected = prev.includes(opt.value);
+        });
+      }
+    }
+
+    function buildFilterOptions(data) {
+      const parents = toArray(data.parents);
+      fillSelect('parentStatusFilter', parents.map(r => r?.parent?.status).filter(Boolean), 'ไม่มี Parent Status');
+      fillSelect('childStatusFilter', parents.flatMap(r => toArray(r.children).map(c => c.status)).filter(Boolean), 'ไม่มี Child Status');
+      fillSelect('squadFilter', parents.flatMap(r => [r.squad, ...(r.squads || []), ...toArray(r.children).map(c => c.squad)]).filter(Boolean), 'ไม่มี Squad');
+      fillSelect('sprintFilter', parents.flatMap(r => [inferParentSprint(r), ...toArray(r.children).map(c => c.sprint)]).filter(v => v && v !== '-'), 'ไม่มี Sprint');
+      fillSelect('assigneeFilter', parents.flatMap(r => [r?.parent?.assignee, inferDominantAssignee(r), ...toArray(r.children).map(c => c.assignee)]).filter(v => v && v !== '-'), 'ไม่มี Assignee');
+    }
+
+    function buildActiveFilterChips(filters) {
+      const chips = [];
+      if (filters.search) chips.push(`Search: ${filters.search}`);
+      if (filters.parentStatuses.length) chips.push(`Parent Status: ${filters.parentStatuses.join(', ')}`);
+      if (filters.childStatuses.length) chips.push(`Child Status: ${filters.childStatuses.join(', ')}`);
+      if (filters.squads.length) chips.push(`Squad: ${filters.squads.join(', ')}`);
+      if (filters.sprints.length) chips.push(`Sprint: ${filters.sprints.join(', ')}`);
+      if (filters.assignees.length) chips.push(`Assignee: ${filters.assignees.join(', ')}`);
+      if (filters.risks.length) chips.push(`Risk: ${filters.risks.join(', ')}`);
+      if (filters.health) chips.push(`Health: ${filters.health}`);
+      document.getElementById('activeFilters').innerHTML = chips.length
+        ? chips.map(x => `<span class="active-chip">${esc(x)}</span>`).join('')
+        : `<span class="hint">ยังไม่ได้เลือกตัวกรองเพิ่มเติม</span>`;
+    }
+
+    function parentMatches(row, filters) {
+      const parent = row.parent || {};
+      const children = toArray(row.children);
+      const linked = toArray(row.linked);
+      const search = lower(filters.search.trim());
+      const parentSprint = inferParentSprint(row);
+      const ownerAssignee = inferDominantAssignee(row);
+      const haystack = [
+        parent.key,
+        parent.summary,
+        parent.status,
+        parent.issueType,
+        row.squad,
+        ...(row.squads || []),
+        parentSprint,
+        parent.assignee,
+        ownerAssignee,
+        ...children.map(c => `${c.key} ${c.summary} ${c.status} ${c.assignee || ''} ${c.squad || ''} ${c.sprint || ''}`),
+        ...linked.map(x => `${x.key} ${x.summary || ''}`)
+      ].join(' ').toLowerCase();
+
+      if (search && !haystack.includes(search)) return false;
+      if (filters.parentStatuses.length && !filters.parentStatuses.includes(parent.status)) return false;
+      if (filters.childStatuses.length && !children.some(c => filters.childStatuses.includes(c.status))) return false;
+      if (filters.squads.length) {
+        const candidateSquads = uniq([row.squad, ...(row.squads || []), ...children.map(c => c.squad)]);
+        if (!candidateSquads.some(s => filters.squads.includes(s))) return false;
+      }
+      if (filters.sprints.length) {
+        const candidateSprints = uniq([parentSprint, ...children.map(c => c.sprint)]);
+        if (!candidateSprints.some(s => filters.sprints.includes(s))) return false;
+      }
+      if (filters.assignees.length) {
+        const candidateAssignees = uniq([parent.assignee, ownerAssignee, ...children.map(c => c.assignee)]);
+        if (!candidateAssignees.some(a => filters.assignees.includes(a))) return false;
+      }
+      if (filters.risks.length && !filters.risks.every(r => toArray(row.riskFlags).includes(r))) return false;
+      if (filters.health && healthOfParent(row) !== filters.health) return false;
+      return true;
+    }
+
+    function sortRows(rows, sortBy) {
+      const items = [...rows];
+      items.sort((a, b) => {
+        const riskA = toArray(a.riskFlags).length;
+        const riskB = toArray(b.riskFlags).length;
+        const progressA = number(a.progressPercent);
+        const progressB = number(b.progressPercent);
+        const updatedA = Math.max(safeDateRank(a.parent?.updated), ...toArray(a.children).map(c => safeDateRank(c.updated)));
+        const updatedB = Math.max(safeDateRank(b.parent?.updated), ...toArray(b.children).map(c => safeDateRank(c.updated)));
+        switch (sortBy) {
+          case 'progress_asc': return progressA - progressB || riskB - riskA;
+          case 'progress_desc': return progressB - progressA || riskB - riskA;
+          case 'updated_desc': return updatedB - updatedA || riskB - riskA;
+          case 'key_asc': return String(a.parent?.key || '').localeCompare(String(b.parent?.key || ''), 'en');
+          case 'risk_desc':
+          default:
+            return riskB - riskA || progressA - progressB || String(a.parent?.key || '').localeCompare(String(b.parent?.key || ''), 'en');
+        }
+      });
+      return items;
+    }
+
+    function renderHero(data) {
+      const parents = toArray(data.parents);
+      const total = parents.length;
+      const healthy = parents.filter(r => healthOfParent(r) === 'healthy').length;
+      const watch = parents.filter(r => healthOfParent(r) === 'watch').length;
+      const critical = parents.filter(r => healthOfParent(r) === 'critical').length;
+      const avgProgress = Math.round(avg(parents.map(r => number(r.progressPercent))));
+      const doneParents = parents.filter(r => number(r.progressPercent) >= 100).length;
+      const coverage = data.summary?.totalParents ? Math.round(((data.summary.totalParents - (data.summary.parentsNoTest || 0)) / data.summary.totalParents) * 100) : 0;
+      const stale = number(data.summary?.staleChildren);
+      const blocked = number(data.summary?.parentsBlocked);
+
+      document.getElementById('heroSummary').innerHTML = `
+        <div class="hero-metric">
+          <div class="label">Portfolio Health</div>
+          <div class="value">${total ? Math.round((healthy / total) * 100) : 0}%</div>
+          <div class="sub">Healthy ${healthy} · Watch ${watch} · Critical ${critical}</div>
+        </div>
+        <div class="hero-metric">
+          <div class="label">Average Progress</div>
+          <div class="value">${avgProgress}%</div>
+          <div class="sub">Parent ที่ปิดครบ 100% แล้ว ${doneParents} รายการ</div>
+        </div>
+        <div class="hero-metric">
+          <div class="label">Test Coverage Signal</div>
+          <div class="value">${coverage}%</div>
+          <div class="sub">อ้างอิงจาก parent ที่มี test case เชื่อมโยง</div>
+        </div>
+        <div class="hero-metric">
+          <div class="label">Risk Attention</div>
+          <div class="value">${blocked + stale}</div>
+          <div class="sub">Blocked ${blocked} · Stale Child ${stale}</div>
+        </div>
+      `;
+
+      const portfolioHealth = critical > 0 ? 'Critical' : (watch > 0 ? 'Watch' : 'Healthy');
+      const portfolioHealthBadge = critical > 0 ? 'b-red' : (watch > 0 ? 'b-amber' : 'b-green');
+      document.getElementById('portfolioHealth').innerHTML = `<span class="badge ${portfolioHealthBadge}">${portfolioHealth}</span>`;
+
+      const topBlocked = parents.filter(r => toArray(r.riskFlags).includes('blocked')).slice(0, 2);
+      const topSlow = [...parents].sort((a, b) => number(a.progressPercent) - number(b.progressPercent)).slice(0, 2);
+      const heavySquad = [...toArray(data.squadSummary)].sort((a, b) => number(b.total) - number(a.total))[0];
+
+      document.getElementById('heroAside').innerHTML = `
+        <div class="mini-stat">
+          <div class="label">ต้องรีบตัดสินใจ</div>
+          <div class="row"><div class="value">${critical}</div><div class="badge b-red">Critical Parents</div></div>
+          <div class="sub">รายการที่ blocked หรือไม่มี child แล้ว progress ยังต่ำ</div>
+        </div>
+        <div class="mini-stat">
+          <div class="label">ทีมที่แบกงานมากสุด</div>
+          <div class="row"><div class="value">${esc(heavySquad?.squad || '-')}</div><div class="badge b-blue">${number(heavySquad?.total)} child</div></div>
+          <div class="sub">ใช้ดูว่าควร balance งานหรือ re-plan sprint หรือไม่</div>
+        </div>
+        <div class="mini-stat">
+          <div class="label">ควร review ทันที</div>
+          <div class="sub">
+            ${topBlocked.length
+              ? topBlocked.map(r => `<div style="margin-bottom:6px"><a class="issue-key" href="${esc(r.parent?.browseUrl || '#')}" target="_blank">${esc(r.parent?.key)}</a> · ${esc(r.parent?.summary || '')}</div>`).join('')
+              : '<div>ยังไม่พบ blocked parent</div>'}
+            ${topSlow.length
+              ? `<div style="margin-top:8px; color: var(--muted);">Progress ต่ำ: ${topSlow.map(r => `${esc(r.parent?.key)} (${number(r.progressPercent)}%)`).join(' · ')}</div>`
+              : ''}
+          </div>
+        </div>
+      `;
     }
 
     function renderSummary(summary) {
       const cards = [
-        ['Total Parents', summary.totalParents, 'FEPMF ทั้งหมด'],
-        ['Children', summary.totalChildren, 'งาน child ที่เชื่อมอยู่'],
-        ['Linked', summary.totalLinked, 'linked work items'],
-        ['Blocked', summary.parentsBlocked, 'parent ที่ติด blocker'],
-        ['No Test', summary.parentsNoTest, 'parent ที่ยังไม่พบ test case'],
-        ['Stale Child', summary.staleChildren, 'child ไม่อัปเดตเกิน 7 วัน']
+        ['Total Parents', summary.totalParents, 'จำนวน FEPMF ทั้งหมดใน portfolio'],
+        ['Total Children', summary.totalChildren, 'จำนวน FED child ที่เชื่อมอยู่'],
+        ['Total Linked', summary.totalLinked, 'จำนวน linked items ที่สัมพันธ์'],
+        ['Total Test Cases', summary.totalTestCases, 'จำนวน test-related issues ที่ตรวจพบ'],
+        ['Blocked Parents', summary.parentsBlocked, 'parent ที่มีสถานะ blocked by'],
+        ['Stale Children', summary.staleChildren, 'child ที่ไม่อัปเดตเกิน 7 วัน']
       ];
 
       document.getElementById('summaryCards').innerHTML = cards.map(c => `
-        <div class="card">
-          <div class="label">${c[0]}</div>
-          <div class="value">${c[1] ?? 0}</div>
-          <div class="sub">${c[2]}</div>
+        <div class="kpi">
+          <div class="label">${esc(c[0])}</div>
+          <div class="value">${number(c[1])}</div>
+          <div class="sub">${esc(c[2])}</div>
         </div>
       `).join('');
     }
 
-    function renderSquadSummary(items) {
-      document.getElementById('squadSummary').innerHTML = items.map(x => `
-        <div class="mini-item">
-          <div class="head">
-            <div class="summary">${esc(x.squad)}</div>
-            <span class="badge b-blue">${x.total} items</span>
+    function renderWorkload(items) {
+      const total = Math.max(1, ...toArray(items).map(x => number(x.total)));
+      if (!items?.length) {
+        document.getElementById('squadWorkload').innerHTML = `<div class="empty">ไม่มีข้อมูล Squad</div>`;
+        return;
+      }
+
+      document.getElementById('squadWorkload').innerHTML = items.map(x => {
+        const pct = Math.round((number(x.total) / total) * 100);
+        const delivery = number(x.done) + number(x.uat) + number(x.test);
+        return `
+          <div class="mini-item">
+            <div class="mini-head">
+              <div class="mini-title">${esc(x.squad)}</div>
+              <span class="badge b-blue">${number(x.total)} child</span>
+            </div>
+            <div class="workload-row">
+              <div class="muted">Capacity</div>
+              <div class="workload-bar"><div style="width:${pct}%; background: linear-gradient(90deg,#60a5fa,#2563eb)"></div></div>
+              <div class="muted" style="text-align:right">${pct}%</div>
+            </div>
+            <div class="workload-row">
+              <div class="muted">Delivery</div>
+              <div class="workload-bar"><div style="width:${Math.min(100, Math.round((delivery / Math.max(1, number(x.total))) * 100))}%; background: linear-gradient(90deg,#86efac,#16a34a)"></div></div>
+              <div class="muted" style="text-align:right">${delivery}</div>
+            </div>
+            <div class="hint">Open ${number(x.open)} · In Progress ${number(x.inProgress)} · Test ${number(x.test)} · UAT ${number(x.uat)} · Done ${number(x.done)} · Blocked ${number(x.blocked)}</div>
           </div>
-          <div class="muted">
-            Open ${x.open} · In Progress ${x.inProgress} · Test ${x.test} · UAT ${x.uat} · Done ${x.done} · Blocked ${x.blocked}
-          </div>
-        </div>
-      `).join('');
+        `;
+      }).join('');
     }
 
-    function renderInsights(data) {
-      const rows = [];
-
-      (data.insights.parentsWithoutChild || []).slice(0, 5).forEach(x => {
-        rows.push({
-          title: 'Parent ไม่มี Child',
-          text: `${x.key} - ${x.summary}`
+    function renderHeatmap(rows) {
+      const squadMap = {};
+      rows.forEach(r => {
+        const squads = uniq([r.squad, ...(r.squads || [])]).filter(Boolean);
+        const riskFlags = toArray(r.riskFlags);
+        squads.forEach(s => {
+          if (!squadMap[s]) squadMap[s] = { squad: s, blocked: 0, stale_child: 0, no_test_case: 0, no_child: 0 };
+          riskFlags.forEach(flag => {
+            if (squadMap[s][flag] !== undefined) squadMap[s][flag] += 1;
+          });
         });
       });
+      const items = Object.values(squadMap);
+      if (!items.length) {
+        document.getElementById('riskHeatmap').innerHTML = `<div class="empty">ไม่มีข้อมูลความเสี่ยง</div>`;
+        return;
+      }
 
-      (data.insights.parentsWithoutTestCase || []).slice(0, 5).forEach(x => {
-        rows.push({
-          title: 'Parent ยังไม่พบ Test Case',
-          text: `${x.key} - ${x.summary}`
-        });
-      });
-
-      (data.insights.blockedParents || []).slice(0, 5).forEach(x => {
-        rows.push({
-          title: 'Parent ติด Block',
-          text: `${x.key} - blocked by ${x.blockedBy.join(', ')}`
-        });
-      });
-
-      (data.insights.staleChildren || []).slice(0, 5).forEach(x => {
-        rows.push({
-          title: 'Child ไม่อัปเดตนาน',
-          text: `${x.key} - ${x.updatedDaysAgo} วัน`
-        });
-      });
-
-      document.getElementById('insightsList').innerHTML = rows.length
-        ? rows.map(r => `
+      const maxVal = Math.max(1, ...items.flatMap(x => [x.blocked, x.stale_child, x.no_test_case, x.no_child]));
+      document.getElementById('riskHeatmap').innerHTML = `
+        <div class="heat-grid">
+          ${items.map(x => `
             <div class="mini-item">
-              <div class="summary">${esc(r.title)}</div>
-              <div class="muted">${esc(r.text)}</div>
+              <div class="mini-head">
+                <div class="mini-title">${esc(x.squad)}</div>
+                <span class="badge b-slate">${x.blocked + x.stale_child + x.no_test_case + x.no_child} risks</span>
+              </div>
+              ${[
+                ['Blocked', x.blocked, '#ef4444'],
+                ['Stale', x.stale_child, '#8b5cf6'],
+                ['No Test', x.no_test_case, '#f59e0b'],
+                ['No Child', x.no_child, '#94a3b8']
+              ].map(([label, value, color]) => `
+                <div class="heat-row">
+                  <div class="muted">${label}</div>
+                  <div class="heat-bar"><div style="width:${Math.round((value / maxVal) * 100)}%; background:${color}"></div></div>
+                  <div class="muted" style="text-align:right">${value}</div>
+                </div>
+              `).join('')}
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    function renderForecast(rows) {
+      const sorted = [...rows].sort((a, b) => {
+        const scoreA = (toArray(a.riskFlags).length * 10) - number(a.progressPercent);
+        const scoreB = (toArray(b.riskFlags).length * 10) - number(b.progressPercent);
+        return scoreB - scoreA;
+      }).slice(0, 5);
+
+      if (!sorted.length) {
+        document.getElementById('deliveryForecast').innerHTML = `<div class="empty">ไม่มีข้อมูลสำหรับ forecast</div>`;
+        return;
+      }
+
+      document.getElementById('deliveryForecast').innerHTML = `
+        <div class="forecast-box">
+          ${sorted.map(r => {
+            const label = forecastOfParent(r);
+            return `
+              <div class="forecast-item">
+                <div class="mini-head">
+                  <div>
+                    <a class="issue-key" href="${esc(r.parent?.browseUrl || '#')}" target="_blank">${esc(r.parent?.key || '-')}</a>
+                    <div class="mini-title" style="margin-top:4px">${esc(r.parent?.summary || '')}</div>
+                  </div>
+                  <span class="badge ${forecastBadgeLabel(label)}">${label}</span>
+                </div>
+                <div class="hint">Progress ${number(r.progressPercent)}% · Sprint ${esc(inferParentSprint(r))} · Risk ${toArray(r.riskFlags).length} รายการ</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    function renderInsights(data, rows) {
+      const items = [];
+
+      toArray(data.insights?.blockedParents).slice(0, 3).forEach(x => {
+        items.push({
+          type: 'Blocked Parent',
+          detail: `${x.key} · blocked by ${toArray(x.blockedBy).join(', ') || '-'}`,
+          tone: 'b-red'
+        });
+      });
+
+      toArray(data.insights?.parentsWithoutTestCase).slice(0, 3).forEach(x => {
+        items.push({
+          type: 'Missing Test Case',
+          detail: `${x.key} · ${x.summary}`,
+          tone: 'b-amber'
+        });
+      });
+
+      toArray(data.insights?.staleChildren).slice(0, 4).forEach(x => {
+        items.push({
+          type: 'Stale Child',
+          detail: `${x.key} · ไม่อัปเดต ${x.updatedDaysAgo} วัน`,
+          tone: 'b-purple'
+        });
+      });
+
+      if (!items.length && rows.length) {
+        const fallback = rows.slice(0, 4).map(r => ({
+          type: 'Review Portfolio',
+          detail: `${r.parent?.key} · progress ${number(r.progressPercent)}%`,
+          tone: 'b-blue'
+        }));
+        items.push(...fallback);
+      }
+
+      document.getElementById('insightsList').innerHTML = items.length
+        ? items.map(x => `
+            <div class="mini-item">
+              <div class="mini-head">
+                <div class="mini-title">${esc(x.type)}</div>
+                <span class="badge ${x.tone}">${esc(x.type)}</span>
+              </div>
+              <div class="hint">${esc(x.detail)}</div>
             </div>
           `).join('')
         : `<div class="empty">ยังไม่พบ insight</div>`;
     }
 
-    function parentMatches(parentRow, query, squad, risk) {
-      const q = query.trim().toLowerCase();
-
-      const hay = [
-        parentRow.parent.key,
-        parentRow.parent.summary,
-        parentRow.parent.status,
-        parentRow.squad,
-        ...(parentRow.children || []).map(x => `${x.key} ${x.summary} ${x.assignee || ''}`),
-        ...(parentRow.linked || []).map(x => `${x.key} ${x.summary}`)
-      ].join(' ').toLowerCase();
-
-      if (q && !hay.includes(q)) return false;
-      if (squad && !(parentRow.squads || []).includes(squad) && parentRow.squad !== squad) return false;
-      if (risk && !(parentRow.riskFlags || []).includes(risk)) return false;
-
-      return true;
+    function renderVisibilityStats(rows) {
+      document.getElementById('resultCount').textContent = `${rows.length} parent items ที่ตรงตามเงื่อนไข`; 
+      const riskTotal = rows.filter(r => toArray(r.riskFlags).length > 0).length;
+      const avgProgress = Math.round(avg(rows.map(r => number(r.progressPercent))));
+      const squads = uniq(rows.flatMap(r => [r.squad, ...(r.squads || [])]).filter(Boolean));
+      document.getElementById('visibleRiskCount').textContent = `Risk Items: ${riskTotal}`;
+      document.getElementById('visibleProgressAvg').textContent = `Avg Progress: ${rows.length ? avgProgress : 0}%`;
+      document.getElementById('visibleSquadMix').textContent = `Squads: ${squads.length}`;
     }
 
     function renderPortfolio(rows) {
       const wrap = document.getElementById('portfolioWrap');
-      document.getElementById('resultCount').textContent = `${rows.length} parent items`;
+      renderVisibilityStats(rows);
 
       if (!rows.length) {
         wrap.innerHTML = `<div class="empty">ไม่พบข้อมูลตามเงื่อนไขที่เลือก</div>`;
         return;
       }
 
+      const body = rows.map(row => {
+        const parent = row.parent || {};
+        const parentHealth = healthBadge(healthOfParent(row));
+        const children = toArray(row.children);
+        const expanded = expandedParents.has(parent.key);
+        const parentSprint = inferParentSprint(row);
+        const parentAssignee = inferDominantAssignee(row);
+        const updatedDays = [parent.updatedDaysAgo, ...children.map(c => c.updatedDaysAgo)].filter(v => v !== null && v !== undefined);
+        const lastTouched = updatedDays.length ? Math.min(...updatedDays.map(number)) : 0;
+
+        return `
+          <tr class="parent-row">
+            <td style="width: 460px;">
+              <div class="issue-cell">
+                <button class="row-toggle" data-parent-key="${esc(parent.key)}" aria-label="toggle children">${expanded ? '−' : '+'}</button>
+                <div class="issue-main">
+                  <a class="issue-key" href="${esc(parent.browseUrl || '#')}" target="_blank">${esc(parent.key || '-')}</a>
+                  <div class="summary">${esc(parent.summary || '-')}</div>
+                  <div class="meta-line">
+                    <span class="badge ${badgeClass(parent.status)}">${esc(parent.status || '-')}</span>
+                    ${parent.issueType ? `<span class="badge b-slate">${esc(parent.issueType)}</span>` : ''}
+                    <span class="badge ${parentHealth.badge}"><span class="health-dot ${parentHealth.dot}"></span>${parentHealth.label}</span>
+                    <span class="badge ${forecastBadgeLabel(forecastOfParent(row))}">${forecastOfParent(row)}</span>
+                  </div>
+                  <div class="muted" style="margin-top:8px">อัปเดตล่าสุดในสายงานนี้เมื่อ ${daysAgoLabel(lastTouched)} ที่แล้ว</div>
+                </div>
+              </div>
+            </td>
+            <td>
+              <div class="owner-stack">
+                <div class="owner-row"><span class="label">Squad</span><span>${esc(row.squad || row.squads?.[0] || '-')}</span></div>
+                <div class="owner-row"><span class="label">Owner</span><span>${esc(parentAssignee || '-')}</span></div>
+                <div class="owner-row"><span class="label">Sprint</span><span>${esc(parentSprint || '-')}</span></div>
+              </div>
+            </td>
+            <td>
+              <div class="progress-block">
+                <div class="progress-head"><span>Child Completion</span><strong>${number(row.progressPercent)}%</strong></div>
+                <div class="progress"><div style="width:${number(row.progressPercent)}%"></div></div>
+                <div class="muted" style="margin-top:8px">Done child / total child</div>
+              </div>
+            </td>
+            <td>
+              <div class="counts-list">
+                <span class="badge b-slate">Children ${number(row.childrenCount)}</span>
+                <span class="badge b-slate">Linked ${number(row.linkedCount)}</span>
+                <span class="badge b-slate">Tests ${number(row.testCaseCount)}</span>
+                <span class="badge b-slate">Files ${number(row.attachmentCount)}</span>
+              </div>
+            </td>
+            <td>
+              <div class="risk-list">${formatRiskList(row)}</div>
+            </td>
+            <td>
+              <div class="muted">${esc(parent.status || '-')}</div>
+              <div class="summary" style="font-size:14px; margin-top:4px">${esc(parentSprint || '-')}</div>
+            </td>
+          </tr>
+          ${expanded ? `
+            <tr class="child-container">
+              <td colspan="6">
+                <div class="child-wrap">
+                  <div class="child-card">
+                    <div class="child-card-head">
+                      <div>
+                        <div class="panel-title" style="font-size:15px">Child Items under ${esc(parent.key || '-')}</div>
+                        <div class="panel-sub">รายละเอียด Child, owner, sprint, status และ test signal</div>
+                      </div>
+                      <div class="counts-list">
+                        <span class="badge b-slate">${number(row.childrenCount)} child</span>
+                        <span class="badge b-slate">${number(row.childSubtaskCount)} subtask</span>
+                        <span class="badge b-slate">${number(row.testCaseCount)} tests</span>
+                      </div>
+                    </div>
+                    ${children.length ? `
+                      <div style="overflow:auto;">
+                        <table class="child-table">
+                          <thead>
+                            <tr>
+                              <th>Child Issue</th>
+                              <th>Status</th>
+                              <th>Squad</th>
+                              <th>Assignee</th>
+                              <th>Sprint</th>
+                              <th>Updated</th>
+                              <th>Test Signal</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            ${children.map(child => `
+                              <tr class="child-row">
+                                <td>
+                                  <a class="issue-key" href="${esc(child.browseUrl || '#')}" target="_blank">${esc(child.key || '-')}</a>
+                                  <div class="summary" style="font-size:13px; margin-top:4px;">${esc(child.summary || '-')}</div>
+                                </td>
+                                <td><span class="badge ${badgeClass(child.status)}">${esc(child.status || '-')}</span></td>
+                                <td>${esc(child.squad || '-')}</td>
+                                <td>${esc(child.assignee || '-')}</td>
+                                <td>${esc(child.sprint || '-')}</td>
+                                <td>${daysAgoLabel(child.updatedDaysAgo)}</td>
+                                <td>${childTestCount(row, child) > 0 ? `<span class="badge b-green">Matched ${childTestCount(row, child)}</span>` : `<span class="badge b-amber">Unclear</span>`}</td>
+                              </tr>
+                            `).join('')}
+                          </tbody>
+                        </table>
+                      </div>
+                    ` : `<div class="empty">Parent นี้ยังไม่พบ Child FED ที่เชื่อมโยง</div>`}
+                  </div>
+                </div>
+              </td>
+            </tr>
+          ` : ''}
+        `;
+      }).join('');
+
       wrap.innerHTML = `
         <table>
           <thead>
             <tr>
-              <th style="min-width:340px">Parent</th>
-              <th>Owner Squad</th>
-              <th style="min-width:180px">Progress</th>
-              <th>Counts</th>
+              <th style="min-width:430px">Parent FEPMF</th>
+              <th style="min-width:180px">Ownership</th>
+              <th style="min-width:200px">Progress</th>
+              <th style="min-width:180px">Counts</th>
               <th style="min-width:220px">Risk</th>
+              <th style="min-width:160px">Status / Sprint</th>
             </tr>
           </thead>
-          <tbody>
-            ${rows.map(r => `
-              <tr>
-                <td>
-                  <div class="summary">
-                    <a class="key" href="${r.parent.browseUrl}" target="_blank">${esc(r.parent.key)}</a>
-                    &nbsp; ${esc(r.parent.summary)}
-                  </div>
-                  <div class="muted" style="margin-bottom:8px">
-                    <span class="badge ${badgeClass(r.parent.status)}">${esc(r.parent.status || '-')}</span>
-                    ${r.parent.issueType ? ` <span class="badge b-slate">${esc(r.parent.issueType)}</span>` : ''}
-                  </div>
-                  ${(r.children || []).slice(0, 4).map(c => `
-                    <div class="muted" style="margin-top:4px">
-                      ↳ <a class="key" href="${c.browseUrl}" target="_blank">${esc(c.key)}</a>
-                      ${esc(c.summary)} ${c.sprint ? `· Sprint ${esc(c.sprint)}` : ''}
-                    </div>
-                  `).join('')}
-                  ${r.childrenCount > 4 ? `<div class="muted" style="margin-top:4px">และอีก ${r.childrenCount - 4} child items</div>` : ''}
-                </td>
-                <td>
-                  <div class="summary">${esc(r.squad || '-')}</div>
-                  <div class="muted">${(r.squads || []).join(', ') || '-'}</div>
-                </td>
-                <td>
-                  <div class="progress"><div style="width:${r.progressPercent || 0}%"></div></div>
-                  <div class="muted">${r.progressPercent || 0}% done from child completion</div>
-                </td>
-                <td>
-                  <div class="muted">Children: ${r.childrenCount}</div>
-                  <div class="muted">Linked: ${r.linkedCount}</div>
-                  <div class="muted">Tests: ${r.testCaseCount}</div>
-                  <div class="muted">Attachments: ${r.attachmentCount}</div>
-                </td>
-                <td>
-                  <div class="risk-list">
-                    ${(r.riskFlags || []).length
-                      ? r.riskFlags.map(riskBadge).join('')
-                      : `<span class="badge b-green">Healthy</span>`}
-                  </div>
-                </td>
-              </tr>
-            `).join('')}
-          </tbody>
+          <tbody>${body}</tbody>
         </table>
       `;
+
+      wrap.querySelectorAll('.row-toggle').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const key = btn.getAttribute('data-parent-key');
+          if (!key) return;
+          if (expandedParents.has(key)) expandedParents.delete(key);
+          else expandedParents.add(key);
+          renderPortfolio(filteredParents);
+        });
+      });
+    }
+
+    function currentFilters() {
+      return {
+        search: document.getElementById('searchInput').value || '',
+        parentStatuses: selectedValues('parentStatusFilter'),
+        childStatuses: selectedValues('childStatusFilter'),
+        squads: selectedValues('squadFilter'),
+        sprints: selectedValues('sprintFilter'),
+        assignees: selectedValues('assigneeFilter'),
+        risks: selectedValues('riskFilter'),
+        health: document.getElementById('healthFilter').value || '',
+        sortBy: document.getElementById('sortFilter').value || 'risk_desc'
+      };
     }
 
     function applyFilters() {
       if (!dashboardData) return;
-
-      const query = document.getElementById('searchInput').value || '';
-      const squad = document.getElementById('squadFilter').value || '';
-      const risk = document.getElementById('riskFilter').value || '';
-
-      filteredParents = (dashboardData.parents || []).filter(x =>
-        parentMatches(x, query, squad, risk)
+      const filters = currentFilters();
+      buildActiveFilterChips(filters);
+      filteredParents = sortRows(
+        toArray(dashboardData.parents).filter(row => parentMatches(row, filters)),
+        filters.sortBy
       );
-
       renderPortfolio(filteredParents);
+      renderHeatmap(filteredParents);
+      renderForecast(filteredParents);
+      renderInsights(dashboardData, filteredParents);
+    }
+
+    function clearFilters() {
+      document.getElementById('searchInput').value = '';
+      ['parentStatusFilter','childStatusFilter','squadFilter','sprintFilter','assigneeFilter','riskFilter'].forEach(id => {
+        Array.from(document.getElementById(id).options).forEach(opt => opt.selected = false);
+      });
+      document.getElementById('healthFilter').value = '';
+      document.getElementById('sortFilter').value = 'risk_desc';
+      applyFilters();
     }
 
     async function loadDashboard() {
       const wrap = document.getElementById('portfolioWrap');
       wrap.innerHTML = `<div class="loading">กำลังโหลดข้อมูลจาก Jira...</div>`;
+      document.getElementById('heroSummary').innerHTML = `<div class="loading">กำลังคำนวณภาพรวม...</div>`;
+      document.getElementById('heroAside').innerHTML = `<div class="loading">กำลังวิเคราะห์...</div>`;
 
       try {
         const data = await fetchDashboard();
         dashboardData = data;
-        filteredParents = data.parents || [];
-
+        buildFilterOptions(data);
+        renderHero(data);
         renderSummary(data.summary || {});
-        renderSquadSummary(data.squadSummary || []);
-        renderInsights(data);
-        renderPortfolio(filteredParents);
-
+        renderWorkload(data.squadSummary || []);
         const ts = new Date(data.generatedAt || Date.now());
-        document.getElementById('syncTime').textContent =
-          `อัปเดตล่าสุด: ${ts.toLocaleString('th-TH')}`;
+        document.getElementById('syncTime').textContent = `อัปเดตล่าสุด: ${ts.toLocaleString('th-TH')}`;
+        applyFilters();
       } catch (err) {
-        wrap.innerHTML = `<div class="empty" style="color:#b91c1c">โหลดข้อมูลไม่สำเร็จ: ${esc(err.message)}</div>`;
+        const msg = esc(err.message || 'Unknown error');
+        wrap.innerHTML = `<div class="error">โหลดข้อมูลไม่สำเร็จ: ${msg}</div>`;
+        document.getElementById('heroSummary').innerHTML = `<div class="error">ไม่สามารถโหลด executive snapshot ได้</div>`;
+        document.getElementById('heroAside').innerHTML = `<div class="error">ไม่สามารถวิเคราะห์ข้อมูลได้</div>`;
         document.getElementById('syncTime').textContent = 'โหลดข้อมูลไม่สำเร็จ';
       }
     }
 
+    function expandAll() {
+      if (!dashboardData) return;
+      const shouldExpandAll = expandedParents.size !== toArray(filteredParents).length;
+      expandedParents.clear();
+      if (shouldExpandAll) {
+        toArray(filteredParents).forEach(r => {
+          if (r?.parent?.key) expandedParents.add(r.parent.key);
+        });
+      }
+      document.getElementById('expandAllBtn').textContent = shouldExpandAll ? 'Collapse All' : 'Expand All';
+      renderPortfolio(filteredParents);
+    }
+
+    function bindEvents() {
+      document.getElementById('refreshBtn').addEventListener('click', loadDashboard);
+      document.getElementById('clearFiltersBtn').addEventListener('click', clearFilters);
+      document.getElementById('expandAllBtn').addEventListener('click', expandAll);
+      ['searchInput','parentStatusFilter','childStatusFilter','squadFilter','sprintFilter','assigneeFilter','riskFilter','healthFilter','sortFilter']
+        .forEach(id => {
+          const el = document.getElementById(id);
+          const eventName = id === 'searchInput' ? 'input' : 'change';
+          el.addEventListener(eventName, () => {
+            document.getElementById('expandAllBtn').textContent = 'Expand All';
+            applyFilters();
+          });
+        });
+    }
+
+    bindEvents();
     loadDashboard();
   </script>
 </body>
