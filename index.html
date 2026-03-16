@@ -6,31 +6,13 @@
   <title>FEPMF Portfolio Dashboard</title>
   <style>
     :root {
-      --bg: #f4f5f7;
-      --surface: #fff;
-      --surface-subtle: #fafbfc;
-      --text: #172b4d;
-      --muted: #6b778c;
-      --line: #dfe1e6;
-      --line-strong: #c1c7d0;
-      --blue: #0052cc;
-      --blue-soft: #deebff;
-      --green: #006644;
-      --green-soft: #e3fcef;
-      --amber: #974f0c;
-      --amber-soft: #fff0b3;
-      --red: #ae2a19;
-      --red-soft: #ffebe6;
-      --purple: #5243aa;
-      --purple-soft: #eae6ff;
-      --shadow: 0 1px 2px rgba(9,30,66,.08), 0 6px 24px rgba(9,30,66,.08);
-      --radius: 12px;
+      --bg: #f4f5f7; --surface: #fff; --surface-subtle: #fafbfc; --text: #172b4d; --muted: #6b778c; --line: #dfe1e6; --blue: #0052cc; --blue-soft: #deebff; --green: #006644; --green-soft: #e3fcef; --amber: #974f0c; --amber-soft: #fff0b3; --red: #ae2a19; --red-soft: #ffebe6; --purple: #5243aa; --purple-soft: #eae6ff; --shadow: 0 1px 2px rgba(9,30,66,.08), 0 6px 24px rgba(9,30,66,.08); --radius: 12px;
     }
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: Inter, Arial, Helvetica, sans-serif; color: var(--text); background: var(--bg); }
-    a { color: var(--blue); text-decoration: none; }
-    button, input, select { font: inherit; }
-    .page { max-width: 1640px; margin: 0 auto; padding: 20px; }
+    body { margin:0; font-family: Inter, Arial, Helvetica, sans-serif; color:var(--text); background:var(--bg); }
+    a { color:var(--blue); text-decoration:none; }
+    button,input { font:inherit; }
+    .page { max-width:1640px; margin:0 auto; padding:20px; }
     .topbar { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; margin-bottom:16px; }
     .title { margin:0; font-size:28px; font-weight:700; letter-spacing:-.02em; }
     .subtitle { margin-top:6px; color:var(--muted); font-size:14px; }
@@ -44,9 +26,10 @@
     .kpi .label { color:var(--muted); font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
     .kpi .value { margin-top:10px; font-size:30px; font-weight:700; }
     .kpi .sub { margin-top:4px; color:var(--muted); font-size:12px; }
-    .filter-card { padding:14px; margin-bottom:16px; }
-    .filter-row { display:grid; grid-template-columns:1.5fr repeat(6,minmax(0,1fr)); gap:10px; }
-    .input, .select { width:100%; padding:10px 12px; border:1px solid var(--line); background:#fff; border-radius:10px; color:var(--text); }
+    .filter-card { padding:14px; margin-bottom:16px; position:relative; }
+    .filter-row { display:grid; grid-template-columns:1.4fr repeat(6,minmax(0,1fr)); gap:10px; align-items:start; }
+    .input, .multi-trigger { width:100%; padding:10px 12px; border:1px solid var(--line); background:#fff; border-radius:10px; color:var(--text); min-height:42px; }
+    .input:focus, .multi-trigger:focus, .multi-search input:focus { outline:2px solid #4c9aff55; border-color:#4c9aff; }
     .chips { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
     .chip { background:#ebecf0; color:#253858; border-radius:999px; padding:6px 10px; font-size:12px; display:inline-flex; gap:8px; align-items:center; }
     .chip button { border:none; background:transparent; cursor:pointer; color:inherit; padding:0; }
@@ -59,26 +42,20 @@
     thead th { position:sticky; top:0; z-index:5; background:#f7f8fa; color:#44546f; font-size:12px; text-transform:uppercase; letter-spacing:.04em; padding:12px 14px; border-bottom:1px solid var(--line); text-align:left; white-space:nowrap; }
     tbody td { background:#fff; padding:12px 14px; border-bottom:1px solid #ebecf0; vertical-align:top; }
     tbody tr:hover td { background:#fcfcfd; }
-    .parent-row td { font-size:14px; }
     .caret { width:28px; height:28px; border:1px solid var(--line); background:#fff; border-radius:8px; cursor:pointer; }
     .stack { display:grid; gap:6px; }
     .keyline { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
     .key { font-weight:700; }
     .muted { color:var(--muted); font-size:12px; }
     .badge { display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:4px 8px; font-size:12px; font-weight:600; white-space:nowrap; }
-    .b-blue { color:var(--blue); background:var(--blue-soft); }
-    .b-green { color:var(--green); background:var(--green-soft); }
-    .b-amber { color:var(--amber); background:var(--amber-soft); }
-    .b-red { color:var(--red); background:var(--red-soft); }
-    .b-purple { color:var(--purple); background:var(--purple-soft); }
-    .b-slate { color:#42526e; background:#ebecf0; }
+    .b-blue { color:var(--blue); background:var(--blue-soft); } .b-green { color:var(--green); background:var(--green-soft); } .b-amber { color:var(--amber); background:var(--amber-soft); } .b-red { color:var(--red); background:var(--red-soft); } .b-purple { color:var(--purple); background:var(--purple-soft); } .b-slate { color:#42526e; background:#ebecf0; }
     .progress { height:10px; border-radius:999px; overflow:hidden; background:#ebecf0; }
     .progress > div { height:100%; background:linear-gradient(90deg,#4c9aff,#0052cc); }
     .progress-meta { margin-top:6px; font-size:12px; color:var(--muted); display:flex; justify-content:space-between; gap:8px; }
     .risk-list { display:flex; flex-wrap:wrap; gap:6px; }
     .detail-row td { padding:0; background:#f7f8fa; }
     .detail { padding:16px 18px 18px; border-top:1px solid var(--line); }
-    .detail-grid { display:grid; grid-template-columns:1.3fr .7fr; gap:16px; }
+    .detail-grid { display:grid; grid-template-columns:1.4fr .6fr; gap:16px; }
     .detail-block { background:#fff; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
     .detail-title { padding:12px 14px; font-size:13px; font-weight:700; border-bottom:1px solid var(--line); background:#fafbfc; }
     .mini-table { width:100%; min-width:0; }
@@ -87,8 +64,6 @@
     .mini-empty { padding:16px; color:var(--muted); font-size:12px; }
     .side { display:grid; gap:16px; }
     .panel-body { padding:14px 16px 16px; }
-    .list { display:grid; gap:10px; }
-    .list-item { border:1px solid var(--line); border-radius:10px; padding:10px 12px; background:#fff; }
     .bar-row { display:grid; grid-template-columns:100px 1fr 42px; gap:8px; align-items:center; font-size:12px; }
     .heatmap { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
     .heat-cell { border:1px solid var(--line); border-radius:10px; padding:10px; background:#fff; min-height:76px; }
@@ -96,8 +71,23 @@
     .calendar-row { display:flex; justify-content:space-between; gap:10px; padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:#fff; }
     .pill { font-size:11px; color:#44546f; background:#ebecf0; border-radius:999px; padding:3px 8px; }
     .loading, .empty { padding:48px 20px; text-align:center; color:var(--muted); }
-    @media (max-width: 1280px) { .layout { grid-template-columns:1fr; } .grid-kpi { grid-template-columns:repeat(3,minmax(0,1fr)); } .filter-row { grid-template-columns:1fr 1fr 1fr; } }
-    @media (max-width: 800px) { .page { padding:12px; } .topbar { flex-direction:column; } .grid-kpi { grid-template-columns:repeat(2,minmax(0,1fr)); } .filter-row { grid-template-columns:1fr; } .detail-grid { grid-template-columns:1fr; } }
+    .multi { position:relative; }
+    .multi-trigger { display:flex; align-items:center; justify-content:space-between; gap:10px; cursor:pointer; text-align:left; }
+    .multi-trigger .value { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#091e42; }
+    .multi.open .multi-trigger { border-color:#4c9aff; box-shadow:0 0 0 2px #4c9aff22; }
+    .multi-panel { position:absolute; inset:auto 0 auto 0; top:46px; background:#fff; border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); z-index:20; display:none; }
+    .multi.open .multi-panel { display:block; }
+    .multi-search { padding:10px; border-bottom:1px solid var(--line); }
+    .multi-search input { width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:8px; }
+    .multi-options { max-height:280px; overflow:auto; padding:6px; }
+    .multi-option { display:flex; gap:10px; align-items:flex-start; padding:8px 10px; border-radius:8px; cursor:pointer; }
+    .multi-option:hover { background:#f7f8fa; }
+    .multi-option input { margin-top:2px; }
+    .multi-actions { display:flex; justify-content:space-between; padding:8px 10px; border-top:1px solid var(--line); background:#fafbfc; }
+    .link-list { display:grid; gap:8px; }
+    .link-item { border:1px solid var(--line); border-radius:10px; padding:10px 12px; }
+    @media (max-width:1280px){ .layout{grid-template-columns:1fr;} .grid-kpi{grid-template-columns:repeat(3,minmax(0,1fr));} .filter-row{grid-template-columns:1fr 1fr 1fr;} }
+    @media (max-width:800px){ .page{padding:12px;} .topbar{flex-direction:column;} .grid-kpi{grid-template-columns:repeat(2,minmax(0,1fr));} .filter-row{grid-template-columns:1fr;} .detail-grid{grid-template-columns:1fr;} }
   </style>
 </head>
 <body>
@@ -119,415 +109,81 @@
     <div class="card filter-card">
       <div class="filter-row">
         <input id="searchInput" class="input" placeholder="ค้นหา FEPMF / FED / Test Case / Summary" />
-        <select id="parentStatusFilter" class="select"><option value="">Parent Status ทั้งหมด</option></select>
-        <select id="childStatusFilter" class="select"><option value="">Child Status ทั้งหมด</option></select>
-        <select id="squadFilter" class="select"><option value="">ทุก Squad</option></select>
-        <select id="sprintFilter" class="select"><option value="">ทุก Sprint</option></select>
-        <select id="assigneeFilter" class="select"><option value="">ทุก Assignee</option></select>
-        <select id="riskFilter" class="select"><option value="">ทุกความเสี่ยง</option></select>
+        <div id="parentStatusFilter" class="multi"></div>
+        <div id="childStatusFilter" class="multi"></div>
+        <div id="squadFilter" class="multi"></div>
+        <div id="sprintFilter" class="multi"></div>
+        <div id="assigneeFilter" class="multi"></div>
+        <div id="riskFilter" class="multi"></div>
       </div>
       <div class="chips" id="activeChips"></div>
     </div>
 
     <div class="layout">
       <div class="card">
-        <div class="section-head">
-          <div>
-            <div class="section-title">Portfolio Overview</div>
-            <div class="section-sub" id="resultCount">-</div>
-          </div>
-        </div>
+        <div class="section-head"><div><div class="section-title">Portfolio Overview</div><div class="section-sub" id="resultCount">-</div></div></div>
         <div class="table-wrap" id="portfolioWrap"><div class="loading">กำลังโหลดข้อมูลจาก Jira...</div></div>
       </div>
-
       <div class="side">
-        <div class="card">
-          <div class="section-head"><div><div class="section-title">Squad Workload</div><div class="section-sub">แสดงเฉพาะ Squad ที่มีงาน</div></div></div>
-          <div class="panel-body" id="squadPanel"></div>
-        </div>
-        <div class="card">
-          <div class="section-head"><div><div class="section-title">Risk Heatmap</div><div class="section-sub">ดูความเสี่ยงต่อ Squad แบบกวาดตาเดียว</div></div></div>
-          <div class="panel-body" id="riskHeatmap"></div>
-        </div>
-        <div class="card">
-          <div class="section-head"><div><div class="section-title">Sprint Calendar</div><div class="section-sub">15 mandays ไม่รวมเสาร์อาทิตย์ ตามช่วงที่กำหนด</div></div></div>
-          <div class="panel-body" id="sprintCalendar"></div>
-        </div>
+        <div class="card"><div class="section-head"><div><div class="section-title">Squad Workload</div><div class="section-sub">แสดงเฉพาะ Squad ที่มีงาน</div></div></div><div class="panel-body" id="squadSummary"></div></div>
+        <div class="card"><div class="section-head"><div><div class="section-title">Risk Heatmap</div><div class="section-sub">ดูความเสี่ยงต่อ Squad แบบภาพเดียว</div></div></div><div class="panel-body" id="riskHeatmap"></div></div>
+        <div class="card"><div class="section-head"><div><div class="section-title">Sprint Calendar</div><div class="section-sub">15 mandays ไม่รวมเสาร์อาทิตย์ ตามช่วงที่กำหนด</div></div></div><div class="panel-body" id="sprintCalendar"></div></div>
       </div>
     </div>
   </div>
+<script>
+const expanded = new Set();
+let dashboardData = null;
+let filteredParents = [];
+const filterConfig = {
+  parentStatus: { el: 'parentStatusFilter', label: 'Parent Status', placeholder: 'Parent Status ทั้งหมด' },
+  childStatus: { el: 'childStatusFilter', label: 'Child Status', placeholder: 'Child Status ทั้งหมด' },
+  squad: { el: 'squadFilter', label: 'Squad', placeholder: 'ทุก Squad' },
+  sprint: { el: 'sprintFilter', label: 'Sprint', placeholder: 'ทุก Sprint' },
+  assignee: { el: 'assigneeFilter', label: 'Assignee', placeholder: 'ทุก Assignee' },
+  risk: { el: 'riskFilter', label: 'Risk', placeholder: 'ทุกความเสี่ยง' }
+};
+const filterState = { q: '', parentStatus: [], childStatus: [], squad: [], sprint: [], assignee: [], risk: [] };
+const filterOptions = { parentStatus: [], childStatus: [], squad: [], sprint: [], assignee: [], risk: [] };
+const filterSearch = { parentStatus: '', childStatus: '', squad: '', sprint: '', assignee: '', risk: '' };
 
-  <script>
-    let dashboardData = null;
-    let filteredParents = [];
-    const expanded = new Set();
-
-    function esc(v) {
-      return String(v ?? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-    }
-
-    function badgeClass(status) {
-      const s = String(status || '').toLowerCase();
-      if (s.includes('done') || s.includes('closed') || s.includes('complete') || s.includes('deploy')) return 'b-green';
-      if (s.includes('uat') || s.includes('test') || s.includes('sit')) return 'b-purple';
-      if (s.includes('progress') || s.includes('develop') || s.includes('implement')) return 'b-blue';
-      if (s.includes('block')) return 'b-red';
-      if (s.includes('plan') || s.includes('open') || s.includes('backlog')) return 'b-amber';
-      return 'b-slate';
-    }
-
-    function riskBadge(flag) {
-      const map = {
-        blocked: ['Blocked', 'b-red'],
-        no_test_case: ['No Test Case', 'b-amber'],
-        stale_child: ['Stale Child', 'b-purple'],
-        no_child: ['No Child', 'b-slate']
-      };
-      const item = map[flag] || [flag, 'b-slate'];
-      return `<span class="badge ${item[1]}">${item[0]}</span>`;
-    }
-
-    function healthBadge(v) {
-      if (v === 'Healthy') return '<span class="badge b-green">Healthy</span>';
-      if (v === 'Watch') return '<span class="badge b-amber">Watch</span>';
-      return '<span class="badge b-red">Critical</span>';
-    }
-
-    async function fetchDashboard() {
-      const r = await fetch('/api/dashboard');
-      const d = await r.json();
-      if (d.error) throw new Error(d.error);
-      return d;
-    }
-
-    function renderSummary(summary) {
-      const cards = [
-        ['Total Parents', summary.totalParents, 'FEPMF ทั้งหมด'],
-        ['Children', summary.totalChildren, 'Child work items ทั้งหมด'],
-        ['Test Cases', summary.totalTestCases, 'Test case ที่ลิงก์เจอ'],
-        ['Blocked', summary.parentsBlocked, 'Parent ที่ติด blocker'],
-        ['No Test', summary.parentsNoTest, 'Parent ที่ยังไม่พบ test case'],
-        ['Avg Progress', `${summary.avgProgress || 0}%`, 'เฉลี่ยทั้ง portfolio']
-      ];
-      document.getElementById('summaryCards').innerHTML = cards.map(c => `
-        <div class="card kpi">
-          <div class="label">${c[0]}</div>
-          <div class="value">${esc(c[1])}</div>
-          <div class="sub">${c[2]}</div>
-        </div>
-      `).join('');
-    }
-
-    function populateFilters(meta) {
-      const appendOptions = (id, items, labelFn) => {
-        const el = document.getElementById(id);
-        const current = el.value;
-        const first = el.querySelector('option').outerHTML;
-        el.innerHTML = first + (items || []).filter(Boolean).map(v => `<option value="${esc(v)}">${esc(labelFn ? labelFn(v) : v)}</option>`).join('');
-        el.value = current;
-      };
-      appendOptions('parentStatusFilter', meta?.available?.parentStatuses || []);
-      appendOptions('childStatusFilter', meta?.available?.childStatuses || []);
-      appendOptions('squadFilter', meta?.available?.squads || []);
-      appendOptions('sprintFilter', meta?.available?.sprints || [], v => v);
-      appendOptions('assigneeFilter', meta?.available?.assignees || []);
-      appendOptions('riskFilter', meta?.available?.risks || []);
-    }
-
-    function getActiveFilters() {
-      return {
-        q: document.getElementById('searchInput').value.trim().toLowerCase(),
-        parentStatus: document.getElementById('parentStatusFilter').value,
-        childStatus: document.getElementById('childStatusFilter').value,
-        squad: document.getElementById('squadFilter').value,
-        sprint: document.getElementById('sprintFilter').value,
-        assignee: document.getElementById('assigneeFilter').value,
-        risk: document.getElementById('riskFilter').value
-      };
-    }
-
-    function renderActiveChips() {
-      const filters = getActiveFilters();
-      const map = [
-        ['q', 'Search'], ['parentStatus', 'Parent'], ['childStatus', 'Child'], ['squad', 'Squad'], ['sprint', 'Sprint'], ['assignee', 'Assignee'], ['risk', 'Risk']
-      ];
-      const chips = map.filter(([k]) => filters[k]).map(([k, l]) => `
-        <span class="chip">${l}: ${esc(filters[k])} <button onclick="clearOne('${k}')">✕</button></span>
-      `).join('');
-      document.getElementById('activeChips').innerHTML = chips;
-    }
-
-    function clearOne(key) {
-      const idMap = {
-        q: 'searchInput', parentStatus: 'parentStatusFilter', childStatus: 'childStatusFilter', squad: 'squadFilter', sprint: 'sprintFilter', assignee: 'assigneeFilter', risk: 'riskFilter'
-      };
-      document.getElementById(idMap[key]).value = '';
-      applyFilters();
-    }
-
-    function textBlob(row) {
-      return [
-        row.parent.key, row.parent.summary, row.parent.status, row.parent.squad, row.parent.assignee, row.parent.sprint, row.dueDate,
-        ...(row.children || []).flatMap(c => [c.key, c.summary, c.status, c.squad, c.assignee, c.sprint]),
-        ...(row.testCases || []).flatMap(t => [t.key, t.summary, t.status])
-      ].join(' ').toLowerCase();
-    }
-
-    function rowMatches(row, filters) {
-      if (filters.q && !textBlob(row).includes(filters.q)) return false;
-      if (filters.parentStatus && row.parent.status !== filters.parentStatus) return false;
-      if (filters.childStatus && !(row.children || []).some(c => c.status === filters.childStatus)) return false;
-      if (filters.squad && !(row.parent.squad === filters.squad || (row.children || []).some(c => c.squad === filters.squad))) return false;
-      if (filters.sprint && !(row.parent.sprint === filters.sprint || (row.children || []).some(c => c.sprint === filters.sprint))) return false;
-      if (filters.assignee && !(row.parent.assignee === filters.assignee || (row.children || []).some(c => c.assignee === filters.assignee))) return false;
-      if (filters.risk && !(row.riskFlags || []).includes(filters.risk)) return false;
-      return true;
-    }
-
-    function formatDate(v) {
-      if (!v) return '-';
-      const iso = /^\d{4}-\d{2}-\d{2}$/.test(v) ? `${v}T00:00:00Z` : v;
-      const d = new Date(iso);
-      if (Number.isNaN(d.getTime())) return v;
-      return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(d);
-    }
-
-    function progressMeta(row) {
-      return row.progressSource === 'jira_field' ? 'Progress from Jira' : 'Calculated from child completion';
-    }
-
-    function renderPortfolio(rows) {
-      const wrap = document.getElementById('portfolioWrap');
-      document.getElementById('resultCount').textContent = `${rows.length} FEPMF items`; 
-      if (!rows.length) {
-        wrap.innerHTML = '<div class="empty">ไม่พบข้อมูลตามเงื่อนไขที่เลือก</div>';
-        return;
-      }
-
-      wrap.innerHTML = `
-        <table>
-          <thead>
-            <tr>
-              <th style="width:48px"></th>
-              <th style="min-width:360px">Parent</th>
-              <th style="min-width:220px">Progress</th>
-              <th>Squad</th>
-              <th>Assignee</th>
-              <th>Sprint</th>
-              <th>Due Date</th>
-              <th>Children</th>
-              <th>Tests</th>
-              <th style="min-width:220px">Risk</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rows.map(r => {
-              const open = expanded.has(r.parent.key);
-              return `
-                <tr class="parent-row">
-                  <td><button class="caret" onclick="toggleRow('${r.parent.key}')">${open ? '–' : '+'}</button></td>
-                  <td>
-                    <div class="stack">
-                      <div class="keyline"><a class="key" href="${esc(r.parent.browseUrl)}" target="_blank">${esc(r.parent.key)}</a> ${healthBadge(r.health)}</div>
-                      <div>${esc(r.parent.summary)}</div>
-                      <div class="keyline">
-                        <span class="badge ${badgeClass(r.parent.status)}">${esc(r.parent.status || '-')}</span>
-                        ${r.parent.issueType ? `<span class="badge b-slate">${esc(r.parent.issueType)}</span>` : ''}
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <div class="progress"><div style="width:${r.progressPercent || 0}%"></div></div>
-                    <div class="progress-meta"><span>${r.progressPercent || 0}%</span><span>${esc(progressMeta(r))}</span></div>
-                  </td>
-                  <td>${r.parent.squad ? `<span class="badge b-blue">${esc(r.parent.squad)}</span>` : '<span class="muted">-</span>'}</td>
-                  <td>${r.parent.assignee ? esc(r.parent.assignee) : '<span class="muted">-</span>'}</td>
-                  <td>${r.parent.sprint ? `<div class="stack"><div>${esc(r.parent.sprint)}</div><div class="muted">${esc(r.sprintCalendar ? r.sprintCalendar.rangeText : '')}</div></div>` : '<span class="muted">-</span>'}</td>
-                  <td>${r.dueDate ? `<div class="stack"><div>${esc(formatDate(r.dueDate))}</div><div class="muted">Agreed milestone</div></div>` : '<span class="muted">-</span>'}</td>
-                  <td>${r.childrenCount}</td>
-                  <td>${r.testCaseCount}</td>
-                  <td><div class="risk-list">${(r.riskFlags || []).length ? r.riskFlags.map(riskBadge).join('') : '<span class="badge b-green">Healthy</span>'}</div></td>
-                </tr>
-                ${open ? `<tr class="detail-row"><td colspan="10">${renderDetail(r)}</td></tr>` : ''}
-              `;
-            }).join('')}
-          </tbody>
-        </table>
-      `;
-    }
-
-    function renderDetail(r) {
-      const childRows = (r.children || []).map(c => `
-        <tr>
-          <td><a href="${esc(c.browseUrl)}" target="_blank">${esc(c.key)}</a></td>
-          <td>${esc(c.summary || '')}</td>
-          <td><span class="badge ${badgeClass(c.status)}">${esc(c.status || '-')}</span></td>
-          <td>${c.squad ? `<span class="badge b-blue">${esc(c.squad)}</span>` : '-'}</td>
-          <td>${esc(c.assignee || '-')}</td>
-          <td>${esc(c.sprint || '-')}</td>
-          <td>${c.updatedDaysAgo == null ? '-' : `${esc(c.updatedDaysAgo)}d`}</td>
-        </tr>
-      `).join('');
-
-      const testRows = (r.testCases || []).map(t => `
-        <tr>
-          <td><a href="${esc(t.browseUrl)}" target="_blank">${esc(t.key)}</a></td>
-          <td>${esc(t.summary || '')}</td>
-          <td><span class="badge b-purple">Test Case</span></td>
-          <td>${esc(t.status || '-')}</td>
-        </tr>
-      `).join('');
-
-      return `
-        <div class="detail">
-          <div class="detail-grid">
-            <div class="detail-block">
-              <div class="detail-title">Child Work Items (${r.childrenCount})</div>
-              ${r.childrenCount ? `
-                <table class="mini-table">
-                  <thead><tr><th style="width:100px">Key</th><th>Summary</th><th style="width:130px">Status</th><th style="width:110px">Squad</th><th style="width:150px">Assignee</th><th style="width:110px">Sprint</th><th style="width:90px">Updated</th></tr></thead>
-                  <tbody>${childRows}</tbody>
-                </table>
-              ` : '<div class="mini-empty">ไม่พบ child work items</div>'}
-            </div>
-            <div class="detail-block">
-              <div class="detail-title">Linked Test Cases (${r.testCaseCount})</div>
-              ${r.testCaseCount ? `
-                <table class="mini-table">
-                  <thead><tr><th style="width:100px">Key</th><th>Summary</th><th style="width:100px">Type</th><th style="width:120px">Status</th></tr></thead>
-                  <tbody>${testRows}</tbody>
-                </table>
-              ` : '<div class="mini-empty">ไม่พบ test case ที่ลิงก์อยู่</div>'}
-            </div>
-          </div>
-        </div>
-      `;
-    }
-
-    function renderSquadSummary(items) {
-      const el = document.getElementById('squadPanel');
-      if (!(items || []).length) {
-        el.innerHTML = '<div class="empty">ไม่พบข้อมูล squad</div>';
-        return;
-      }
-      const max = Math.max(...items.map(x => x.total), 1);
-      el.innerHTML = `
-        <div class="list">
-          ${items.map(x => `
-            <div class="list-item">
-              <div class="bar-row"><strong>${esc(x.squad)}</strong><div class="progress"><div style="width:${Math.round((x.total / max) * 100)}%"></div></div><strong>${x.total}</strong></div>
-              <div class="muted" style="margin-top:8px">Open ${x.open} · In Progress ${x.inProgress} · Test ${x.test} · UAT ${x.uat} · Done ${x.done} · Blocked ${x.blocked}</div>
-            </div>
-          `).join('')}
-        </div>
-      `;
-    }
-
-    function renderRiskHeatmap(rows) {
-      const squads = [...new Set(rows.map(r => r.parent.squad).filter(Boolean))];
-      const el = document.getElementById('riskHeatmap');
-      if (!squads.length) {
-        el.innerHTML = '<div class="empty">ไม่พบข้อมูล risk heatmap</div>';
-        return;
-      }
-      const risks = ['blocked', 'stale_child', 'no_test_case'];
-      el.innerHTML = `
-        <div class="heatmap">
-          ${squads.flatMap(s => risks.map(risk => {
-            const count = rows.filter(x => x.parent.squad === s && (x.riskFlags || []).includes(risk)).length;
-            const cls = risk === 'blocked' ? 'b-red' : risk === 'stale_child' ? 'b-purple' : 'b-amber';
-            return `<div class="heat-cell"><div class="muted">${esc(s)}</div><div style="margin:6px 0 8px">${riskBadge(risk)}</div><div class="badge ${cls}">${count}</div></div>`;
-          })).join('')}
-        </div>
-      `;
-    }
-
-    function renderSprintCalendar(items) {
-      const el = document.getElementById('sprintCalendar');
-      el.innerHTML = `
-        <div class="calendar-list">
-          ${(items || []).map(x => `
-            <div class="calendar-row">
-              <div>
-                <div><strong>${esc(x.name)}</strong></div>
-                <div class="muted">${esc(formatDate(x.start))} - ${esc(formatDate(x.end))}</div>
-              </div>
-              <div class="pill">${x.mandays} mandays</div>
-            </div>
-          `).join('')}
-        </div>
-      `;
-    }
-
-    function applyFilters() {
-      if (!dashboardData) return;
-      const filters = getActiveFilters();
-      filteredParents = (dashboardData.parents || []).filter(row => rowMatches(row, filters));
-      renderActiveChips();
-      renderPortfolio(filteredParents);
-      renderSquadSummary(buildSquadSummaryFromFiltered(filteredParents));
-      renderRiskHeatmap(filteredParents);
-    }
-
-    function buildSquadSummaryFromFiltered(rows) {
-      const map = new Map();
-      rows.flatMap(r => r.children || []).forEach(c => {
-        if (!c.squad) return;
-        if (!map.has(c.squad)) map.set(c.squad, { squad: c.squad, total: 0, open: 0, inProgress: 0, test: 0, uat: 0, done: 0, blocked: 0 });
-        const s = map.get(c.squad);
-        s.total += 1;
-        if (c.statusGroup === 'open') s.open += 1;
-        if (c.statusGroup === 'in_progress') s.inProgress += 1;
-        if (c.statusGroup === 'test') s.test += 1;
-        if (c.statusGroup === 'uat') s.uat += 1;
-        if (c.statusGroup === 'done') s.done += 1;
-        if (c.statusGroup === 'blocked') s.blocked += 1;
-      });
-      return [...map.values()].sort((a,b) => b.total - a.total);
-    }
-
-    function toggleRow(key) {
-      if (expanded.has(key)) expanded.delete(key); else expanded.add(key);
-      renderPortfolio(filteredParents);
-    }
-
-    async function loadDashboard() {
-      try {
-        document.getElementById('portfolioWrap').innerHTML = '<div class="loading">กำลังโหลดข้อมูลจาก Jira...</div>';
-        const data = await fetchDashboard();
-        dashboardData = data;
-        populateFilters(data.meta || {});
-        renderSummary(data.summary || {});
-        renderSprintCalendar(data.sprintCalendar || []);
-        filteredParents = data.parents || [];
-        renderSquadSummary(data.squadSummary || []);
-        renderRiskHeatmap(filteredParents);
-        renderPortfolio(filteredParents);
-        document.getElementById('syncTime').textContent = `Updated ${new Date(data.generatedAt || Date.now()).toLocaleString('th-TH')}`;
-        renderActiveChips();
-      } catch (e) {
-        document.getElementById('portfolioWrap').innerHTML = `<div class="empty">โหลดข้อมูลไม่สำเร็จ: ${esc(e.message || e)}</div>`;
-        document.getElementById('syncTime').textContent = 'Load failed';
-      }
-    }
-
-    function bindEvents() {
-      ['searchInput','parentStatusFilter','childStatusFilter','squadFilter','sprintFilter','assigneeFilter','riskFilter'].forEach(id => {
-        document.getElementById(id).addEventListener(id === 'searchInput' ? 'input' : 'change', applyFilters);
-      });
-      document.getElementById('refreshBtn').addEventListener('click', loadDashboard);
-      document.getElementById('clearBtn').addEventListener('click', () => {
-        ['searchInput','parentStatusFilter','childStatusFilter','squadFilter','sprintFilter','assigneeFilter','riskFilter'].forEach(id => document.getElementById(id).value = '');
-        applyFilters();
-      });
-    }
-
-    bindEvents();
-    loadDashboard();
-  </script>
+function esc(v){ return String(v ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function badgeClass(status){ const s=String(status||'').toLowerCase(); if(s.includes('done')||s.includes('closed')||s.includes('complete')||s.includes('deploy'))return'b-green'; if(s.includes('uat')||s.includes('test')||s.includes('sit'))return'b-purple'; if(s.includes('progress')||s.includes('develop')||s.includes('implement'))return'b-blue'; if(s.includes('block'))return'b-red'; if(s.includes('plan')||s.includes('open')||s.includes('backlog'))return'b-amber'; return'b-slate'; }
+function riskBadge(flag){ const map={blocked:['Blocked','b-red'],no_test_case:['No Test Case','b-amber'],stale_child:['Stale Child','b-purple'],no_child:['No Child','b-slate']}; const item=map[flag]||[flag,'b-slate']; return `<span class="badge ${item[1]}">${item[0]}</span>`; }
+function healthBadge(v){ if(v==='Healthy') return '<span class="badge b-green">Healthy</span>'; if(v==='Watch') return '<span class="badge b-amber">Watch</span>'; return '<span class="badge b-red">Critical</span>'; }
+async function fetchDashboard(){ const r=await fetch('/api/dashboard'); const d=await r.json(); if(d.error) throw new Error(d.error); return d; }
+function formatDate(v){ if(!v) return '-'; const iso=/^\d{4}-\d{2}-\d{2}$/.test(v)?`${v}T00:00:00Z`:v; const d=new Date(iso); if(Number.isNaN(d.getTime())) return v; return new Intl.DateTimeFormat('en-GB',{day:'2-digit',month:'short',year:'numeric',timeZone:'UTC'}).format(d); }
+function progressMeta(row){ return row.progressSource==='jira_field' ? 'Progress from Jira' : 'Calculated from child completion'; }
+function renderSummary(summary){ const cards=[['Total Parents',summary.totalParents,'FEPMF ทั้งหมด'],['Children',summary.totalChildren,'Child work items ทั้งหมด'],['Linked',summary.totalLinked||0,'Linked work items'],['Test Cases',summary.totalTestCases,'Test case ที่ลิงก์เจอ'],['Blocked',summary.parentsBlocked,'Parent ที่ติด blocker'],['Avg Progress',`${summary.avgProgress||0}%`,'เฉลี่ยทั้ง portfolio']]; document.getElementById('summaryCards').innerHTML = cards.map(c=>`<div class="card kpi"><div class="label">${c[0]}</div><div class="value">${esc(c[1])}</div><div class="sub">${c[2]}</div></div>`).join(''); }
+function setFilterOptions(meta){ filterOptions.parentStatus = meta?.available?.parentStatuses || []; filterOptions.childStatus = meta?.available?.childStatuses || []; filterOptions.squad = meta?.available?.squads || []; filterOptions.sprint = meta?.available?.sprints || []; filterOptions.assignee = meta?.available?.assignees || []; filterOptions.risk = meta?.available?.risks || []; renderAllMultis(); }
+function multiDisplay(key){ const selected = filterState[key] || []; if(!selected.length) return filterConfig[key].placeholder; if(selected.length===1) return selected[0]; return `${selected[0]} +${selected.length-1}`; }
+function renderMulti(key){ const cfg = filterConfig[key]; const host = document.getElementById(cfg.el); const selected = filterState[key] || []; const search = (filterSearch[key]||'').toLowerCase(); const items = (filterOptions[key]||[]).filter(Boolean).filter(v => String(v).toLowerCase().includes(search)); host.innerHTML = `<button type="button" class="multi-trigger"><span class="value">${esc(multiDisplay(key))}</span><span class="muted">▾</span></button><div class="multi-panel"><div class="multi-search"><input type="text" placeholder="ค้นหาใน ${esc(cfg.label)}" value="${esc(filterSearch[key]||'')}" data-role="search"></div><div class="multi-options">${items.map(v=>`<label class="multi-option"><input type="checkbox" value="${esc(v)}" ${selected.includes(v)?'checked':''}><span>${esc(v)}</span></label>`).join('') || '<div class="mini-empty">ไม่พบตัวเลือก</div>'}</div><div class="multi-actions"><button type="button" class="btn" data-role="clear" style="padding:6px 10px">ล้าง</button><button type="button" class="btn" data-role="close" style="padding:6px 10px">ปิด</button></div></div>`;
+  host.querySelector('.multi-trigger').addEventListener('click', e => { e.stopPropagation(); document.querySelectorAll('.multi.open').forEach(el => { if(el!==host) el.classList.remove('open'); }); host.classList.toggle('open'); const s = host.querySelector('[data-role="search"]'); if(host.classList.contains('open') && s) setTimeout(()=>s.focus(), 0); });
+  host.querySelector('[data-role="search"]').addEventListener('input', e => { filterSearch[key]=e.target.value; renderMulti(key); host.classList.add('open'); });
+  host.querySelectorAll('input[type="checkbox"]').forEach(chk => chk.addEventListener('change', () => { const vals=[...host.querySelectorAll('input[type="checkbox"]:checked')].map(x=>x.value); filterState[key]=vals; renderMulti(key); host.classList.add('open'); applyFilters(); }));
+  host.querySelector('[data-role="clear"]').addEventListener('click', () => { filterState[key]=[]; filterSearch[key]=''; renderMulti(key); host.classList.add('open'); applyFilters(); });
+  host.querySelector('[data-role="close"]').addEventListener('click', ()=> host.classList.remove('open'));
+}
+function renderAllMultis(){ Object.keys(filterConfig).forEach(renderMulti); }
+function getActiveFilters(){ return JSON.parse(JSON.stringify(filterState)); }
+function matchesAny(selected, value){ return !selected.length || selected.includes(value); }
+function rowMatches(row, filters){ if(filters.q && !textBlob(row).includes(filters.q)) return false; if(filters.parentStatus.length && !matchesAny(filters.parentStatus, row.parent.status)) return false; if(filters.childStatus.length && !(row.children||[]).some(c=>filters.childStatus.includes(c.status))) return false; if(filters.squad.length && !(filters.squad.includes(row.parent.squad) || (row.children||[]).some(c=>filters.squad.includes(c.squad)))) return false; if(filters.sprint.length && !(filters.sprint.includes(row.parent.sprint) || (row.children||[]).some(c=>filters.sprint.includes(c.sprint)))) return false; if(filters.assignee.length && !(filters.assignee.includes(row.parent.assignee) || (row.children||[]).some(c=>filters.assignee.includes(c.assignee)))) return false; if(filters.risk.length && !filters.risk.some(r=>(row.riskFlags||[]).includes(r))) return false; return true; }
+function textBlob(row){ return [row.parent.key,row.parent.summary,row.parent.status,row.parent.squad,row.parent.assignee,row.parent.sprint,row.dueDate,...(row.children||[]).flatMap(c=>[c.key,c.summary,c.status,c.squad,c.assignee,c.sprint]),...(row.linked||[]).flatMap(c=>[c.key,c.summary,c.status]),...(row.testCases||[]).flatMap(t=>[t.key,t.summary,t.status])].join(' ').toLowerCase(); }
+function renderActiveChips(){ const chips=[]; if(filterState.q) chips.push(`<span class="chip">Search: ${esc(filterState.q)} <button onclick="clearOne('q')">✕</button></span>`); Object.keys(filterConfig).forEach(key => { (filterState[key]||[]).forEach(v => chips.push(`<span class="chip">${esc(filterConfig[key].label)}: ${esc(v)} <button onclick="removeValue('${key}','${esc(v)}')">✕</button></span>`)); }); document.getElementById('activeChips').innerHTML = chips.join(''); }
+function clearOne(key){ if(key==='q'){ filterState.q=''; document.getElementById('searchInput').value=''; } else { filterState[key]=[]; filterSearch[key]=''; renderMulti(key); } applyFilters(); }
+function removeValue(key, value){ filterState[key]=(filterState[key]||[]).filter(v=>v!==value); renderMulti(key); applyFilters(); }
+function childTable(rows, type){ if(!rows?.length) return '<div class="mini-empty">ไม่พบข้อมูล</div>'; return `<table class="mini-table"><thead><tr><th>Key</th><th>Summary</th><th>Status</th><th>Type</th><th>Squad</th><th>Assignee</th><th>Sprint</th></tr></thead><tbody>${rows.map(r=>`<tr><td><a href="${esc(r.browseUrl)}" target="_blank">${esc(r.key)}</a></td><td>${esc(r.summary||'-')}</td><td><span class="badge ${badgeClass(r.status)}">${esc(r.status||'-')}</span></td><td>${esc(type==='test' ? 'Test Case' : (r.issueType||'-'))}</td><td>${esc(r.squad||'-')}</td><td>${esc(r.assignee||'-')}</td><td>${esc(r.sprint||'-')}</td></tr>`).join('')}</tbody></table>`; }
+function renderPortfolio(rows){ const wrap=document.getElementById('portfolioWrap'); document.getElementById('resultCount').textContent=`${rows.length} FEPMF items`; if(!rows.length){ wrap.innerHTML='<div class="empty">ไม่พบข้อมูลตามเงื่อนไขที่เลือก</div>'; return; } wrap.innerHTML=`<table><thead><tr><th style="width:48px"></th><th style="min-width:360px">Parent</th><th style="min-width:220px">Progress</th><th>Squad</th><th>Assignee</th><th>Sprint</th><th>Due Date</th><th>Children</th><th>Linked</th><th>Tests</th><th style="min-width:220px">Risk</th></tr></thead><tbody>${rows.map(r=>{ const open=expanded.has(r.parent.key); return `<tr><td><button class="caret" onclick="toggleRow('${esc(r.parent.key)}')">${open?'−':'+'}</button></td><td><div class="stack"><div class="keyline"><a class="key" href="${esc(r.parent.browseUrl)}" target="_blank">${esc(r.parent.key)}</a>${healthBadge(r.health)}<span class="badge ${badgeClass(r.parent.status)}">${esc(r.parent.status||'-')}</span></div><div>${esc(r.parent.summary||'-')}</div></div></td><td><div class="progress"><div style="width:${Math.max(0,Math.min(100,r.progressPercent||0))}%"></div></div><div class="progress-meta"><span>${esc(r.progressPercent||0)}%</span><span>${esc(progressMeta(r))}</span></div></td><td>${esc(r.squad||'-')}</td><td>${esc(r.assignee||'-')}</td><td>${esc(r.sprint||'-')}</td><td>${esc(formatDate(r.dueDate)||'-')}</td><td>${esc(r.childrenCount||0)}</td><td>${esc(r.linkedCount||0)}</td><td>${esc(r.testCaseCount||0)}</td><td><div class="risk-list">${(r.riskFlags||[]).map(riskBadge).join('') || '<span class="muted">-</span>'}</div></td></tr>${open?`<tr class="detail-row"><td colspan="11"><div class="detail"><div class="detail-grid"><div class="detail-block"><div class="detail-title">Child work items (${r.childrenCount||0})</div>${childTable(r.children,'child')}</div><div class="stack"><div class="detail-block"><div class="detail-title">Linked work items (${r.linkedCount||0})</div><div class="panel-body">${r.linked?.length?`<div class="link-list">${r.linked.map(l=>`<div class="link-item"><div><a href="${esc(l.browseUrl)}" target="_blank"><strong>${esc(l.key)}</strong></a> <span class="badge ${badgeClass(l.status)}">${esc(l.status||'-')}</span></div><div style="margin-top:6px">${esc(l.summary||'-')}</div><div class="muted" style="margin-top:4px">${esc(l.relationType||l.relationLabel||'linked')}</div></div>`).join('')}</div>`:'<div class="mini-empty">ไม่พบ linked work items</div>'}</div></div><div class="detail-block"><div class="detail-title">Test cases (${r.testCaseCount||0})</div>${childTable(r.testCases,'test')}</div></div></div></div></td></tr>`:''}`; }).join('')}</tbody></table>`; }
+function renderSquadSummary(rows){ const el=document.getElementById('squadSummary'); if(!rows?.length){ el.innerHTML='<div class="empty" style="padding:12px">ไม่พบข้อมูล</div>'; return; } el.innerHTML=rows.map(r=>`<div class="bar-row" style="margin-bottom:10px"><div>${esc(r.squad)}</div><div><div class="progress"><div style="width:${Math.min(100,Math.round((r.total/Math.max(...rows.map(x=>x.total),1))*100))}%"></div></div><div class="muted" style="margin-top:4px">Done ${esc(r.done)} / Blocked ${esc(r.blocked)}</div></div><div>${esc(r.total)}</div></div>`).join(''); }
+function renderRiskHeatmap(rows){ const squads=[...new Set(rows.flatMap(r=>[r.squad,...(r.children||[]).map(c=>c.squad)]).filter(Boolean))]; const risks=['blocked','stale_child','no_test_case','no_child']; const el=document.getElementById('riskHeatmap'); if(!squads.length){ el.innerHTML='<div class="empty" style="padding:12px">ไม่พบข้อมูล</div>'; return; } el.innerHTML=`<div class="heatmap">${squads.flatMap(s=>risks.map(risk=>{ const count=rows.filter(row=>(row.squad===s || (row.children||[]).some(c=>c.squad===s)) && (row.riskFlags||[]).includes(risk)).length; return `<div class="heat-cell"><div class="muted">${esc(s)}</div><div style="font-weight:700;margin-top:6px">${esc(risk)}</div><div style="font-size:28px;margin-top:8px">${count}</div></div>`; })).join('')}</div>`; }
+function renderSprintCalendar(items){ const el=document.getElementById('sprintCalendar'); el.innerHTML=`<div class="calendar-list">${(items||[]).map(x=>`<div class="calendar-row"><div><div><strong>${esc(x.name)}</strong></div><div class="muted">${esc(formatDate(x.start))} - ${esc(formatDate(x.end))}</div></div><div class="pill">${x.mandays} mandays</div></div>`).join('')}</div>`; }
+function buildSquadSummaryFromFiltered(rows){ const map=new Map(); rows.flatMap(r=>r.children||[]).forEach(c=>{ if(!c.squad) return; if(!map.has(c.squad)) map.set(c.squad,{squad:c.squad,total:0,done:0,blocked:0}); const s=map.get(c.squad); s.total+=1; if(c.statusGroup==='done') s.done+=1; if(c.statusGroup==='blocked') s.blocked+=1; }); return [...map.values()].sort((a,b)=>b.total-a.total); }
+function applyFilters(){ if(!dashboardData) return; filterState.q = document.getElementById('searchInput').value.trim().toLowerCase(); const filters=getActiveFilters(); filteredParents=(dashboardData.parents||[]).filter(row=>rowMatches(row,filters)); renderActiveChips(); renderPortfolio(filteredParents); renderSquadSummary(buildSquadSummaryFromFiltered(filteredParents)); renderRiskHeatmap(filteredParents); }
+function toggleRow(key){ if(expanded.has(key)) expanded.delete(key); else expanded.add(key); renderPortfolio(filteredParents); }
+async function loadDashboard(){ try{ document.getElementById('portfolioWrap').innerHTML='<div class="loading">กำลังโหลดข้อมูลจาก Jira...</div>'; const data=await fetchDashboard(); dashboardData=data; setFilterOptions(data.meta||{}); renderSummary(data.summary||{}); renderSprintCalendar(data.sprintCalendar||[]); filteredParents=data.parents||[]; renderSquadSummary(data.squadSummary||[]); renderRiskHeatmap(filteredParents); renderPortfolio(filteredParents); document.getElementById('syncTime').textContent=`Updated ${new Date(data.generatedAt || Date.now()).toLocaleString('th-TH')}`; renderActiveChips(); } catch(e){ document.getElementById('portfolioWrap').innerHTML=`<div class="empty">โหลดข้อมูลไม่สำเร็จ: ${esc(e.message || e)}</div>`; document.getElementById('syncTime').textContent='Load failed'; } }
+function bindEvents(){ document.getElementById('searchInput').addEventListener('input', applyFilters); document.getElementById('refreshBtn').addEventListener('click', loadDashboard); document.getElementById('clearBtn').addEventListener('click', ()=>{ document.getElementById('searchInput').value=''; filterState.q=''; Object.keys(filterConfig).forEach(k=>{ filterState[k]=[]; filterSearch[k]=''; renderMulti(k); }); applyFilters(); }); document.addEventListener('click', e => { if(!e.target.closest('.multi')) document.querySelectorAll('.multi.open').forEach(el=>el.classList.remove('open')); }); }
+window.toggleRow=toggleRow; window.clearOne=clearOne; window.removeValue=removeValue;
+bindEvents(); loadDashboard();
+</script>
 </body>
 </html>
