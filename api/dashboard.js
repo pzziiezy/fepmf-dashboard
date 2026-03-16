@@ -24,14 +24,8 @@ export default async function handler(req, res) {
     'Content-Type': 'application/json'
   }
 
-  const BOARD_TO_SQUAD = {
-    '563': 'KEPLER',
-    '564': 'MIDAS',
-    '565': 'NEBULA'
-  }
-
   const KNOWN_SQUADS = ['KEPLER', 'MIDAS', 'NEBULA']
-  const SPRINT_FIELDS = [
+  const SPRINT_FIELD_KEYS = [
     'customfield_10020',
     'customfield_10021',
     'customfield_10015',
@@ -66,29 +60,32 @@ export default async function handler(req, res) {
 
       if (!issues.length || all.length >= (d.total || 0)) break
       start += 100
-      if (start > 5000) break
+      if (start > 4000) break
     }
 
     return all
+  }
+
+  function lower(v) {
+    return String(v || '').toLowerCase()
   }
 
   function uniq(arr) {
     return [...new Set((arr || []).filter(Boolean))]
   }
 
-  function uniqBy(arr, keyFn) {
-    const m = new Map()
+  function uniqByKey(arr) {
+    const map = new Map()
     for (const item of arr || []) {
-      const key = keyFn(item)
-      if (key) m.set(key, item)
+      if (item?.key) map.set(item.key, item)
     }
-    return [...m.values()]
+    return [...map.values()]
   }
 
   function pickText(v) {
     if (!v) return ''
     if (typeof v === 'string') return v
-    if (typeof v === 'number' || typeof v === 'boolean') return String(v)
+    if (typeof v === 'number') return String(v)
     if (Array.isArray(v)) return v.map(pickText).filter(Boolean).join(', ')
     if (typeof v === 'object') {
       if (v.displayName) return v.displayName
@@ -100,8 +97,18 @@ export default async function handler(req, res) {
     return ''
   }
 
-  function lower(v) {
-    return String(v || '').toLowerCase()
+  function daysSince(dateString) {
+    if (!dateString) return null
+    const t = new Date(dateString).getTime()
+    if (Number.isNaN(t)) return null
+    return Math.floor((Date.now() - t) / (1000 * 60 * 60 * 24))
+  }
+
+  function formatDateISO(dateString) {
+    if (!dateString) return ''
+    const d = new Date(dateString)
+    if (Number.isNaN(d.getTime())) return ''
+    return d.toISOString().slice(0, 10)
   }
 
   function getStatusName(issue) {
@@ -136,24 +143,31 @@ export default async function handler(req, res) {
     }))
   }
 
+  function getDueDate(issue) {
+    return issue?.fields?.duedate || ''
+  }
+
   function groupStatus(status) {
     const s = lower(status)
 
-    if (s.includes('done') || s.includes('closed') || s.includes('complete') || s.includes('resolved') || s.includes('deliver')) return 'done'
+    if (s.includes('done') || s.includes('closed') || s.includes('complete') || s.includes('resolved') || s.includes('deliver')) {
+      return 'done'
+    }
     if (s.includes('uat')) return 'uat'
     if (s.includes('sit')) return 'sit'
-    if (s.includes('test')) return 'test'
-    if (s.includes('progress') || s.includes('develop') || s.includes('implement') || s.includes('coding') || s.includes('doing')) return 'in_progress'
+    if (s.includes('test') || s.includes('qa')) return 'test'
     if (s.includes('block')) return 'blocked'
-    if (s.includes('open') || s.includes('todo') || s.includes('to do') || s.includes('ready') || s.includes('backlog') || s.includes('selected for development')) return 'open'
+    if (s.includes('progress') || s.includes('develop') || s.includes('implement') || s.includes('coding') || s.includes('doing')) {
+      return 'in_progress'
+    }
+    if (s.includes('open') || s.includes('todo') || s.includes('to do') || s.includes('ready') || s.includes('backlog') || s.includes('selected')) {
+      return 'open'
+    }
     return 'other'
   }
 
-  function daysSince(dateString) {
-    if (!dateString) return null
-    const t = new Date(dateString).getTime()
-    if (Number.isNaN(t)) return null
-    return Math.floor((Date.now() - t) / (1000 * 60 * 60 * 24))
+  function isDoneStatus(status) {
+    return groupStatus(status) === 'done'
   }
 
   function isPotentialTestCase(issue) {
@@ -161,61 +175,81 @@ export default async function handler(req, res) {
     const summary = lower(issue?.fields?.summary || '')
     const labels = (issue?.fields?.labels || []).map(lower).join(' ')
     const comps = (issue?.fields?.components || []).map(c => lower(c?.name)).join(' ')
-    const projectKey = lower(getProjectKey(issue))
+    const project = lower(getProjectKey(issue))
 
     return (
       issueType.includes('test') ||
-      projectKey === 'misqa' ||
+      issueType.includes('qa') ||
       summary.includes('test case') ||
       summary.includes('testcase') ||
       summary.includes('unit test') ||
-      summary.includes('integration test') ||
+      summary.includes('qa') ||
       summary.includes('uat') ||
       summary.includes('sit') ||
-      summary.includes('qa') ||
       labels.includes('test') ||
+      labels.includes('qa') ||
       labels.includes('uat') ||
       labels.includes('sit') ||
-      labels.includes('qa') ||
       comps.includes('test') ||
+      comps.includes('qa') ||
       comps.includes('uat') ||
       comps.includes('sit') ||
-      comps.includes('qa')
+      project === 'misqa'
     )
   }
 
-  function parseSprintCandidate(candidate) {
-    if (!candidate) return ''
+  function findSprint(issue) {
+    const fields = issue?.fields || {}
+    const candidates = SPRINT_FIELD_KEYS.map(k => fields[k]).filter(Boolean)
 
-    if (Array.isArray(candidate)) {
-      for (let i = candidate.length - 1; i >= 0; i -= 1) {
-        const t = parseSprintCandidate(candidate[i])
+    for (const candidate of candidates) {
+      if (Array.isArray(candidate) && candidate.length) {
+        const last = candidate[candidate.length - 1]
+        if (typeof last === 'string') {
+          const m = last.match(/name=([^,\]]+)/i)
+          if (m?.[1]) return m[1]
+          return last
+        }
+        const t = pickText(last)
         if (t) return t
       }
-      return ''
-    }
 
-    if (typeof candidate === 'string') {
-      const match = candidate.match(/name=([^,\]]+)/i)
-      if (match?.[1]) return match[1].trim()
-      return candidate.trim()
-    }
+      if (typeof candidate === 'string') {
+        const m = candidate.match(/name=([^,\]]+)/i)
+        if (m?.[1]) return m[1]
+        return candidate
+      }
 
-    if (typeof candidate === 'object') {
-      if (candidate.name) return String(candidate.name).trim()
-      if (candidate.value) return String(candidate.value).trim()
-      const picked = pickText(candidate)
-      if (picked) return picked.trim()
+      const t = pickText(candidate)
+      if (t) return t
     }
 
     return ''
   }
 
-  function findSprint(issue) {
-    const fields = issue?.fields || {}
-    for (const fieldName of SPRINT_FIELDS) {
-      const sprint = parseSprintCandidate(fields[fieldName])
-      if (sprint) return sprint
+  function extractCandidateTexts(issue) {
+    const f = issue?.fields || {}
+    const bucket = [
+      f.summary,
+      getStatusName(issue),
+      getIssueTypeName(issue),
+      getAssigneeName(issue),
+      getProjectKey(issue),
+      pickText(f.reporter),
+      pickText(f.creator),
+      ...(f.labels || []),
+      ...(f.components || []).map(x => x?.name),
+      findSprint(issue),
+      JSON.stringify(f.description || ''),
+      JSON.stringify(f)
+    ]
+    return bucket.filter(Boolean).join(' | ').toUpperCase()
+  }
+
+  function inferSquad(issue) {
+    const text = extractCandidateTexts(issue)
+    for (const squad of KNOWN_SQUADS) {
+      if (text.includes(squad)) return squad
     }
     return ''
   }
@@ -225,7 +259,12 @@ export default async function handler(req, res) {
 
     for (const st of issue?.fields?.subtasks || []) {
       if (!st?.key) continue
-      records.push({ key: st.key, relationType: 'subtask', direction: 'child' })
+      records.push({
+        key: st.key,
+        relationType: 'subtask',
+        relationLabel: 'subtask',
+        direction: 'child'
+      })
     }
 
     for (const link of issue?.fields?.issuelinks || []) {
@@ -255,48 +294,8 @@ export default async function handler(req, res) {
     return records
   }
 
-  function classifyRelation(parentIssue, linkedIssue, relation) {
-    if (!linkedIssue) return 'linked'
-
-    const proj = getProjectKey(linkedIssue)
-    const relText = lower(`${relation?.relationType || ''} ${relation?.relationLabel || ''}`)
-
-    if (relation?.relationType === 'subtask') return 'child'
-    if (proj === 'FED') return 'child'
-
-    if (proj === 'FEPMF') {
-      if (
-        relText.includes('child') ||
-        relText.includes('parent') ||
-        relText.includes('implements') ||
-        relText.includes('relates') ||
-        relText.includes('blocks') ||
-        relText.includes('is blocked by')
-      ) {
-        return 'child'
-      }
-      return 'linked'
-    }
-
-    if (proj === 'MISQA') return 'linked'
-    return 'linked'
-  }
-
-  function inferBoardIdFromIssue(issue) {
-    const text = JSON.stringify(issue?.fields || {})
-    const matches = text.match(/"boardId"\s*:?\s*"?(\d+)"?/i)
-    if (matches?.[1]) return matches[1]
-    return ''
-  }
-
-  function inferSquad(issue) {
-    const text = JSON.stringify(issue?.fields || {}).toUpperCase()
-    for (const squad of KNOWN_SQUADS) {
-      if (text.includes(squad)) return squad
-    }
-
-    const boardId = inferBoardIdFromIssue(issue)
-    return BOARD_TO_SQUAD[boardId] || ''
+  function quoteKeys(keys) {
+    return keys.map(k => `"${k}"`).join(',')
   }
 
   function normalizeIssue(issue) {
@@ -322,72 +321,110 @@ export default async function handler(req, res) {
       attachments: getAttachments(issue),
       attachmentCount: (issue?.fields?.attachment || []).length,
       parentKey: issue?.fields?.parent?.key || '',
+      dueDate: getDueDate(issue),
+      dueDateIso: formatDateISO(getDueDate(issue)),
       relatedKeys: uniq(extractLinkRecords(issue).map(x => x.key))
     }
   }
 
-  function calcProgressFromChildren(children) {
-    if (!children.length) return 0
+  function relationText(rel) {
+    return lower(`${rel?.relationType || ''} ${rel?.relationLabel || ''}`)
+  }
+
+  function isStrongChildRelation(rel) {
+    const text = relationText(rel)
+    return (
+      rel?.relationType === 'subtask' ||
+      text.includes('child') ||
+      text.includes('parent') ||
+      text.includes('implements') ||
+      text.includes('relates') ||
+      text.includes('belongs') ||
+      text.includes('contains') ||
+      text.includes('decomposes') ||
+      text.includes('split')
+    )
+  }
+
+  function classifyRelation(parentRaw, linkedRaw, relation) {
+    if (!linkedRaw) return 'linked'
+    if (relation?.relationType === 'subtask') return 'child'
+
+    const linkedProj = getProjectKey(linkedRaw)
+
+    if (isPotentialTestCase(linkedRaw)) return 'test'
+    if (linkedRaw?.fields?.parent?.key === parentRaw?.key) return 'child'
+    if (linkedProj === 'FED') return 'child'
+    if (isStrongChildRelation(relation)) return 'child'
+
+    return 'linked'
+  }
+
+  function dominantValue(values = []) {
+    const stats = new Map()
+    for (const value of values.filter(Boolean)) {
+      stats.set(value, (stats.get(value) || 0) + 1)
+    }
+    let best = ''
+    let count = 0
+    for (const [value, score] of stats.entries()) {
+      if (score > count) {
+        best = value
+        count = score
+      }
+    }
+    return best
+  }
+
+  function calcProgressFromChildren(parentStatus, children) {
+    if (!children.length) {
+      return isDoneStatus(parentStatus) ? 100 : 0
+    }
     const done = children.filter(c => c.statusGroup === 'done').length
     return Math.round((done / children.length) * 100)
   }
 
-  function deriveValueFromChildren(children, selector, fallback = '') {
-    const values = uniq(children.map(selector).filter(Boolean))
-    if (!values.length) return fallback
-    if (values.length === 1) return values[0]
-    return values[0]
-  }
+  function generateSprintCalendar() {
+    const result = []
+    let sprintNumber = 4
+    let current = new Date('2026-03-09T00:00:00+07:00')
 
-  function deriveDominantValue(children, selector, fallback = '') {
-    const counts = new Map()
-    for (const child of children) {
-      const value = selector(child)
-      if (!value) continue
-      counts.set(value, (counts.get(value) || 0) + 1)
+    while (current.getFullYear() <= 2026) {
+      const start = new Date(current)
+      const end = new Date(current)
+      end.setDate(end.getDate() + 18)
+      if (start.getFullYear() !== 2026) break
+      result.push({
+        name: `Sprint${sprintNumber}`,
+        start: start.toISOString().slice(0, 10),
+        end: end.toISOString().slice(0, 10),
+        mandays: 15
+      })
+      sprintNumber += 1
+      current.setDate(current.getDate() + 21)
+      if (current.getFullYear() > 2026) break
     }
-    let winner = fallback
-    let max = 0
-    for (const [value, count] of counts.entries()) {
-      if (count > max) {
-        winner = value
-        max = count
-      }
-    }
-    return winner
+    return result
   }
 
-  function bucketFromProgress(progressPercent) {
-    if (progressPercent >= 85) return 'high'
-    if (progressPercent >= 50) return 'medium'
-    return 'low'
-  }
-
-  function estimateDeliveryBucket(parentStatus, progressPercent, riskFlags) {
-    const s = lower(parentStatus)
-    if (riskFlags.includes('blocked')) return 'slipping'
-    if (s.includes('s7') || progressPercent >= 95) return 'delivered'
-    if (progressPercent >= 75 && riskFlags.length <= 1) return 'on_track'
-    if (progressPercent >= 40) return 'watch'
-    return 'early'
+  function makeForecast(progressPercent, dueDate) {
+    if (!dueDate) return 'No due date'
+    if (progressPercent >= 100) return 'Completed'
+    if (progressPercent >= 80) return 'Likely on track'
+    if (progressPercent >= 50) return 'Watch closely'
+    return 'Needs intervention'
   }
 
   function computeHealth(progressPercent, riskFlags) {
-    const riskScore =
-      (riskFlags.includes('blocked') ? 50 : 0) +
-      (riskFlags.includes('stale_child') ? 25 : 0) +
-      (riskFlags.includes('no_test_case') ? 15 : 0) +
-      (riskFlags.includes('no_child') ? 40 : 0)
-
-    const score = Math.max(0, Math.min(100, progressPercent - riskScore + 60))
-
-    if (score >= 75) return { score, label: 'healthy' }
-    if (score >= 45) return { score, label: 'watch' }
-    return { score, label: 'critical' }
-  }
-
-  function quoteKeys(keys) {
-    return keys.map(k => `"${k}"`).join(',')
+    let score = 100
+    if (riskFlags.includes('blocked')) score -= 35
+    if (riskFlags.includes('stale_child')) score -= 20
+    if (riskFlags.includes('no_test_case')) score -= 15
+    if (riskFlags.includes('no_child')) score -= 25
+    score += Math.min(progressPercent, 100) * 0.15
+    if (score >= 80) return 'Healthy'
+    if (score >= 55) return 'Watch'
+    return 'Critical'
   }
 
   try {
@@ -407,10 +444,14 @@ export default async function handler(req, res) {
       'components',
       'parent',
       'description',
-      ...SPRINT_FIELDS
+      'duedate',
+      ...SPRINT_FIELD_KEYS
     ]
 
-    const parentsRaw = await fetchAllByJql('project = FEPMF ORDER BY updated DESC', baseFields)
+    const parentsRaw = await fetchAllByJql(
+      'project = FEPMF ORDER BY updated DESC',
+      baseFields
+    )
 
     const relationMapByParent = new Map()
     const level1KeySet = new Set()
@@ -424,7 +465,10 @@ export default async function handler(req, res) {
     let level1IssuesRaw = []
     const level1Keys = [...level1KeySet]
     if (level1Keys.length) {
-      level1IssuesRaw = await fetchAllByJql(`key IN (${quoteKeys(level1Keys)}) ORDER BY updated DESC`, baseFields)
+      level1IssuesRaw = await fetchAllByJql(
+        `key IN (${quoteKeys(level1Keys)}) ORDER BY updated DESC`,
+        baseFields
+      )
     }
 
     const level1RawMap = new Map(level1IssuesRaw.map(i => [i.key, i]))
@@ -440,29 +484,35 @@ export default async function handler(req, res) {
     let level2IssuesRaw = []
     const level2Keys = [...level2KeySet]
     if (level2Keys.length) {
-      level2IssuesRaw = await fetchAllByJql(`key IN (${quoteKeys(level2Keys)}) ORDER BY updated DESC`, baseFields)
+      level2IssuesRaw = await fetchAllByJql(
+        `key IN (${quoteKeys(level2Keys)}) ORDER BY updated DESC`,
+        baseFields
+      )
     }
 
     const allRawMap = new Map()
-    for (const p of parentsRaw) allRawMap.set(p.key, p)
-    for (const i of level1IssuesRaw) allRawMap.set(i.key, i)
-    for (const i of level2IssuesRaw) allRawMap.set(i.key, i)
+    for (const issue of parentsRaw) allRawMap.set(issue.key, issue)
+    for (const issue of level1IssuesRaw) allRawMap.set(issue.key, issue)
+    for (const issue of level2IssuesRaw) allRawMap.set(issue.key, issue)
 
     const normalizedMap = new Map()
     for (const raw of allRawMap.values()) {
       normalizedMap.set(raw.key, normalizeIssue(raw))
     }
 
+    const sprintCalendar = generateSprintCalendar()
+
     const parentRows = parentsRaw.map(parentRaw => {
       const parent = normalizedMap.get(parentRaw.key)
       const rels = relationMapByParent.get(parent.key) || []
-
-      const level1Items = rels.map(rel => {
-        const raw = allRawMap.get(rel.key)
-        const item = normalizedMap.get(rel.key)
-        if (!raw || !item) return null
-        return { relation: rel, raw, item }
-      }).filter(Boolean)
+      const level1Items = rels
+        .map(rel => {
+          const raw = allRawMap.get(rel.key)
+          const item = normalizedMap.get(rel.key)
+          if (!raw || !item) return null
+          return { relation: rel, raw, item }
+        })
+        .filter(Boolean)
 
       const children = []
       const linked = []
@@ -473,10 +523,14 @@ export default async function handler(req, res) {
 
       for (const row of level1Items) {
         const kind = classifyRelation(parentRaw, row.raw, row.relation)
-        const relLabel = lower(`${row.relation.relationType || ''} ${row.relation.relationLabel || ''}`)
+        const relLabel = relationText(row.relation)
 
         if (kind === 'child') {
-          children.push(row.item)
+          children.push({
+            ...row.item,
+            relationType: row.relation.relationType || '',
+            relationLabel: row.relation.relationLabel || ''
+          })
 
           const childRelations = extractLinkRecords(row.raw)
           for (const cr of childRelations) {
@@ -485,10 +539,15 @@ export default async function handler(req, res) {
             if (!subRaw || !subItem) continue
 
             if (cr.relationType === 'subtask' || subItem.parentKey === row.item.key) {
-              childSubtasks.push({ ...subItem, rootChildKey: row.item.key })
+              childSubtasks.push({
+                ...subItem,
+                rootChildKey: row.item.key
+              })
             }
             if (isPotentialTestCase(subRaw)) tests.push(subItem)
           }
+        } else if (kind === 'test') {
+          tests.push(row.item)
         } else {
           linked.push(row.item)
         }
@@ -498,49 +557,38 @@ export default async function handler(req, res) {
         if (isPotentialTestCase(row.raw)) tests.push(row.item)
       }
 
-      const finalChildren = uniqBy(children, x => x.key)
-      const finalLinked = uniqBy(linked, x => x.key)
-      const finalBlockers = uniqBy(blockers, x => x.key)
-      const finalBlockedBy = uniqBy(blockedBy, x => x.key)
-      const finalTests = uniqBy(tests, x => x.key)
-      const finalChildSubtasks = uniqBy(childSubtasks, x => `${x.rootChildKey || ''}:${x.key}`)
+      const finalChildren = uniqByKey(children)
+      const finalLinked = uniqByKey(linked)
+      const finalBlockers = uniqByKey(blockers)
+      const finalBlockedBy = uniqByKey(blockedBy)
+      const finalTests = uniqByKey(tests)
+      const finalChildSubtasks = uniqByKey(childSubtasks)
 
-      const parentSprint = parent.sprint || deriveDominantValue(finalChildren, c => c.sprint, '')
-      const parentAssignee = parent.assignee || deriveDominantValue(finalChildren, c => c.assignee, '')
-      const dominantSquad = deriveDominantValue(finalChildren, c => c.squad, parent.squad || '')
+      const parentSquad = parent.squad || dominantValue(finalChildren.map(c => c.squad))
+      const parentAssignee = parent.assignee || dominantValue(finalChildren.map(c => c.assignee))
+      const parentSprint = parent.sprint || dominantValue(finalChildren.map(c => c.sprint))
+      const progressPercent = calcProgressFromChildren(parent.status, finalChildren)
 
       const riskFlags = []
       if (!finalChildren.length) riskFlags.push('no_child')
       if (finalTests.length === 0) riskFlags.push('no_test_case')
-      if (finalBlockedBy.length > 0 || parent.statusGroup === 'blocked') riskFlags.push('blocked')
+      if (finalBlockedBy.length > 0 || finalChildren.some(c => c.statusGroup === 'blocked')) riskFlags.push('blocked')
       if (finalChildren.some(c => (c.updatedDaysAgo ?? 0) >= 7 && c.statusGroup !== 'done')) riskFlags.push('stale_child')
-
-      const progressPercent = calcProgressFromChildren(finalChildren)
-      const health = computeHealth(progressPercent, riskFlags)
-      const childStatusBreakdown = {
-        open: finalChildren.filter(x => x.statusGroup === 'open').length,
-        inProgress: finalChildren.filter(x => x.statusGroup === 'in_progress').length,
-        sit: finalChildren.filter(x => x.statusGroup === 'sit').length,
-        test: finalChildren.filter(x => x.statusGroup === 'test').length,
-        uat: finalChildren.filter(x => x.statusGroup === 'uat').length,
-        done: finalChildren.filter(x => x.statusGroup === 'done').length,
-        blocked: finalChildren.filter(x => x.statusGroup === 'blocked').length,
-        other: finalChildren.filter(x => x.statusGroup === 'other').length
-      }
 
       return {
         parent: {
           ...parent,
-          sprint: parentSprint,
+          squad: parentSquad,
           assignee: parentAssignee,
-          squad: dominantSquad || parent.squad || ''
+          sprint: parentSprint
         },
         progressPercent,
-        progressBucket: bucketFromProgress(progressPercent),
-        squad: dominantSquad,
+        squad: parentSquad,
         squads: uniq(finalChildren.map(c => c.squad)),
-        sprint: parentSprint,
         assignee: parentAssignee,
+        sprint: parentSprint,
+        dueDate: parent.dueDate,
+        dueDateIso: parent.dueDateIso,
         childrenCount: finalChildren.length,
         linkedCount: finalLinked.length,
         blockerCount: finalBlockers.length,
@@ -548,12 +596,21 @@ export default async function handler(req, res) {
         testCaseCount: finalTests.length,
         attachmentCount: parent.attachmentCount,
         childSubtaskCount: finalChildSubtasks.length,
-        riskFlags,
-        health,
-        deliveryForecast: estimateDeliveryBucket(parent.status, progressPercent, riskFlags),
-        childStatusBreakdown,
-        childAssignees: uniq(finalChildren.map(c => c.assignee)),
-        childSprints: uniq(finalChildren.map(c => c.sprint)),
+        riskFlags: uniq(riskFlags),
+        health: computeHealth(progressPercent, uniq(riskFlags)),
+        deliveryForecast: makeForecast(progressPercent, parent.dueDate),
+        childStatusBreakdown: {
+          open: finalChildren.filter(x => x.statusGroup === 'open').length,
+          in_progress: finalChildren.filter(x => x.statusGroup === 'in_progress').length,
+          test: finalChildren.filter(x => x.statusGroup === 'test').length,
+          sit: finalChildren.filter(x => x.statusGroup === 'sit').length,
+          uat: finalChildren.filter(x => x.statusGroup === 'uat').length,
+          done: finalChildren.filter(x => x.statusGroup === 'done').length,
+          blocked: finalChildren.filter(x => x.statusGroup === 'blocked').length,
+          other: finalChildren.filter(x => x.statusGroup === 'other').length
+        },
+        childAssignees: uniq(finalChildren.map(x => x.assignee)),
+        childSprints: uniq(finalChildren.map(x => x.sprint)),
         children: finalChildren,
         childSubtasks: finalChildSubtasks,
         linked: finalLinked,
@@ -563,19 +620,18 @@ export default async function handler(req, res) {
       }
     })
 
-    const allChildren = parentRows.flatMap(r => r.children)
-    const allLinked = parentRows.flatMap(r => r.linked)
-    const allChildSubtasks = parentRows.flatMap(r => r.childSubtasks)
-    const allTests = parentRows.flatMap(r => r.testCases)
-    const uniqIssueCount = arr => new Set((arr || []).map(x => x.key)).size
+    const allChildren = uniqByKey(parentRows.flatMap(r => r.children))
+    const allLinked = uniqByKey(parentRows.flatMap(r => r.linked))
+    const allChildSubtasks = uniqByKey(parentRows.flatMap(r => r.childSubtasks))
+    const allTests = uniqByKey(parentRows.flatMap(r => r.testCases))
 
     const summary = {
       totalParents: parentRows.length,
-      totalChildren: uniqIssueCount(allChildren),
-      totalLinked: uniqIssueCount(allLinked),
-      totalChildSubtasks: uniqIssueCount(allChildSubtasks),
-      totalTestCases: uniqIssueCount(allTests),
-      totalAttachments: parentRows.reduce((sum, r) => sum + (r.attachmentCount || 0), 0),
+      totalChildren: allChildren.length,
+      totalLinked: allLinked.length,
+      totalChildSubtasks: allChildSubtasks.length,
+      totalTestCases: allTests.length,
+      totalAttachments: parentRows.reduce((sum, r) => sum + r.attachmentCount, 0),
       openChildren: allChildren.filter(x => x.statusGroup === 'open').length,
       inProgressChildren: allChildren.filter(x => x.statusGroup === 'in_progress').length,
       sitChildren: allChildren.filter(x => x.statusGroup === 'sit').length,
@@ -585,19 +641,21 @@ export default async function handler(req, res) {
       blockedChildren: allChildren.filter(x => x.statusGroup === 'blocked').length,
       parentsNoChild: parentRows.filter(r => r.childrenCount === 0).length,
       parentsNoTest: parentRows.filter(r => r.testCaseCount === 0).length,
-      parentsBlocked: parentRows.filter(r => r.blockedByCount > 0 || r.riskFlags.includes('blocked')).length,
+      parentsBlocked: parentRows.filter(r => r.riskFlags.includes('blocked')).length,
       staleChildren: allChildren.filter(x => (x.updatedDaysAgo ?? 0) >= 7 && x.statusGroup !== 'done').length,
-      healthyParents: parentRows.filter(r => r.health.label === 'healthy').length,
-      watchParents: parentRows.filter(r => r.health.label === 'watch').length,
-      criticalParents: parentRows.filter(r => r.health.label === 'critical').length,
-      avgProgressPercent: parentRows.length
-        ? Math.round(parentRows.reduce((sum, r) => sum + (r.progressPercent || 0), 0) / parentRows.length)
-        : 0
+      avgProgress: parentRows.length ? Math.round(parentRows.reduce((sum, r) => sum + r.progressPercent, 0) / parentRows.length) : 0,
+      healthyParents: parentRows.filter(r => r.health === 'Healthy').length,
+      criticalParents: parentRows.filter(r => r.health === 'Critical').length
     }
 
-    const squadSummary = KNOWN_SQUADS.map(name => {
+    const squadsPresent = uniq([
+      ...KNOWN_SQUADS,
+      ...parentRows.map(r => r.squad),
+      ...allChildren.map(c => c.squad)
+    ])
+
+    const squadSummary = squadsPresent.map(name => {
       const squadItems = allChildren.filter(c => c.squad === name)
-      const uniqueAssignees = uniq(squadItems.map(x => x.assignee)).length
       return {
         squad: name,
         total: squadItems.length,
@@ -608,8 +666,7 @@ export default async function handler(req, res) {
         uat: squadItems.filter(x => x.statusGroup === 'uat').length,
         done: squadItems.filter(x => x.statusGroup === 'done').length,
         blocked: squadItems.filter(x => x.statusGroup === 'blocked').length,
-        assignees: uniqueAssignees,
-        workloadPercent: summary.totalChildren ? Math.round((squadItems.length / summary.totalChildren) * 100) : 0
+        utilization: Math.min(100, Math.round((squadItems.filter(x => x.statusGroup !== 'done').length / Math.max(squadItems.length, 1)) * 100))
       }
     })
 
@@ -618,14 +675,12 @@ export default async function handler(req, res) {
         .filter(r => r.childrenCount === 0)
         .slice(0, 20)
         .map(r => ({ key: r.parent.key, summary: r.parent.summary, status: r.parent.status })),
-
       parentsWithoutTestCase: parentRows
         .filter(r => r.testCaseCount === 0)
         .slice(0, 20)
         .map(r => ({ key: r.parent.key, summary: r.parent.summary, status: r.parent.status })),
-
       blockedParents: parentRows
-        .filter(r => r.blockedByCount > 0 || r.riskFlags.includes('blocked'))
+        .filter(r => r.riskFlags.includes('blocked'))
         .slice(0, 20)
         .map(r => ({
           key: r.parent.key,
@@ -633,7 +688,6 @@ export default async function handler(req, res) {
           status: r.parent.status,
           blockedBy: r.blockedBy.map(x => x.key)
         })),
-
       staleChildren: allChildren
         .filter(x => (x.updatedDaysAgo ?? 0) >= 7 && x.statusGroup !== 'done')
         .sort((a, b) => (b.updatedDaysAgo || 0) - (a.updatedDaysAgo || 0))
@@ -644,34 +698,23 @@ export default async function handler(req, res) {
           squad: x.squad,
           status: x.status,
           updatedDaysAgo: x.updatedDaysAgo
-        })),
-
-      criticalParents: parentRows
-        .filter(r => r.health.label === 'critical')
-        .sort((a, b) => (a.health.score || 0) - (b.health.score || 0))
-        .slice(0, 20)
-        .map(r => ({
-          key: r.parent.key,
-          summary: r.parent.summary,
-          status: r.parent.status,
-          progressPercent: r.progressPercent,
-          squad: r.squad,
-          health: r.health.label,
-          riskFlags: r.riskFlags
         }))
     }
 
     const meta = {
-      squads: KNOWN_SQUADS,
-      availableParentStatuses: uniq(parentRows.map(r => r.parent.status)),
-      availableChildStatuses: uniq(allChildren.map(c => c.status)),
-      availableSprints: uniq([...parentRows.map(r => r.sprint), ...allChildren.map(c => c.sprint)]),
-      availableAssignees: uniq([...parentRows.map(r => r.assignee), ...allChildren.map(c => c.assignee)]),
-      availableRiskFlags: ['blocked', 'no_test_case', 'stale_child', 'no_child']
+      available: {
+        parentStatuses: uniq(parentRows.map(r => r.parent.status)),
+        childStatuses: uniq(allChildren.map(x => x.status)),
+        squads: uniq([...parentRows.map(r => r.squad), ...allChildren.map(x => x.squad)]),
+        sprints: uniq([...parentRows.map(r => r.sprint), ...allChildren.map(x => x.sprint)]),
+        assignees: uniq([...parentRows.map(r => r.assignee), ...allChildren.map(x => x.assignee)]),
+        risks: ['blocked', 'stale_child', 'no_test_case', 'no_child']
+      }
     }
 
     return res.status(200).json({
       generatedAt: new Date().toISOString(),
+      sprintCalendar,
       summary,
       squadSummary,
       insights,
