@@ -1,7 +1,6 @@
 {
-  "outputDirectory": ".",
   "rewrites": [
     { "source": "/api/jira", "destination": "/api/jira.js" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/api/dashboard", "destination": "/api/dashboard.js" }
   ]
 }
