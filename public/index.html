@@ -1,1 +1,468 @@
 
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FEPMF Dashboard — BigC DGT</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0F1117;--bg2:#161B25;--bg3:#1E2535;--bg4:#242B3D;
+  --border:#2A3448;--border2:#3A4560;
+  --text:#E8EDF8;--text2:#8A9BC4;--text3:#4A5878;
+  --blue:#4F8EF7;--blue2:#2D5DB8;--blue-bg:#1A2744;
+  --green:#3DD68C;--green-bg:#0E2A1E;
+  --amber:#F7B84F;--amber-bg:#2A1E0A;
+  --red:#F75F5F;--purple:#9B7EF7;--teal:#4FDEF7;--cyan:#4FC8F7;
+  --font:'IBM Plex Sans Thai',sans-serif;
+  --mono:'IBM Plex Mono',monospace;
+}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;font-size:14px}
+a{color:var(--blue);text-decoration:none}
+button{font-family:var(--font);cursor:pointer}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* Layout */
+.topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 20px;height:54px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-mark{width:28px;height:28px;background:linear-gradient(135deg,#4F8EF7,#9B7EF7);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#fff}
+.logo-title{font-size:15px;font-weight:500}
+.logo-sub{font-size:10px;color:var(--text3);font-family:var(--mono)}
+.topbar-right{display:flex;align-items:center;gap:10px}
+.live{width:6px;height:6px;background:var(--green);border-radius:50%;animation:pulse 2s infinite}
+.sync-time{font-size:11px;color:var(--text3);font-family:var(--mono)}
+.btn-refresh{background:var(--bg3);border:1px solid var(--border);color:var(--text2);padding:5px 12px;border-radius:7px;font-size:12px;display:flex;align-items:center;gap:5px}
+.btn-refresh:hover{border-color:var(--blue);color:var(--blue)}
+
+.toolbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:8px 20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.search-wrap{position:relative;flex:1;min-width:180px;max-width:300px}
+.search-ico{position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:13px;color:var(--text3);pointer-events:none}
+.search-input{background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 8px 6px 28px;border-radius:7px;font-size:13px;font-family:var(--font);width:100%;outline:none}
+.search-input:focus{border-color:var(--blue)}
+.search-input::placeholder{color:var(--text3)}
+.filter-tabs{display:flex;gap:3px;flex-wrap:wrap}
+.tab{padding:4px 10px;border-radius:5px;font-size:11px;cursor:pointer;border:1px solid transparent;color:var(--text2);background:transparent;font-family:var(--font);white-space:nowrap;transition:all .15s}
+.tab:hover{background:var(--bg3);color:var(--text)}
+.tab.active{border-color:var(--blue2);color:var(--blue);background:var(--blue-bg)}
+.tab-n{font-family:var(--mono);font-size:9px;opacity:.7;margin-left:3px}
+.view-toggle{display:flex;background:var(--bg3);border:1px solid var(--border);border-radius:7px;overflow:hidden;margin-left:auto}
+.vbtn{padding:5px 11px;font-size:12px;border:none;background:transparent;color:var(--text2);font-family:var(--font);cursor:pointer}
+.vbtn.active{background:var(--bg4);color:var(--text)}
+
+.main{padding:16px 20px;display:grid;gap:14px}
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;cursor:pointer;transition:all .15s}
+.stat-card:hover{border-color:var(--border2)}
+.stat-label{font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;font-weight:500;margin-bottom:5px}
+.stat-val{font-size:24px;font-weight:500;font-family:var(--mono);line-height:1}
+.stat-sub{font-size:10px;color:var(--text3);margin-top:3px}
+.stat-bar{height:3px;background:var(--bg4);border-radius:2px;margin-top:8px;overflow:hidden}
+.stat-fill{height:100%;border-radius:2px;transition:width .5s}
+
+.content-row{display:grid;grid-template-columns:1fr 260px;gap:14px}
+@media(max-width:860px){.content-row{grid-template-columns:1fr}}
+
+.panel{background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.panel-header{padding:11px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.panel-title{font-size:13px;font-weight:500}
+.panel-count{font-size:11px;color:var(--text3);font-family:var(--mono)}
+
+.issue-list{overflow-y:auto;max-height:560px}
+.issue-row{padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s;display:flex;align-items:flex-start;gap:9px}
+.issue-row:hover,.issue-row.exp{background:var(--bg3)}
+.issue-row:last-child{border-bottom:none}
+.epic-ico{width:18px;height:18px;border-radius:4px;background:#1E1A2A;color:var(--purple);display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;flex-shrink:0;margin-top:2px}
+.issue-body{flex:1;min-width:0}
+.issue-top{display:flex;align-items:center;gap:5px;justify-content:space-between;flex-wrap:wrap}
+.issue-key{font-family:var(--mono);font-size:10px;color:var(--text3)}
+.issue-title{font-size:13px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.4}
+.issue-meta{display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap}
+.issue-date{font-size:10px;color:var(--text3)}
+
+.badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:500;white-space:nowrap}
+.tag-ch{font-size:9px;background:var(--bg3);border:1px solid var(--border);padding:1px 5px;border-radius:3px;color:var(--text3);font-family:var(--mono)}
+
+.prog-wrap{text-align:right}
+.prog-bar{width:52px;height:3px;background:var(--bg4);border-radius:2px;overflow:hidden}
+.prog-fill{height:100%;border-radius:2px;transition:width .4s}
+.prog-label{font-size:9px;color:var(--text3);font-family:var(--mono);margin-top:1px}
+
+.children-box{margin-top:7px;background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:6px}
+.ch-header{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;padding:2px 5px 5px;display:flex;justify-content:space-between}
+.ch-item{display:flex;align-items:center;gap:7px;padding:5px 6px;border-radius:5px;cursor:pointer;transition:background .12s}
+.ch-item:hover{background:var(--bg3)}
+.ch-key{font-family:var(--mono);font-size:10px;color:var(--text3);min-width:68px}
+.ch-title{flex:1;font-size:11px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ch-assignee{font-size:10px;color:var(--text3);white-space:nowrap;min-width:54px;text-align:right}
+
+/* Kanban */
+.kanban-wrap{padding:10px;overflow-x:auto}
+.kanban{display:flex;gap:9px;min-width:max-content}
+.k-col{width:200px;flex-shrink:0}
+.k-head{padding:6px 9px;border-radius:7px 7px 0 0;font-size:11px;font-weight:500;display:flex;justify-content:space-between}
+.k-body{background:var(--bg3);border-radius:0 0 7px 7px;padding:5px;min-height:60px;display:flex;flex-direction:column;gap:4px}
+.k-card{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:8px;cursor:pointer;font-size:12px;transition:border-color .12s}
+.k-card:hover{border-color:var(--border2)}
+.k-key{font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:2px}
+.k-title{line-height:1.4;color:var(--text)}
+.k-foot{display:flex;justify-content:space-between;align-items:center;margin-top:5px}
+.avatar{width:17px;height:17px;border-radius:50%;background:var(--blue-bg);display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:600;color:var(--blue)}
+
+/* Sidebar */
+.sidebar-panel{background:var(--bg2);border:1px solid var(--border);border-radius:12px;margin-bottom:12px;overflow:hidden}
+.sidebar-body{padding:10px 14px}
+
+/* Modal */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:12px;max-width:660px;width:100%;max-height:85vh;overflow-y:auto}
+.modal-head{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;position:sticky;top:0;background:var(--bg2)}
+.modal-key{font-family:var(--mono);font-size:10px;color:var(--text3)}
+.modal-title{font-size:14px;font-weight:500;margin-top:2px}
+.modal-close{background:transparent;border:none;color:var(--text2);font-size:20px;cursor:pointer;line-height:1;padding:0 3px}
+.modal-body{padding:18px}
+
+/* States */
+.loading{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:10px;color:var(--text3)}
+.spinner{width:30px;height:30px;border:2px solid var(--bg4);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite}
+.empty{padding:36px;text-align:center;color:var(--text3);font-size:13px}
+.error-box{padding:20px;text-align:center;color:var(--red)}
+</style>
+</head>
+<body>
+
+<div id="loading" class="loading">
+  <div class="spinner"></div>
+  <span>กำลังโหลดข้อมูลจาก Jira…</span>
+</div>
+
+<div id="app" style="display:none">
+  <header class="topbar">
+    <div class="logo">
+      <div class="logo-mark">PM</div>
+      <div>
+        <div class="logo-title">FEPMF Dashboard</div>
+        <div class="logo-sub">Front-End Project Management Framework</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="live"></div>
+      <span class="sync-time" id="sync-time"></span>
+      <button class="btn-refresh" onclick="loadAll()">↻ Refresh</button>
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <div class="search-wrap">
+      <span class="search-ico">🔍</span>
+      <input class="search-input" id="search" type="text" placeholder="ค้นหา issue, key, assignee…" oninput="applyFilter()">
+    </div>
+    <div class="filter-tabs" id="tabs"></div>
+    <div class="view-toggle">
+      <button class="vbtn active" id="vb-list" onclick="setView('list')">List</button>
+      <button class="vbtn" id="vb-kanban" onclick="setView('kanban')">Kanban</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="stats-row" id="stats"></div>
+    <div class="content-row">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Issues</span>
+          <span class="panel-count" id="result-count"></span>
+        </div>
+        <div id="issues-wrap"></div>
+      </div>
+      <div>
+        <div class="sidebar-panel">
+          <div class="panel-header"><span class="panel-title">Progress by Status</span></div>
+          <div class="sidebar-body" id="status-chart"></div>
+        </div>
+        <div class="sidebar-panel">
+          <div class="panel-header"><span class="panel-title">Top Assignees</span></div>
+          <div class="sidebar-body" id="assignee-chart"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="modal" class="modal-bg" style="display:none" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div class="modal-key" id="m-key"></div>
+        <div class="modal-title" id="m-title"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body" id="m-body"></div>
+  </div>
+</div>
+
+<script>
+const JIRA_WEB = 'https://dgtbigc.atlassian.net/browse/'
+let allIssues = [], childMap = {}, filtered = [], activeStatus = 'all', curView = 'list', expanded = new Set()
+
+const S_ORDER = ['S0 - Create Idea','S1-Confirm Idea','S2 - Validated Idea','S3 - Detail Requirement - PRD','S4- Project Planning','S5 - In Development','S6 - UAT Execute','s7 - Project Deliverd','OPEN']
+const S_SHORT  = {'S0 - Create Idea':'S0 Idea','S1-Confirm Idea':'S1 Confirm','S2 - Validated Idea':'S2 Validate','S3 - Detail Requirement - PRD':'S3 PRD','S4- Project Planning':'S4 Plan','S5 - In Development':'S5 Dev','S6 - UAT Execute':'S6 UAT','s7 - Project Deliverd':'S7 Done','OPEN':'Open'}
+const S_COLOR  = {'S0 - Create Idea':'#7070CC','S1-Confirm Idea':'#4FDEF7','S2 - Validated Idea':'#4FC87A','S3 - Detail Requirement - PRD':'#F7B84F','S4- Project Planning':'#C8C840','S5 - In Development':'#4F8EF7','S6 - UAT Execute':'#E070C8','s7 - Project Deliverd':'#3DD68C','OPEN':'#4A5878'}
+const S_BG     = {'S0 - Create Idea':'#1A1A2A','S1-Confirm Idea':'#0A2228','S2 - Validated Idea':'#0E2818','S3 - Detail Requirement - PRD':'#2A1E0A','S4- Project Planning':'#1A1A0A','S5 - In Development':'#1A2744','S6 - UAT Execute':'#2A1A28','s7 - Project Deliverd':'#0E2A1E','OPEN':'#1E2535'}
+const CS_COLOR = {'To Do':'#7070CC','In Progress':'#4F8EF7','In Review':'#9B7EF7','Ready To Test':'#F7B84F','Done':'#3DD68C','Pending':'#4A5878'}
+const CS_BG    = {'To Do':'#1A1A2A','In Progress':'#1A2744','In Review':'#1E1A2A','Ready To Test':'#2A1E0A','Done':'#0E2A1E','Pending':'#1E2535'}
+const PRI_C    = {P1:'#F75F5F',P2:'#F7A84F',P3:'#8A9BC4',Medium:'#8A9BC4',Lowest:'#4A5878',Meduim:'#8A9BC4'}
+const PRI_BG   = {P1:'#2A0E0E',P2:'#2A1A0A',P3:'#1E2535',Medium:'#1E2535',Lowest:'#1E2535',Meduim:'#1E2535'}
+
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+const fmt = s => { try{return new Date(s).toLocaleDateString('th-TH',{day:'2-digit',month:'short',year:'2-digit'})}catch{return''} }
+const shortName = n => (n||'').replace(/^DGT\s+/i,'').split(' ')[0]
+const initials  = n => (n||'').replace(/^DGT\s+/i,'').split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase()
+const fedKeys   = issue => (issue.fields.issuelinks||[]).flatMap(l=>[l.outwardIssue?.key,l.inwardIssue?.key]).filter(k=>k&&k.startsWith('FED-'))
+const badge     = (label,color,bg) => `<span class="badge" style="color:${color};background:${bg};border:1px solid ${color}33">${esc(label)}</span>`
+const childrenOf = issue => fedKeys(issue).map(k=>childMap[k]).filter(Boolean)
+
+function childProg(children){
+  if(!children.length) return null
+  const done=children.filter(c=>c.fields.status.name==='Done').length
+  const rtt =children.filter(c=>c.fields.status.name==='Ready To Test').length
+  const pct =Math.round((done+rtt)/children.length*100)
+  return{done,rtt,total:children.length,pct}
+}
+
+async function fetchAPI(params){
+  const q = new URLSearchParams(params)
+  const r = await fetch(`/api/dashboard?${q}`)
+  const d = await r.json()
+  if(d.error) throw new Error(d.error)
+  return d
+}
+
+async function loadAll(){
+  document.getElementById('loading').style.display='flex'
+  document.getElementById('app').style.display='none'
+  try{
+    const data = await fetchAPI({action:'fepmf'})
+    allIssues = data.issues||[]
+
+    // load children in batches
+    const keys = [...new Set(allIssues.flatMap(fedKeys))]
+    childMap = {}
+    for(let i=0;i<keys.length;i+=30){
+      const batch=keys.slice(i,i+30)
+      try{
+        const d=await fetchAPI({action:'children',keys:batch.join(',')})
+        ;(d.issues||[]).forEach(c=>{childMap[c.key]=c})
+      }catch(e){}
+    }
+
+    document.getElementById('sync-time').textContent='synced '+new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})
+    renderStats()
+    renderSidebar()
+    applyFilter()
+    document.getElementById('loading').style.display='none'
+    document.getElementById('app').style.display='block'
+  }catch(e){
+    document.getElementById('loading').innerHTML=`<div class="error-box"><b>ไม่สามารถดึงข้อมูลได้</b><p style="margin-top:6px;font-size:12px;color:#4A5878">${e.message}</p><button onclick="loadAll()" style="margin-top:12px;background:#1A2744;border:1px solid #2D5DB8;color:#4F8EF7;padding:6px 14px;border-radius:7px;font-size:12px">ลองใหม่</button></div>`
+  }
+}
+
+function renderStats(){
+  const c={};allIssues.forEach(i=>{const s=i.fields.status.name;c[s]=(c[s]||0)+1})
+  const tot=allIssues.length||1
+  const s5=c['S5 - In Development']||0, s6=c['S6 - UAT Execute']||0, s7=c['s7 - Project Deliverd']||0
+  document.getElementById('stats').innerHTML=[
+    {label:'Total Issues',val:allIssues.length,color:'#4F8EF7',sub:'FEPMF Board',s:'all'},
+    {label:'In Development',val:s5,color:'#4FC8F7',sub:Math.round(s5/tot*100)+'% of total',s:'S5 - In Development'},
+    {label:'UAT / Testing',val:s6,color:'#E070C8',sub:Math.round(s6/tot*100)+'% of total',s:'S6 - UAT Execute'},
+    {label:'Delivered',val:s7,color:'#3DD68C',sub:Math.round(s7/tot*100)+'% of total',s:'s7 - Project Deliverd'},
+    {label:'Child (FED)',val:Object.keys(childMap).length,color:'#F7B84F',sub:'linked to squads',s:null},
+  ].map(({label,val,color,sub,s})=>`
+    <div class="stat-card" onclick="${s?`setStatusFilter('${s.replace(/'/g,"\\'")}')`:''}">
+      <div class="stat-label">${label}</div>
+      <div class="stat-val" style="color:${color}">${val}</div>
+      <div class="stat-sub">${sub}</div>
+    </div>`).join('')
+
+  // tabs
+  const counts={all:allIssues.length};allIssues.forEach(i=>{const s=i.fields.status.name;counts[s]=(counts[s]||0)+1})
+  document.getElementById('tabs').innerHTML=[
+    `<button class="tab ${activeStatus==='all'?'active':''}" onclick="setStatusFilter('all')">All<span class="tab-n">${allIssues.length}</span></button>`,
+    ...S_ORDER.filter(s=>counts[s]).map(s=>`<button class="tab ${activeStatus===s?'active':''}" onclick="setStatusFilter('${s.replace(/'/g,"\\'")}')" style="${activeStatus===s?`border-color:${S_COLOR[s]}66;color:${S_COLOR[s]};background:${S_BG[s]}`:''}"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${S_COLOR[s]};margin-right:4px;vertical-align:middle"></span>${S_SHORT[s]||s}<span class="tab-n">${counts[s]}</span></button>`)
+  ].join('')
+}
+
+function renderSidebar(){
+  const c={};allIssues.forEach(i=>{const s=i.fields.status.name;c[s]=(c[s]||0)+1})
+  const tot=allIssues.length||1
+  document.getElementById('status-chart').innerHTML=S_ORDER.filter(s=>c[s]).map(s=>`
+    <div style="margin-bottom:7px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+        <span style="font-size:11px;color:var(--text2)">${S_SHORT[s]||s}</span>
+        <span style="font-size:11px;color:var(--text3);font-family:var(--mono)">${c[s]}</span>
+      </div>
+      <div style="height:4px;background:var(--bg4);border-radius:2px;overflow:hidden">
+        <div style="width:${Math.round(c[s]/tot*100)}%;height:100%;background:${S_COLOR[s]};border-radius:2px"></div>
+      </div>
+    </div>`).join('')
+
+  const ac={};allIssues.forEach(i=>{const n=shortName(i.fields.assignee?.displayName||'Unassigned');ac[n]=(ac[n]||0)+1})
+  const sorted=Object.entries(ac).sort((a,b)=>b[1]-a[1]).slice(0,7)
+  const maxV=sorted[0]?.[1]||1
+  const colors=['#4F8EF7','#9B7EF7','#4FDEF7','#3DD68C','#F7B84F','#E070C8','#F75F5F']
+  document.getElementById('assignee-chart').innerHTML=sorted.map(([name,count],i)=>`
+    <div style="display:flex;align-items:center;gap:7px;margin-bottom:7px">
+      <span style="font-size:11px;color:var(--text2);width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0">${esc(name)}</span>
+      <div style="flex:1;height:5px;background:var(--bg4);border-radius:3px;overflow:hidden">
+        <div style="width:${count/maxV*100}%;height:100%;background:${colors[i%colors.length]};border-radius:3px"></div>
+      </div>
+      <span style="font-size:11px;color:var(--text3);font-family:var(--mono);width:16px;text-align:right">${count}</span>
+    </div>`).join('')
+}
+
+function applyFilter(){
+  const q=(document.getElementById('search').value||'').toLowerCase()
+  filtered=allIssues.filter(i=>{
+    if(activeStatus!=='all'&&i.fields.status.name!==activeStatus) return false
+    if(q){const hay=`${i.key} ${i.fields.summary} ${i.fields.assignee?.displayName||''}`.toLowerCase();if(!hay.includes(q)) return false}
+    return true
+  })
+  document.getElementById('result-count').textContent=filtered.length+' issues'
+  curView==='list'?renderList():renderKanban()
+}
+
+function setStatusFilter(s){activeStatus=s;renderStats();applyFilter()}
+function setView(v){
+  curView=v
+  document.getElementById('vb-list').className='vbtn'+(v==='list'?' active':'')
+  document.getElementById('vb-kanban').className='vbtn'+(v==='kanban'?' active':'')
+  applyFilter()
+}
+
+function renderList(){
+  if(!filtered.length){document.getElementById('issues-wrap').innerHTML='<div class="empty">ไม่พบ Issue ที่ตรงเงื่อนไข</div>';return}
+  document.getElementById('issues-wrap').innerHTML=`<div class="issue-list">`+filtered.map(issue=>{
+    const f=issue.fields, s=f.status.name
+    const children=childrenOf(issue), prog=childProg(children)
+    const isExp=expanded.has(issue.key)
+    const aName=shortName(f.assignee?.displayName||''), pri=f.priority?.name||''
+    return `<div class="issue-row ${isExp?'exp':''}" onclick="toggleExpand('${issue.key}')">
+      <div class="epic-ico">E</div>
+      <div class="issue-body">
+        <div class="issue-top">
+          <div style="display:flex;align-items:center;gap:5px">
+            <span class="issue-key">${issue.key}</span>
+            ${badge(S_SHORT[s]||s,S_COLOR[s]||'#8A9BC4',S_BG[s]||'#1E2535')}
+            ${pri?badge(pri,PRI_C[pri]||'#8A9BC4',PRI_BG[pri]||'#1E2535'):''}
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            ${children.length?`<span class="tag-ch">${children.length}ch</span>`:''}
+            ${prog?`<div class="prog-wrap"><div class="prog-bar"><div class="prog-fill" style="width:${prog.pct}%;background:${prog.pct===100?'#3DD68C':'#4F8EF7'}"></div></div><div class="prog-label">${prog.pct}%</div></div>`:''}
+          </div>
+        </div>
+        <div class="issue-title">${esc(f.summary||'(ไม่มีชื่อ)')}</div>
+        <div class="issue-meta">
+          ${aName?badge(aName,'#8A9BC4','#1E2535'):''}
+          <span class="issue-date">${fmt(f.updated)}</span>
+          <a href="${JIRA_WEB}${issue.key}" target="_blank" onclick="event.stopPropagation()" style="font-size:10px;font-family:var(--mono)">${issue.key} ↗</a>
+          <button onclick="event.stopPropagation();openModal('${issue.key}')" style="font-size:10px;color:var(--purple);background:transparent;border:1px solid #3A3A5A;padding:1px 6px;border-radius:4px">detail</button>
+        </div>
+        ${isExp?renderChildren(issue,children):''}
+      </div>
+    </div>`
+  }).join('')+'</div>'
+}
+
+function renderChildren(issue,children){
+  const prog=childProg(children)
+  if(!children.length) return`<div class="children-box"><div style="font-size:12px;color:var(--text3);padding:4px;text-align:center">ไม่มี FED Child Issues</div></div>`
+  return`<div class="children-box">
+    <div class="ch-header"><span>Child Issues — Dev Squads</span>${prog?`<span style="font-family:var(--mono);color:${prog.pct===100?'#3DD68C':'#4F8EF7'}">${prog.done}/${prog.total} done · ${prog.pct}%</span>`:''}</div>
+    ${children.map(c=>{
+      const cs=c.fields.status.name, ca=shortName(c.fields.assignee?.displayName||'')
+      return`<div class="ch-item" onclick="event.stopPropagation();openModal('${c.key}')">
+        <span class="ch-key">${c.key}</span>
+        <span class="ch-title">${esc(c.fields.summary||'')}</span>
+        ${badge(cs,CS_COLOR[cs]||'#8A9BC4',CS_BG[cs]||'#1E2535')}
+        <span class="ch-assignee">${esc(ca)}</span>
+      </div>`
+    }).join('')}
+  </div>`
+}
+
+function renderKanban(){
+  const cols={};S_ORDER.forEach(s=>{cols[s]=[]})
+  filtered.forEach(i=>{const s=i.fields.status.name;if(!cols[s])cols[s]=[];cols[s].push(i)})
+  const active=S_ORDER.filter(s=>cols[s]?.length)
+  if(!active.length){document.getElementById('issues-wrap').innerHTML='<div class="empty">ไม่พบ Issue</div>';return}
+  document.getElementById('issues-wrap').innerHTML=`<div class="kanban-wrap"><div class="kanban">`+active.map(s=>{
+    const col=S_COLOR[s],bg=S_BG[s]
+    return`<div class="k-col">
+      <div class="k-head" style="background:${bg};color:${col}"><span>${S_SHORT[s]||s}</span><span style="font-family:var(--mono);font-size:9px">${cols[s].length}</span></div>
+      <div class="k-body">${cols[s].slice(0,18).map(i=>{
+        const children=childrenOf(i),prog=childProg(children),ini=initials(i.fields.assignee?.displayName||'')
+        return`<div class="k-card" onclick="openModal('${i.key}')">
+          <div class="k-key">${i.key}</div>
+          <div class="k-title">${esc((i.fields.summary||'').slice(0,52))}${(i.fields.summary||'').length>52?'…':''}</div>
+          <div class="k-foot">
+            ${ini?`<div class="avatar">${ini}</div>`:'<span></span>'}
+            ${prog?`<span style="font-size:9px;font-family:var(--mono);color:${prog.pct===100?'#3DD68C':'#4A5878'}">${prog.pct}%</span>`:children.length?`<span style="font-size:9px;color:#4A5878">${children.length}ch</span>`:'<span></span>'}
+          </div>
+        </div>`
+      }).join('')}${cols[s].length>18?`<div style="font-size:11px;color:var(--text3);text-align:center;padding:4px">+${cols[s].length-18} more</div>`:''}</div>
+    </div>`
+  }).join('')+'</div></div>'
+}
+
+function toggleExpand(key){
+  if(curView==='kanban'){openModal(key);return}
+  expanded.has(key)?expanded.delete(key):expanded.add(key)
+  renderList()
+}
+
+function openModal(key){
+  const issue=allIssues.find(i=>i.key===key)||childMap[key]
+  if(!issue) return
+  const f=issue.fields, s=f.status.name, pri=f.priority?.name||''
+  const children=childrenOf(issue), prog=childProg(children)
+  document.getElementById('m-key').textContent=issue.key
+  document.getElementById('m-title').textContent=f.summary||''
+  document.getElementById('m-body').innerHTML=`
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+      ${badge(S_SHORT[s]||s,S_COLOR[s]||'#8A9BC4',S_BG[s]||'#1E2535')}
+      ${pri?badge(pri,PRI_C[pri]||'#8A9BC4',PRI_BG[pri]||'#1E2535'):''}
+      ${f.assignee?badge(shortName(f.assignee.displayName),'#8A9BC4','#1E2535'):''}
+      <a href="${JIRA_WEB}${issue.key}" target="_blank" style="font-size:11px;font-family:var(--mono);align-self:center">เปิดใน Jira ↗</a>
+    </div>
+    ${children.length?`
+      <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;font-weight:500;margin-bottom:7px;display:flex;justify-content:space-between">
+        <span>Child Issues (${children.length})</span>
+        ${prog?`<span style="font-family:var(--mono);color:${prog.pct===100?'#3DD68C':'#4F8EF7'}">${prog.done}/${prog.total} · ${prog.pct}%</span>`:''}
+      </div>
+      ${prog?`<div style="height:5px;background:var(--bg4);border-radius:3px;margin-bottom:10px;overflow:hidden"><div style="width:${prog.pct}%;height:100%;background:${prog.pct===100?'#3DD68C':'#4F8EF7'};border-radius:3px"></div></div>`:''}
+      ${children.map(c=>{
+        const cs=c.fields.status.name, ca=shortName(c.fields.assignee?.displayName||'')
+        return`<div style="display:flex;align-items:center;gap:7px;padding:6px 9px;border-radius:6px;margin-bottom:3px;background:var(--bg3);cursor:pointer" onclick="openModal('${c.key}')">
+          <a href="${JIRA_WEB}${c.key}" target="_blank" onclick="event.stopPropagation()" style="font-family:var(--mono);font-size:10px;min-width:74px">${c.key}</a>
+          <span style="flex:1;font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.fields.summary||'')}</span>
+          ${badge(cs,CS_COLOR[cs]||'#8A9BC4',CS_BG[cs]||'#1E2535')}
+          <span style="font-size:10px;color:var(--text3);white-space:nowrap">${esc(ca)}</span>
+        </div>`
+      }).join('')}`:''}
+    <div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--border);font-size:11px;color:var(--text3);font-family:var(--mono)">
+      Updated: ${fmt(f.updated)} · Created: ${fmt(f.created)}
+    </div>`
+  document.getElementById('modal').style.display='flex'
+}
+
+function closeModal(){document.getElementById('modal').style.display='none'}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()})
+loadAll()
+</script>
+</body>
+</html>
