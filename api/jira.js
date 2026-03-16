@@ -1,58 +1,179 @@
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end()
+  }
 
   const EMAIL = process.env.JIRA_EMAIL
   const TOKEN = process.env.JIRA_API_TOKEN
-  const BASE = 'https://api.atlassian.com/ex/jira/a7d03eec-4d39-4f31-b491-3abab9fe9f51/rest/api/3'
+
+  // สำคัญมาก: ใช้ Jira site URL ตรง ๆ
+  const BASE = 'https://dgtbigc.atlassian.net/rest/api/3'
 
   if (!EMAIL || !TOKEN) {
-    return res.status(500).json({ error: 'Missing env vars' })
+    return res.status(500).json({
+      error: 'Missing env vars: JIRA_EMAIL or JIRA_API_TOKEN'
+    })
   }
 
   const auth = Buffer.from(`${EMAIL}:${TOKEN}`).toString('base64')
-  const headers = { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' }
+  const headers = {
+    Authorization: `Basic ${auth}`,
+    Accept: 'application/json',
+    'Content-Type': 'application/json'
+  }
 
   async function fetchJira(path) {
-    const r = await fetch(`${BASE}${path}`, { headers })
-    if (!r.ok) throw new Error(`Jira ${r.status}: ${r.statusText}`)
+    const url = `${BASE}${path}`
+    const r = await fetch(url, { method: 'GET', headers })
+
+    if (!r.ok) {
+      const text = await r.text()
+      throw new Error(`Jira ${r.status}: ${r.statusText} | ${text}`)
+    }
+
     return r.json()
   }
 
-  async function fetchAll(jql, fields) {
-    let start = 0, all = []
+  async function fetchAll(jql, fields = []) {
+    let start = 0
+    let all = []
+
     while (true) {
-      const p = new URLSearchParams({ jql, startAt: String(start), maxResults: '100', fields: fields.join(',') })
-      const d = await fetchJira(`/search?${p}`)
-      all = [...all, ...(d.issues || [])]
-      if (all.length >= d.total || !d.issues?.length) break
+      const p = new URLSearchParams({
+        jql,
+        startAt: String(start),
+        maxResults: '100'
+      })
+
+      if (fields.length) {
+        p.set('fields', fields.join(','))
+      }
+
+      const d = await fetchJira(`/search?${p.toString()}`)
+      const issues = d.issues || []
+
+      all = [...all, ...issues]
+
+      if (!issues.length || all.length >= (d.total || 0)) break
+
       start += 100
-      if (start > 600) break
+
+      // กัน loop ยาวเกิน
+      if (start > 2000) break
     }
+
     return all
   }
 
   try {
     const { action = 'fepmf', keys = '', key = '' } = req.query
 
+    // 1) ดึง FEPMF ทั้งหมด
     if (action === 'fepmf') {
-      const issues = await fetchAll('project = FEPMF ORDER BY updated DESC',
-        ['summary', 'status', 'assignee', 'priority', 'issuelinks', 'issuetype', 'created', 'updated'])
-      return res.json({ issues })
+      const issues = await fetchAll(
+        'project = FEPMF ORDER BY updated DESC',
+        [
+          'summary',
+          'status',
+          'assignee',
+          'priority',
+          'issuelinks',
+          'issuetype',
+          'created',
+          'updated',
+          'attachment',
+          'subtasks',
+          'project',
+          'labels',
+          'components',
+          'description'
+        ]
+      )
+
+      return res.status(200).json({ issues })
     }
 
+    // 2) ดึง child / linked items หลาย key พร้อมกัน
     if (action === 'children' && keys) {
-      const issues = await fetchAll(`key IN (${keys}) ORDER BY updated DESC`,
-        ['summary', 'status', 'assignee', 'priority', 'issuetype', 'parent'])
-      return res.json({ issues })
+      const cleanKeys = keys
+        .split(',')
+        .map(k => k.trim())
+        .filter(Boolean)
+
+      if (!cleanKeys.length) {
+        return res.status(400).json({ error: 'No valid keys provided' })
+      }
+
+      const jql = `key IN (${cleanKeys.map(k => `"${k}"`).join(',')}) ORDER BY updated DESC`
+
+      const issues = await fetchAll(
+        jql,
+        [
+          'summary',
+          'status',
+          'assignee',
+          'priority',
+          'issuetype',
+          'parent',
+          'created',
+          'updated',
+          'attachment',
+          'subtasks',
+          'project',
+          'labels',
+          'components',
+          'description',
+          'issuelinks'
+        ]
+      )
+
+      return res.status(200).json({ issues })
     }
 
+    // 3) ดึง issue รายตัวแบบละเอียด
     if (action === 'issue' && key) {
-      const data = await fetchJira(`/issue/${key}?fields=summary,status,assignee,priority,issuelinks,issuetype,description,created,updated`)
-      return res.json(data)
+      const data = await fetchJira(
+        `/issue/${encodeURIComponent(key)}?fields=` +
+          [
+            'summary',
+            'status',
+            'assignee',
+            'priority',
+            'issuelinks',
+            'issuetype',
+            'description',
+            'created',
+            'updated',
+            'attachment',
+            'subtasks',
+            'project',
+            'labels',
+            'components',
+            'parent'
+          ].join(',')
+      )
+
+      return res.status(200).json(data)
+    }
+
+    // 4) health check ไว้ test ว่า function ยังทำงานไหม
+    if (action === 'health') {
+      return res.status(200).json({
+        ok: true,
+        hasEmail: !!EMAIL,
+        hasToken: !!TOKEN,
+        base: BASE
+      })
     }
 
     return res.status(400).json({ error: 'unknown action' })
   } catch (e) {
-    return res.status(500).json({ error: e.message })
+    return res.status(500).json({
+      error: e.message || 'Unknown server error'
+    })
   }
 }
