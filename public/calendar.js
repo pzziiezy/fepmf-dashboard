@@ -4,6 +4,7 @@
   source: '',
   editingId: '',
   timelineVisibleCount: 30,
+  selectedMonth: '',
   filters: {
     q: '',
     status: ['S4', 'S5', 'S6']
@@ -24,9 +25,19 @@ function toIsoDate(value) {
 }
 
 function getTwoMonthRange() {
-  const now = new Date()
-  const y = now.getUTCFullYear()
-  const m = now.getUTCMonth()
+  let y
+  let m
+
+  if (state.selectedMonth && /^\d{4}-\d{2}$/.test(state.selectedMonth)) {
+    const [yy, mm] = state.selectedMonth.split('-').map(Number)
+    y = yy
+    m = mm - 1
+  } else {
+    const now = new Date()
+    y = now.getUTCFullYear()
+    m = now.getUTCMonth()
+  }
+
   const start = new Date(Date.UTC(y, m, 1))
   const end = new Date(Date.UTC(y, m + 2, 0))
   return { start: toIsoDate(start), end: toIsoDate(end) }
@@ -348,6 +359,20 @@ async function loadAll() {
 }
 
 function bindEvents() {
+  const monthPicker = document.getElementById('calendarMonthPicker')
+  if (monthPicker) {
+    const now = new Date()
+    const currentMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`
+    state.selectedMonth = currentMonth
+    monthPicker.value = currentMonth
+
+    monthPicker.addEventListener('change', (e) => {
+      state.selectedMonth = e.target.value || currentMonth
+      state.timelineVisibleCount = 30
+      renderTimeline()
+    })
+  }
+
   document.getElementById('calendarSearch').addEventListener('input', (e) => {
     state.filters.q = e.target.value || ''
     state.timelineVisibleCount = 30

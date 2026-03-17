@@ -273,6 +273,7 @@
     if (status === 'S7') return true
 
     const s = lower(getStatus(issue))
+    if (s.includes('cab approved') || s.includes('approved')) return true
     if (s.includes('done') || s.includes('complete') || s.includes('closed') || s.includes('resolved') || s.includes('delivered')) return true
     if (s.includes('cancel')) return true
     return false
@@ -360,6 +361,7 @@
     const text = lower(item?.statusRaw || item?.status || '')
     if (!text) return 0
     if (text.includes('cancel')) return 100
+    if (text.includes('cab approved') || text.includes('approved')) return 100
     if (text.includes('done') || text.includes('complete') || text.includes('closed') || text.includes('resolved') || text.includes('deliver') || text.includes('s7')) return 100
     if (text.includes('review') || text.includes('uat') || text.includes('sit') || text.includes('test') || text.includes('qa') || text.includes('s6') || text.includes('s5')) return 80
     if (text.includes('progress') || text.includes('doing') || text.includes('develop') || text.includes('implement') || text.includes('s4') || text.includes('s3') || text.includes('s2')) return 50

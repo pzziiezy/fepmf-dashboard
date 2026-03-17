@@ -58,6 +58,7 @@ function statusBadgeClass(status) {
   if (s === 'S4') return 'badge status-s4'
   if (s === 'S3') return 'badge status-s3'
   if (s === 'Cancelled') return 'badge status-cancel'
+  if (l.includes('cab approved') || l.includes('approved')) return 'badge status-s7'
   if (l.includes('done') || l.includes('complete') || l.includes('closed') || l.includes('resolved') || l.includes('deliver')) return 'badge status-s7'
   if (l.includes('review') || l.includes('test') || l.includes('uat') || l.includes('sit') || l.includes('qa')) return 'badge status-s6'
   if (l.includes('progress') || l.includes('doing') || l.includes('develop')) return 'badge status-s5'
@@ -73,6 +74,7 @@ function workItemStatusClass(item) {
 function workItemRowClass(item) {
   if (String(item.key || '').startsWith('MISQA-')) return 'misqa-item'
   const s = String(item.status || '').toLowerCase()
+  if (s.includes('cab approved') || s.includes('approved')) return 'item-done'
   if (s.includes('done') || s.includes('complete') || s.includes('closed') || s.includes('resolved') || s.includes('deliver') || s === 's7') return 'item-done'
   if (s.includes('test') || s.includes('review') || s.includes('uat') || s.includes('sit') || s.includes('qa') || s === 's6') return 'item-test'
   if (s.includes('progress') || s.includes('doing') || s.includes('develop') || s === 's5' || s === 's4') return 'item-progress'
