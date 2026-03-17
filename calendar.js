@@ -22,26 +22,28 @@ function toIsoDate(value) {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
 }
 
-function monthStart(year, month) {
-  return new Date(Date.UTC(year, month, 1))
-}
-
-function monthEnd(year, month) {
-  return new Date(Date.UTC(year, month + 1, 0))
-}
-
 function getTwoMonthRange() {
   const now = new Date()
   const y = now.getUTCFullYear()
   const m = now.getUTCMonth()
-  return {
-    start: toIsoDate(monthStart(y, m)),
-    end: toIsoDate(monthEnd(y, m + 1))
-  }
+  const start = new Date(Date.UTC(y, m, 1))
+  const end = new Date(Date.UTC(y, m + 2, 0))
+  return { start: toIsoDate(start), end: toIsoDate(end) }
 }
 
 function overlaps(aStart, aEnd, bStart, bEnd) {
   return aStart <= bEnd && bStart <= aEnd
+}
+
+function statusBadgeClass(status) {
+  const s = String(status || '')
+  if (s === 'S7') return 'badge status-s7'
+  if (s === 'S6') return 'badge status-s6'
+  if (s === 'S5') return 'badge status-s5'
+  if (s === 'S4') return 'badge status-s4'
+  if (s === 'S3') return 'badge status-s3'
+  if (s === 'Cancelled') return 'badge status-cancel'
+  return 'badge status-default'
 }
 
 function buildStatusFilter() {
@@ -57,7 +59,7 @@ function buildStatusFilter() {
       <div class="multi-options">
         ${options.map((value) => `
           <label class="multi-option"><input type="checkbox" value="${esc(value)}" ${selected.includes(value) ? 'checked' : ''} /><span>${esc(value)}</span></label>
-        `).join('')}
+        `).join('') || '<div class="mini-empty">ไม่พบค่า</div>'}
       </div>
       <div class="multi-actions">
         <button class="btn" data-role="clear" type="button" style="padding:6px 10px">ล้าง</button>
@@ -137,9 +139,7 @@ function filteredEvents() {
   return enumerateEvents().filter((e) => {
     if (!overlaps(e.start, e.end, start, end)) return false
 
-    if (e.source === 'parent') {
-      if (state.filters.status.length && !state.filters.status.includes(e.status)) return false
-    }
+    if (e.source === 'parent' && state.filters.status.length && !state.filters.status.includes(e.status)) return false
 
     if (q) {
       const blob = `${e.key} ${e.title} ${e.status} ${e.squad}`.toLowerCase()
@@ -183,15 +183,15 @@ function renderTimeline() {
       <div class="timeline-row" style="grid-template-columns:240px repeat(${days}, minmax(16px, 1fr));">
         <div class="row-label">
           <div style="display:flex;justify-content:space-between;gap:6px;align-items:center">
-            <strong>${e.url ? `<a href="${esc(e.url)}" target="_blank">${esc(e.key)}</a>` : esc(e.key)}</strong>
-            <span class="badge b-status" style="padding:2px 8px">${esc(e.status)}</span>
+            <strong>${e.url ? `<a href="${esc(e.url)}" target="_blank" title="${esc(e.title)}">${esc(e.key)}</a>` : `<span title="${esc(e.title)}">${esc(e.key)}</span>`}</strong>
+            <span class="${statusBadgeClass(e.status)}" style="padding:2px 8px">${esc(e.status)}</span>
           </div>
           <div style="font-size:12px;color:var(--muted)">${esc(e.squad || '-')}</div>
         </div>
-        ${Array.from({ length: days }, () => '<div class="row-day"></div>').join('')}
-        <div class="row-track">
+        <div class="row-track" style="grid-column:2 / -1;grid-row:1;">
           <div class="event-bar ${barClass}" style="left:${left}%;width:${width}%" title="${esc(e.title)}">${esc(e.key)}</div>
         </div>
+        ${Array.from({ length: days }, () => '<div class="row-day"></div>').join('')}
       </div>
     `
   }).join('')
@@ -245,7 +245,7 @@ function renderManualList() {
 
   list.innerHTML = state.plans.map((item) => `
     <div class="item-row">
-      <div class="item-top"><div><strong>${esc(item.key || '-')}</strong> ${esc(item.title)}</div><div class="badge b-status">${esc(item.start)} - ${esc(item.end)}</div></div>
+      <div class="item-top"><div><strong>${esc(item.key || '-')}</strong> ${esc(item.title)}</div><div class="badge status-default">${esc(item.start)} - ${esc(item.end)}</div></div>
       <div class="item-meta">Owner: ${esc(item.owner || '-')} | Sprint: ${esc(item.sprint || '-')}</div>
       <div class="item-meta">${esc(item.note || '')}</div>
       <div style="display:flex;gap:8px;margin-top:6px">
@@ -303,8 +303,7 @@ async function loadAll() {
   state.source = planner.source || ''
 
   state.statusOptions = dashboard.meta?.available?.statuses || []
-  const defaults = ['S4', 'S5', 'S6'].filter((s) => state.statusOptions.includes(s))
-  if (!state.filters.status.length) state.filters.status = defaults
+  state.filters.status = ['S4', 'S5', 'S6'].filter((s) => state.statusOptions.includes(s))
 
   buildStatusFilter()
   renderManualList()

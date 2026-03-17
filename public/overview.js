@@ -2,6 +2,7 @@
   data: null,
   query: '',
   rows: [],
+  expanded: new Set(),
   filters: {
     status: ['S4', 'S5', 'S6'],
     squad: [],
@@ -48,18 +49,32 @@ function formatDate(v) {
   return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(d)
 }
 
-function kpiCards(summary) {
-  return [
-    ['Total FEPMF', summary.totalParents, 'จำนวน FEPMF ทั้งหมด'],
-    ['Linked Items', summary.totalLinkedItems, 'รวม Child/Linked'],
-    ['Average Progress', `${summary.avgProgress || 0}%`, 'ภาพรวมทั้งพอร์ต'],
+function statusBadgeClass(status) {
+  const s = String(status || '')
+  if (s === 'S7') return 'badge status-s7'
+  if (s === 'S6') return 'badge status-s6'
+  if (s === 'S5') return 'badge status-s5'
+  if (s === 'S4') return 'badge status-s4'
+  if (s === 'S3') return 'badge status-s3'
+  if (s === 'Cancelled') return 'badge status-cancel'
+  return 'badge status-default'
+}
+
+function workItemStatusClass(item) {
+  if (String(item.key || '').startsWith('MISQA-')) return 'badge b-misqa'
+  return statusBadgeClass(item.status)
+}
+
+function renderKpis(summary, rows) {
+  const cards = [
+    ['Total FEPMF', rows.length, 'จำนวนตามผลการค้นหา/กรอง'],
+    ['Linked Items', rows.reduce((sum, r) => sum + (r.linkedCount || 0), 0), 'รวม Child/Linked ของผลลัพธ์'],
+    ['Average Progress', `${rows.length ? Math.round(rows.reduce((sum, r) => sum + (r.progressPercent || 0), 0) / rows.length) : 0}%`, 'คำนวณจาก Status ของ Child'],
     ['Current Sprint', summary.currentSprintName || '-', 'สปรินต์ปัจจุบัน'],
     ['Working Days Left', summary.workingDaysRemaining ?? 0, 'ไม่นับเสาร์-อาทิตย์']
   ]
-}
 
-function renderKpis(summary) {
-  document.getElementById('kpis').innerHTML = kpiCards(summary)
+  document.getElementById('kpis').innerHTML = cards
     .map((c) => `<article class="panel kpi"><div class="kpi-label">${c[0]}</div><div class="kpi-value">${esc(c[1])}</div><div class="kpi-sub">${c[2]}</div></article>`)
     .join('')
 }
@@ -70,34 +85,25 @@ function filterRows() {
   state.rows = (state.data?.parents || []).filter((row) => {
     if (q && !textBlob(row).includes(q)) return false
 
-    const statusSelected = state.filters.status
-    if (statusSelected.length && !statusSelected.includes(row.parent.status)) return false
-
-    const squadSelected = state.filters.squad
-    if (squadSelected.length && !squadSelected.includes(row.parent.squad)) return false
-
-    const cabSelected = state.filters.cabDate
-    if (cabSelected.length && !cabSelected.includes(row.parent.cabDate || '')) return false
+    if (state.filters.status.length && !state.filters.status.includes(row.parent.status)) return false
+    if (state.filters.squad.length && !state.filters.squad.includes(row.parent.squad)) return false
+    if (state.filters.cabDate.length && !state.filters.cabDate.includes(row.parent.cabDate || '')) return false
 
     return true
   })
 }
 
-function badgeStatus(status) {
-  if (status === 'S7') return 'badge b-safe'
-  if (status === 'Cancelled') return 'badge b-risk'
-  return 'badge b-status'
-}
-
-function workItemBadge(item) {
-  if (String(item.key || '').startsWith('MISQA-')) return 'badge b-misqa'
-  if (item.status === 'S7') return 'badge b-safe'
-  return 'badge b-status'
+function toggleParent(key) {
+  if (state.expanded.has(key)) state.expanded.delete(key)
+  else state.expanded.add(key)
+  renderRows()
 }
 
 function renderRows() {
   const host = document.getElementById('content')
   const rows = state.rows || []
+
+  renderKpis(state.data?.summary || {}, rows)
 
   if (!rows.length) {
     host.innerHTML = '<div class="panel empty">ไม่พบข้อมูลตามเงื่อนไขที่เลือก</div>'
@@ -106,32 +112,38 @@ function renderRows() {
 
   host.innerHTML = rows
     .map((row) => {
-      const childRows = (row.workItems || []).map((item) => `
-        <div class="item-row">
-          <div class="item-top">
-            <div><a class="item-key" href="${esc(item.browseUrl)}" target="_blank">${esc(item.key)}</a> ${esc(item.summary || '')}</div>
-            <div class="${workItemBadge(item)}">${esc(item.status || '-')}</div>
+      const isOpen = state.expanded.has(row.parent.key)
+      const childRows = (row.workItems || []).map((item) => {
+        const misqaClass = String(item.key || '').startsWith('MISQA-') ? 'misqa-item' : ''
+        return `
+          <div class="item-row ${misqaClass}">
+            <div class="item-top">
+              <div><a class="item-key" href="${esc(item.browseUrl)}" target="_blank">${esc(item.key)}</a> ${esc(item.summary || '')}</div>
+              <div class="${workItemStatusClass(item)}">${esc(item.status || '-')}</div>
+            </div>
+            <div class="item-meta">Assignee: ${esc(item.assignee || '-')}</div>
           </div>
-          <div class="item-meta">Assignee: ${esc(item.assignee || '-')}</div>
-        </div>
-      `).join('')
+        `
+      }).join('')
 
       return `
         <article class="panel parent-card">
           <div class="parent-head">
             <div class="parent-main">
-              <a class="parent-key" href="${esc(row.parent.browseUrl)}" target="_blank">${esc(row.parent.key)}</a>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <button class="btn expand-btn" data-parent="${esc(row.parent.key)}" type="button">${isOpen ? 'Collapse' : 'Expand'}</button>
+                <a class="parent-key" href="${esc(row.parent.browseUrl)}" target="_blank">${esc(row.parent.key)}</a>
+              </div>
               <div>${esc(row.parent.summary || '-')}</div>
               <div class="progress-line"><div style="width:${Math.max(0, Math.min(100, row.progressPercent || 0))}%"></div></div>
               <div class="progress-meta">
                 <span><strong>${esc(row.progressPercent || 0)}%</strong></span>
-                <span>Source: ${esc(row.progress.source === 'jira_field' ? 'Jira Field' : 'Calculated')}</span>
-                <span>Jira: ${esc(row.progress.jiraPercent ?? '-')}</span>
+                <span>Based on child status formula</span>
                 <span>Children Done: ${esc(row.progress.doneLinked || 0)}/${esc(row.progress.totalLinked || 0)}</span>
               </div>
             </div>
             <div class="badges">
-              <span class="${badgeStatus(row.parent.status)}">${esc(row.parent.status || '-')}</span>
+              <span class="${statusBadgeClass(row.parent.status)}">${esc(row.parent.status || '-')}</span>
             </div>
           </div>
 
@@ -142,13 +154,15 @@ function renderRows() {
             <div><strong>Child Count:</strong> ${esc(row.linkedCount || 0)}</div>
           </div>
 
-          <div class="work-items">
-            ${childRows || '<div class="empty">ไม่มี Child/Linked Items</div>'}
-          </div>
+          ${isOpen ? `<div class="work-items">${childRows || '<div class="empty">ไม่มี Child/Linked Items</div>'}</div>` : ''}
         </article>
       `
     })
     .join('')
+
+  host.querySelectorAll('.expand-btn').forEach((btn) => {
+    btn.addEventListener('click', () => toggleParent(btn.getAttribute('data-parent')))
+  })
 }
 
 function selectedText(key) {
@@ -241,10 +255,9 @@ async function load() {
     state.options.squad = data.meta?.available?.squads || []
     state.options.cabDate = data.meta?.available?.cabDates || []
 
-    const allowedDefault = ['S4', 'S5', 'S6'].filter((s) => state.options.status.includes(s))
-    state.filters.status = allowedDefault.length ? allowedDefault : []
+    const defaults = ['S4', 'S5', 'S6'].filter((s) => state.options.status.includes(s))
+    state.filters.status = defaults.length ? defaults : []
 
-    renderKpis(data.summary || {})
     renderFilters()
     applyAll()
 
@@ -270,11 +283,13 @@ function bindEvents() {
     state.searchInFilter.status = ''
     state.searchInFilter.squad = ''
     state.searchInFilter.cabDate = ''
+    state.expanded.clear()
     renderFilters()
     applyAll()
   })
 
   document.getElementById('refreshBtn').addEventListener('click', load)
+
   document.addEventListener('click', (e) => {
     if (!e.target.closest('.multi')) {
       document.querySelectorAll('.multi.open').forEach((el) => el.classList.remove('open'))

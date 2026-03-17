@@ -278,21 +278,6 @@
     return false
   }
 
-  function getProgressFromIssue(issue, progressFieldIds = []) {
-    const candidates = [
-      issue?.fields?.progress,
-      issue?.fields?.aggregateprogress,
-      ...getFieldValues(issue, progressFieldIds)
-    ]
-
-    for (const value of candidates) {
-      const percent = extractPercent(value)
-      if (percent != null) return Math.max(0, Math.min(100, percent))
-    }
-
-    return null
-  }
-
   function getEstimateSprint(issue, estimateSprintFieldIds = []) {
     for (const value of getFieldValues(issue, estimateSprintFieldIds)) {
       const text = String(Array.isArray(value) ? value[0] : value || '').trim()
@@ -326,8 +311,7 @@
       sprintStart: sprint.start,
       sprintEnd: sprint.end,
       squad: inferSquad(issue, cfg.squadFieldIds),
-      estimateSprint: getEstimateSprint(issue, cfg.estimateSprintFieldIds),
-      progressFieldPercent: getProgressFromIssue(issue, cfg.progressFieldIds)
+      estimateSprint: getEstimateSprint(issue, cfg.estimateSprintFieldIds)
     }
   }
 
@@ -355,13 +339,38 @@
     return uniq(records.map((x) => x.key)).map((key) => ({ key }))
   }
 
-  function keyNumber(key) {
-    const m = String(key || '').match(/-(\d+)/)
-    return m ? Number(m[1]) : Number.MAX_SAFE_INTEGER
+  function parseKeyParts(key) {
+    const text = String(key || '').toUpperCase()
+    const m = text.match(/^([A-Z0-9_]+)-(\d+)$/)
+    if (!m) return { prefix: text, num: Number.MAX_SAFE_INTEGER }
+    return { prefix: m[1], num: Number(m[2]) }
   }
 
   function sortChildren(items) {
-    return [...(items || [])].sort((a, b) => keyNumber(a.key) - keyNumber(b.key))
+    return [...(items || [])].sort((a, b) => {
+      const ka = parseKeyParts(a.key)
+      const kb = parseKeyParts(b.key)
+      if (ka.prefix !== kb.prefix) return ka.prefix.localeCompare(kb.prefix)
+      if (ka.num !== kb.num) return ka.num - kb.num
+      return String(a.key || '').localeCompare(String(b.key || ''))
+    })
+  }
+
+  function progressWeightByStatus(item) {
+    const text = lower(item?.statusRaw || item?.status || '')
+    if (!text) return 0
+    if (text.includes('cancel')) return 100
+    if (text.includes('done') || text.includes('complete') || text.includes('closed') || text.includes('resolved') || text.includes('deliver') || text.includes('s7')) return 100
+    if (text.includes('review') || text.includes('uat') || text.includes('sit') || text.includes('test') || text.includes('qa') || text.includes('s6') || text.includes('s5')) return 80
+    if (text.includes('progress') || text.includes('doing') || text.includes('develop') || text.includes('implement') || text.includes('s4') || text.includes('s3') || text.includes('s2')) return 50
+    if (text.includes('open') || text.includes('todo') || text.includes('to do') || text.includes('backlog') || text.includes('s1') || text.includes('s0')) return 0
+    return 20
+  }
+
+  function calcProgressPercentFromChildren(children = []) {
+    if (!children.length) return 0
+    const total = children.reduce((sum, item) => sum + progressWeightByStatus(item), 0)
+    return Math.round(total / children.length)
   }
 
   function statusSort(arr) {
@@ -580,10 +589,8 @@
         return raw ? isDoneIssue(raw) : item.status === 'S7'
       }).length
 
-      const linkedProgress = children.length ? Math.round((doneCount / children.length) * 100) : (isDoneIssue(parentRaw) ? 100 : 0)
-
-      const jiraProgress = parent.progressFieldPercent
-      const progressPercent = jiraProgress != null ? jiraProgress : linkedProgress
+      const linkedProgress = calcProgressPercentFromChildren(children)
+      const progressPercent = linkedProgress
 
       return {
         parent: {
@@ -593,8 +600,8 @@
         linkedCount: children.length,
         progressPercent,
         progress: {
-          source: jiraProgress != null ? 'jira_field' : 'linked_completion',
-          jiraPercent: jiraProgress,
+          source: 'calculated_from_child_status',
+          jiraPercent: null,
           linkedDonePercent: linkedProgress,
           doneLinked: doneCount,
           totalLinked: children.length
