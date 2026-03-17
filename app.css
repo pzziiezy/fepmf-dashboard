@@ -108,6 +108,7 @@ textarea {
 .status-s6 { background: #d9ddff; color: #25359b; border: 1px solid #aeb8ff; }
 .status-s7 { background: #c8f3da; color: #0d6a3f; border: 1px solid #8de1b0; }
 .status-cancel { background: #ffd7dc; color: #8f1d2d; border: 1px solid #ffacb7; }
+.status-manual { background: #1c2b47; color: #ffffff; border: 1px solid #121e34; }
 
 .meta-grid {
   margin-top: 10px;
@@ -207,25 +208,25 @@ textarea {
 .list { margin-top: 12px; display: grid; gap: 8px; }
 .empty { color: var(--muted); padding: 20px; text-align: center; }
 .expand-btn {
-  border: 1px solid #b7c6dd;
-  background: linear-gradient(180deg, #ffffff 0%, #f2f6fc 100%);
-  color: #1e3f6f;
+  border: 1px solid #c4d1e5;
+  background: #f7fbff;
+  color: #35557f;
   border-radius: 999px;
-  padding: 7px 12px;
-  font-size: 12px;
-  font-weight: 700;
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 600;
   letter-spacing: 0.01em;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   cursor: pointer;
   transition: all 0.16s ease;
 }
 
 .expand-btn:hover {
-  border-color: #8aa9d0;
-  background: linear-gradient(180deg, #ffffff 0%, #eaf2fd 100%);
-  box-shadow: 0 3px 10px rgba(16, 75, 148, 0.15);
+  border-color: #9eb6d7;
+  background: #eef5ff;
+  box-shadow: 0 2px 6px rgba(16, 75, 148, 0.12);
 }
 
 .expand-btn:focus-visible {
@@ -235,14 +236,14 @@ textarea {
 
 .expand-btn-icon {
   display: inline-flex;
-  width: 16px;
-  height: 16px;
+  width: 13px;
+  height: 13px;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: #dbe9fb;
+  background: #d7e6fb;
   color: #1e4f90;
-  font-size: 10px;
+  font-size: 9px;
   line-height: 1;
 }
 

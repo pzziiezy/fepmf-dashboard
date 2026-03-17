@@ -160,7 +160,7 @@ function renderRows() {
             <div class="badges">
               <button class="expand-btn" data-parent="${esc(row.parent.key)}" type="button" aria-expanded="${isOpen ? 'true' : 'false'}">
                 <span class="expand-btn-icon">${isOpen ? '▾' : '▸'}</span>
-                <span>${isOpen ? 'Collapse' : 'Expand'}</span>
+                <span>${isOpen ? 'Less' : 'More'}</span>
               </button>
             </div>
           </div>

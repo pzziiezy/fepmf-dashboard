@@ -4,7 +4,6 @@
   source: '',
   editingId: '',
   timelineVisibleCount: 30,
-  selectedMonth: '',
   filters: {
     q: '',
     status: ['S4', 'S5', 'S6']
@@ -25,17 +24,9 @@ function toIsoDate(value) {
 }
 
 function getTwoMonthRange() {
-  let y
-  let m
-  if (state.selectedMonth && /^\d{4}-\d{2}$/.test(state.selectedMonth)) {
-    const [yy, mm] = state.selectedMonth.split('-').map(Number)
-    y = yy
-    m = mm - 1
-  } else {
-    const now = new Date()
-    y = now.getUTCFullYear()
-    m = now.getUTCMonth()
-  }
+  const now = new Date()
+  const y = now.getUTCFullYear()
+  const m = now.getUTCMonth()
   const start = new Date(Date.UTC(y, m, 1))
   const end = new Date(Date.UTC(y, m + 2, 0))
   return { start: toIsoDate(start), end: toIsoDate(end) }
@@ -47,6 +38,7 @@ function overlaps(aStart, aEnd, bStart, bEnd) {
 
 function statusBadgeClass(status) {
   const s = String(status || '')
+  if (s === 'Manual') return 'badge status-manual'
   if (s === 'S7') return 'badge status-s7'
   if (s === 'S6') return 'badge status-s6'
   if (s === 'S5') return 'badge status-s5'
@@ -150,8 +142,7 @@ function filteredEvents() {
 
   return enumerateEvents().filter((e) => {
     if (!overlaps(e.start, e.end, start, end)) return false
-
-    if (e.source === 'parent' && state.filters.status.length && !state.filters.status.includes(e.status)) return false
+    if (state.filters.status.length && !state.filters.status.includes(e.status)) return false
 
     if (q) {
       const blob = `${e.key} ${e.title} ${e.status} ${e.squad}`.toLowerCase()
@@ -194,12 +185,13 @@ function renderTimeline() {
     const barClass = e.source === 'manual' ? 'bar-manual' : 'bar-parent'
     const rangeText = `${e.start} - ${e.end}`
     const hoverText = `${e.title}\n${rangeText}`
+    const itemLabel = e.source === 'manual' ? e.title : e.key
 
     return `
       <div class="timeline-row" style="grid-template-columns:240px repeat(${days}, minmax(16px, 1fr));">
         <div class="row-label">
           <div style="display:flex;justify-content:space-between;gap:6px;align-items:center">
-            <strong>${e.url ? `<a href="${esc(e.url)}" target="_blank" title="${esc(hoverText)}">${esc(e.key)}</a>` : `<span title="${esc(hoverText)}">${esc(e.key)}</span>`}</strong>
+            <strong>${e.url ? `<a href="${esc(e.url)}" target="_blank" title="${esc(hoverText)}">${esc(itemLabel)}</a>` : `<span title="${esc(hoverText)}">${esc(itemLabel)}</span>`}</strong>
             <span class="${statusBadgeClass(e.status)}" style="padding:2px 8px">${esc(e.status)}</span>
           </div>
           <div style="font-size:11px;color:var(--muted);line-height:1.2">${esc(e.squad || '-')}</div>
@@ -344,6 +336,7 @@ async function loadAll() {
   state.source = planner.source || ''
 
   state.statusOptions = dashboard.meta?.available?.statuses || []
+  if (!state.statusOptions.includes('Manual')) state.statusOptions.push('Manual')
   state.filters.status = ['S4', 'S5', 'S6'].filter((s) => state.statusOptions.includes(s))
   state.timelineVisibleCount = 30
 
@@ -355,19 +348,6 @@ async function loadAll() {
 }
 
 function bindEvents() {
-  const monthPicker = document.getElementById('calendarMonthPicker')
-  if (monthPicker) {
-    const now = new Date()
-    const currentMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`
-    state.selectedMonth = currentMonth
-    monthPicker.value = currentMonth
-    monthPicker.addEventListener('change', (e) => {
-      state.selectedMonth = e.target.value || currentMonth
-      state.timelineVisibleCount = 30
-      renderTimeline()
-    })
-  }
-
   document.getElementById('calendarSearch').addEventListener('input', (e) => {
     state.filters.q = e.target.value || ''
     state.timelineVisibleCount = 30
