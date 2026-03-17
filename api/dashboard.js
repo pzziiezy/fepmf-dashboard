@@ -1,11 +1,9 @@
-export default async function handler(req, res) {
+﻿export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end()
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end()
 
   const EMAIL = process.env.JIRA_EMAIL
   const TOKEN = process.env.JIRA_API_TOKEN
@@ -21,6 +19,9 @@ export default async function handler(req, res) {
     Accept: 'application/json',
     'Content-Type': 'application/json'
   }
+
+  const KNOWN_SQUADS = ['KEPLER', 'MIDAS', 'NEBULA']
+  const STATUS_ORDER = ['Open', 'S0', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'Cancelled']
 
   function lower(v) {
     return String(v || '').toLowerCase()
@@ -57,8 +58,8 @@ export default async function handler(req, res) {
     if (v == null) return null
     if (typeof v === 'number') return v
     if (typeof v === 'string') {
-      const match = v.match(/-?\d+(?:\.\d+)?/)
-      return match ? Number(match[0]) : null
+      const m = v.match(/-?\d+(?:\.\d+)?/)
+      return m ? Number(m[0]) : null
     }
     return null
   }
@@ -70,6 +71,7 @@ export default async function handler(req, res) {
       if (v >= 0 && v <= 100) return Math.round(v)
       return null
     }
+
     if (typeof v === 'string') {
       const n = parseNumberLike(v)
       if (n == null) return null
@@ -78,6 +80,7 @@ export default async function handler(req, res) {
       if (n >= 0 && n <= 100) return Math.round(n)
       return null
     }
+
     if (Array.isArray(v)) {
       for (const item of v) {
         const p = extractPercent(item)
@@ -85,8 +88,9 @@ export default async function handler(req, res) {
       }
       return null
     }
+
     if (typeof v === 'object') {
-      for (const key of ['percent', 'percentage', 'progress', 'value', 'done']) {
+      for (const key of ['percent', 'percentage', 'progress', 'value', 'done', 'completed']) {
         if (key in v) {
           const p = extractPercent(v[key])
           if (p != null) return p
@@ -98,6 +102,7 @@ export default async function handler(req, res) {
         if (total && done != null) return Math.round((done / total) * 100)
       }
     }
+
     return null
   }
 
@@ -110,15 +115,18 @@ export default async function handler(req, res) {
 
     function walk(v) {
       if (v == null) return
+
       if (typeof v === 'string') {
         const matches = v.match(/[A-Z][A-Z0-9_]+-\d+/g)
         if (matches) keys.push(...matches)
         return
       }
+
       if (Array.isArray(v)) {
         for (const item of v) walk(item)
         return
       }
+
       if (typeof v === 'object') {
         if (typeof v.key === 'string' && /^[A-Z][A-Z0-9_]+-\d+$/.test(v.key)) keys.push(v.key)
         for (const item of Object.values(v)) walk(item)
@@ -131,10 +139,12 @@ export default async function handler(req, res) {
 
   function readParentRefKey(value) {
     if (value == null) return ''
+
     if (typeof value === 'string') {
       const m = value.match(/FEPMF-\d+/i)
       return m ? m[0].toUpperCase() : ''
     }
+
     if (Array.isArray(value)) {
       for (const item of value) {
         const key = readParentRefKey(item)
@@ -142,6 +152,7 @@ export default async function handler(req, res) {
       }
       return ''
     }
+
     if (typeof value === 'object') {
       if (typeof value.key === 'string' && /^FEPMF-\d+$/i.test(value.key)) return value.key.toUpperCase()
       for (const item of Object.values(value)) {
@@ -149,63 +160,8 @@ export default async function handler(req, res) {
         if (key) return key
       }
     }
+
     return ''
-  }
-
-  function findSprintCandidates(value) {
-    const rows = []
-
-    function walk(v) {
-      if (v == null) return
-      if (Array.isArray(v)) {
-        for (const x of v) walk(x)
-        return
-      }
-      if (typeof v === 'string') {
-        const matches = v.match(/Sprint\s*\d+/gi)
-        if (matches) {
-          for (const name of matches) rows.push({ name: name.replace(/\s+/g, ''), raw: null })
-        }
-        return
-      }
-      if (typeof v === 'object') {
-        const name = v.name || v.value || v.displayName || null
-        if (typeof name === 'string' && /sprint/i.test(name)) {
-          rows.push({
-            name: name.replace(/\s+/g, ''),
-            raw: {
-              id: v.id || null,
-              state: v.state || null,
-              startDate: v.startDate || v.startdate || null,
-              endDate: v.endDate || v.enddate || null,
-              completeDate: v.completeDate || null
-            }
-          })
-        }
-        for (const x of Object.values(v)) walk(x)
-      }
-    }
-
-    walk(value)
-    return rows
-  }
-
-  function parseSprintFromIssue(issue, sprintFieldIds = []) {
-    const rows = []
-    for (const fieldId of sprintFieldIds) {
-      rows.push(...findSprintCandidates(issue?.fields?.[fieldId]))
-    }
-    rows.push(...findSprintCandidates(issue?.fields?.sprint))
-    rows.push(...findSprintCandidates(issue?.fields?.Sprint))
-
-    if (!rows.length) return { name: '', start: '', end: '' }
-
-    const first = rows[0]
-    return {
-      name: first.name || '',
-      start: first.raw?.startDate ? toIsoDate(first.raw.startDate) : '',
-      end: first.raw?.endDate ? toIsoDate(first.raw.endDate) : ''
-    }
   }
 
   function toIsoDate(value) {
@@ -215,188 +171,271 @@ export default async function handler(req, res) {
     return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
   }
 
-  function formatDateHuman(value) {
-    if (!value) return ''
-    const d = new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00Z` : value)
-    if (Number.isNaN(d.getTime())) return ''
-    return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(d)
+  function findSprintCandidates(value) {
+    const out = []
+
+    function walk(v) {
+      if (v == null) return
+
+      if (typeof v === 'string') {
+        const matches = v.match(/Sprint\s*\d+/gi)
+        if (matches) {
+          for (const name of matches) out.push({ name: name.replace(/\s+/g, ''), raw: null })
+        }
+        return
+      }
+
+      if (Array.isArray(v)) {
+        for (const item of v) walk(item)
+        return
+      }
+
+      if (typeof v === 'object') {
+        const name = v.name || v.value || v.displayName || null
+        if (typeof name === 'string' && /sprint/i.test(name)) {
+          out.push({
+            name: name.replace(/\s+/g, ''),
+            raw: {
+              startDate: v.startDate || v.startdate || null,
+              endDate: v.endDate || v.enddate || null
+            }
+          })
+        }
+        for (const item of Object.values(v)) walk(item)
+      }
+    }
+
+    walk(value)
+    return out
+  }
+
+  function parseSprintFromIssue(issue, sprintFieldIds = []) {
+    const rows = []
+    for (const id of sprintFieldIds) rows.push(...findSprintCandidates(issue?.fields?.[id]))
+    rows.push(...findSprintCandidates(issue?.fields?.sprint))
+
+    if (!rows.length) return { name: '', start: '', end: '' }
+
+    const first = rows[0]
+    return {
+      name: first.name || '',
+      start: toIsoDate(first.raw?.startDate),
+      end: toIsoDate(first.raw?.endDate)
+    }
+  }
+
+  function upperText(v) {
+    if (v == null) return ''
+    if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') return String(v).toUpperCase()
+    if (Array.isArray(v)) return v.map(upperText).join(' | ')
+    if (typeof v === 'object') return Object.values(v).map(upperText).join(' | ')
+    return ''
+  }
+
+  function inferSquad(issue, squadFieldIds = []) {
+    for (const value of getFieldValues(issue, squadFieldIds)) {
+      const text = upperText(value)
+      const found = KNOWN_SQUADS.find((x) => text.includes(x))
+      if (found) return found
+    }
+
+    const fallbackValues = [issue?.fields?.labels, issue?.fields?.components?.map((c) => c?.name), issue?.fields?.summary]
+    for (const value of fallbackValues) {
+      const text = upperText(value)
+      const found = KNOWN_SQUADS.find((x) => text.includes(x))
+      if (found) return found
+    }
+
+    return ''
+  }
+
+  function normalizeMainStatus(status) {
+    const text = String(status || '').trim()
+    if (!text) return 'Open'
+
+    const sMatch = text.match(/\bS\s*([0-7])\b/i)
+    if (sMatch) return `S${sMatch[1]}`
+
+    if (/open/i.test(text)) return 'Open'
+    if (/cancel/i.test(text)) return 'Cancelled'
+
+    return text
   }
 
   function getStatus(issue) {
     return issue?.fields?.status?.name || ''
   }
 
-  function getStatusCategory(issue) {
-    return issue?.fields?.status?.statusCategory?.key || ''
-  }
-
-  function statusGroup(issue) {
-    const category = lower(getStatusCategory(issue))
-    if (category === 'done') return 'done'
-    if (category === 'indeterminate') return 'in_progress'
+  function isDoneIssue(issue) {
+    const status = normalizeMainStatus(getStatus(issue))
+    const statusCategory = lower(issue?.fields?.status?.statusCategory?.key)
+    if (statusCategory === 'done') return true
+    if (status === 'S7') return true
 
     const s = lower(getStatus(issue))
-    if (!s) return 'other'
-    if (s.includes('block')) return 'blocked'
-    if (s.includes('done') || s.includes('closed') || s.includes('complete') || s.includes('resolved') || s.includes('deploy')) return 'done'
-    if (s.includes('uat')) return 'uat'
-    if (s.includes('sit')) return 'sit'
-    if (s.includes('test') || s.includes('qa')) return 'test'
-    if (s.includes('progress') || s.includes('develop') || s.includes('doing') || s.includes('review') || s.includes('implement')) return 'in_progress'
-    if (s.includes('open') || s.includes('todo') || s.includes('to do') || s.includes('plan') || s.includes('backlog') || s.includes('selected')) return 'open'
-    return 'other'
-  }
-
-  function isDoneIssue(issue) {
-    return statusGroup(issue) === 'done'
+    if (s.includes('done') || s.includes('complete') || s.includes('closed') || s.includes('resolved') || s.includes('delivered')) return true
+    if (s.includes('cancel')) return true
+    return false
   }
 
   function getProgressFromIssue(issue, progressFieldIds = []) {
-    const candidates = [issue?.fields?.progress, issue?.fields?.aggregateprogress, ...getFieldValues(issue, progressFieldIds)]
+    const candidates = [
+      issue?.fields?.progress,
+      issue?.fields?.aggregateprogress,
+      ...getFieldValues(issue, progressFieldIds)
+    ]
+
     for (const value of candidates) {
       const percent = extractPercent(value)
       if (percent != null) return Math.max(0, Math.min(100, percent))
     }
+
     return null
+  }
+
+  function getEstimateSprint(issue, estimateSprintFieldIds = []) {
+    for (const value of getFieldValues(issue, estimateSprintFieldIds)) {
+      const text = String(Array.isArray(value) ? value[0] : value || '').trim()
+      if (!text) continue
+      const m = text.match(/\d+/)
+      if (m) return `Sprint${m[0]}`
+      return text
+    }
+
+    const fromSprint = parseSprintFromIssue(issue, [])
+    return fromSprint.name || ''
   }
 
   function normalizeIssue(issue, cfg) {
     const sprint = parseSprintFromIssue(issue, cfg.sprintFieldIds)
+    const statusRaw = getStatus(issue)
     return {
       id: issue?.id || '',
       key: issue?.key || '',
       browseUrl: issue?.key ? `https://dgtbigc.atlassian.net/browse/${issue.key}` : '',
       summary: issue?.fields?.summary || '',
       issueType: issue?.fields?.issuetype?.name || '',
-      status: getStatus(issue),
-      statusGroup: statusGroup(issue),
       assignee: issue?.fields?.assignee?.displayName || '',
+      statusRaw,
+      status: normalizeMainStatus(statusRaw),
+      statusCategory: issue?.fields?.status?.statusCategory?.key || '',
       projectKey: issue?.fields?.project?.key || '',
-      created: issue?.fields?.created || '',
-      updated: issue?.fields?.updated || '',
       dueDate: issue?.fields?.duedate || '',
+      created: issue?.fields?.created || '',
       sprint: sprint.name,
       sprintStart: sprint.start,
       sprintEnd: sprint.end,
+      squad: inferSquad(issue, cfg.squadFieldIds),
+      estimateSprint: getEstimateSprint(issue, cfg.estimateSprintFieldIds),
       progressFieldPercent: getProgressFromIssue(issue, cfg.progressFieldIds)
     }
   }
 
-  function extractRelationRecords(issue, childFieldIds = [], linkedFieldIds = []) {
+  function extractRelations(issue, childFieldIds = [], linkedFieldIds = []) {
     const records = []
 
-    for (const subtask of issue?.fields?.subtasks || []) {
-      if (!subtask?.key) continue
-      records.push({
-        key: String(subtask.key).toUpperCase(),
-        direction: 'subtask',
-        relationType: 'subtask',
-        relationLabel: 'subtask'
-      })
+    for (const sub of issue?.fields?.subtasks || []) {
+      if (!sub?.key) continue
+      records.push({ key: String(sub.key).toUpperCase() })
     }
 
     for (const link of issue?.fields?.issuelinks || []) {
-      const typeName = link?.type?.name || 'link'
-      const outwardLabel = link?.type?.outward || 'outward'
-      const inwardLabel = link?.type?.inward || 'inward'
-
-      if (link?.outwardIssue?.key) {
-        records.push({
-          key: String(link.outwardIssue.key).toUpperCase(),
-          direction: 'outward',
-          relationType: typeName,
-          relationLabel: outwardLabel
-        })
-      }
-
-      if (link?.inwardIssue?.key) {
-        records.push({
-          key: String(link.inwardIssue.key).toUpperCase(),
-          direction: 'inward',
-          relationType: typeName,
-          relationLabel: inwardLabel
-        })
-      }
+      if (link?.outwardIssue?.key) records.push({ key: String(link.outwardIssue.key).toUpperCase() })
+      if (link?.inwardIssue?.key) records.push({ key: String(link.inwardIssue.key).toUpperCase() })
     }
 
     for (const fieldId of childFieldIds) {
-      for (const key of parseIssueKeysFromValue(issue?.fields?.[fieldId])) {
-        records.push({ key, direction: 'child_field', relationType: 'child_field', relationLabel: fieldId })
-      }
+      for (const key of parseIssueKeysFromValue(issue?.fields?.[fieldId])) records.push({ key })
     }
 
     for (const fieldId of linkedFieldIds) {
-      for (const key of parseIssueKeysFromValue(issue?.fields?.[fieldId])) {
-        records.push({ key, direction: 'linked_field', relationType: 'linked_field', relationLabel: fieldId })
-      }
+      for (const key of parseIssueKeysFromValue(issue?.fields?.[fieldId])) records.push({ key })
     }
 
-    return records
+    return uniq(records.map((x) => x.key)).map((key) => ({ key }))
   }
 
-  function mergeRelations(records) {
-    const map = new Map()
-    for (const item of records || []) {
-      if (!item?.key) continue
-      if (!map.has(item.key)) {
-        map.set(item.key, {
-          key: item.key,
-          relationTypes: new Set(),
-          relationLabels: new Set(),
-          directions: new Set()
-        })
-      }
-      const row = map.get(item.key)
-      if (item.relationType) row.relationTypes.add(item.relationType)
-      if (item.relationLabel) row.relationLabels.add(item.relationLabel)
-      if (item.direction) row.directions.add(item.direction)
+  function keyNumber(key) {
+    const m = String(key || '').match(/-(\d+)/)
+    return m ? Number(m[1]) : Number.MAX_SAFE_INTEGER
+  }
+
+  function sortChildren(items) {
+    return [...(items || [])].sort((a, b) => keyNumber(a.key) - keyNumber(b.key))
+  }
+
+  function statusSort(arr) {
+    const rank = new Map(STATUS_ORDER.map((x, i) => [x, i]))
+    return [...(arr || [])].sort((a, b) => {
+      const ra = rank.has(a) ? rank.get(a) : 100
+      const rb = rank.has(b) ? rank.get(b) : 100
+      if (ra !== rb) return ra - rb
+      return String(a).localeCompare(String(b))
+    })
+  }
+
+  function buildSprintCalendar2026() {
+    const rows = []
+    let sprint = 4
+    let start = new Date(Date.UTC(2026, 2, 9))
+
+    while (start.getUTCFullYear() === 2026) {
+      const end = new Date(start.getTime())
+      end.setUTCDate(end.getUTCDate() + 18)
+
+      rows.push({
+        sprint: sprint,
+        name: `Sprint${sprint}`,
+        start: toIsoDate(start),
+        end: toIsoDate(end)
+      })
+
+      sprint += 1
+      start = new Date(start.getTime())
+      start.setUTCDate(start.getUTCDate() + 21)
     }
 
-    return [...map.values()].map((row) => ({
-      key: row.key,
-      relationTypes: [...row.relationTypes],
-      relationLabels: [...row.relationLabels],
-      directions: [...row.directions]
-    }))
+    return rows
+  }
+
+  function workingDaysRemaining(startIso, endIso) {
+    if (!startIso || !endIso) return 0
+    const start = new Date(`${startIso}T00:00:00Z`)
+    const end = new Date(`${endIso}T00:00:00Z`)
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) return 0
+
+    let count = 0
+    const cur = new Date(start.getTime())
+    while (cur <= end) {
+      const day = cur.getUTCDay()
+      if (day !== 0 && day !== 6) count += 1
+      cur.setUTCDate(cur.getUTCDate() + 1)
+    }
+    return count
   }
 
   async function fetchJira(path, options = {}) {
-    const response = await fetch(`${BASE}${path}`, {
-      headers,
-      ...options
-    })
-
+    const response = await fetch(`${BASE}${path}`, { headers, ...options })
     if (!response.ok) {
       const text = await response.text()
       throw new Error(`Jira ${response.status}: ${response.statusText} | ${text}`)
     }
-
     return response.json()
   }
 
   async function fetchAllByJql(jql, fields = []) {
-    const all = []
-    let nextPageToken = undefined
+    let nextPageToken
     let guard = 0
+    let all = []
 
     while (true) {
-      const body = {
-        jql,
-        maxResults: 100,
-        fields
-      }
+      const body = { jql, fields, maxResults: 100 }
       if (nextPageToken) body.nextPageToken = nextPageToken
-
-      const page = await fetchJira('/search/jql', {
-        method: 'POST',
-        body: JSON.stringify(body)
-      })
-
+      const page = await fetchJira('/search/jql', { method: 'POST', body: JSON.stringify(body) })
       const issues = page.issues || []
-      all.push(...issues)
+      all = all.concat(issues)
       nextPageToken = page.nextPageToken
       guard += 1
-
       if (!issues.length || page.isLast || !nextPageToken || guard > 120) break
     }
 
@@ -405,10 +444,11 @@ export default async function handler(req, res) {
 
   async function fetchIssuesByKeys(keys, fields = []) {
     const output = []
-    const uniqueKeys = uniq((keys || []).map((k) => String(k).toUpperCase()))
+    const uniqueKeys = uniq((keys || []).map((x) => String(x).toUpperCase()))
 
     for (let i = 0; i < uniqueKeys.length; i += 50) {
       const batch = uniqueKeys.slice(i, i + 50)
+      if (!batch.length) continue
       const jql = `key in (${quoteValues(batch)}) ORDER BY updated DESC`
       const issues = await fetchAllByJql(jql, fields)
       output.push(...issues)
@@ -419,25 +459,40 @@ export default async function handler(req, res) {
 
   try {
     const fieldCatalog = await fetchJira('/field')
+
     const sprintFieldIds = uniq([
       ...exactFieldIds(fieldCatalog, ['Sprint']),
-      ...fuzzyFieldIds(fieldCatalog, ['sprint']).slice(0, 6)
+      ...fuzzyFieldIds(fieldCatalog, ['sprint']).slice(0, 8)
     ])
+
     const progressFieldIds = uniq([
-      ...exactFieldIds(fieldCatalog, ['Progress']),
-      ...fuzzyFieldIds(fieldCatalog, ['progress', 'percent done']).slice(0, 6)
+      ...exactFieldIds(fieldCatalog, ['Progress', 'Project Progress', '% Progress', 'Percent Progress', 'Actual Progress']),
+      ...fuzzyFieldIds(fieldCatalog, ['progress', 'percent']).slice(0, 12)
     ])
+
+    const squadFieldIds = uniq([
+      ...exactFieldIds(fieldCatalog, ['Squad', 'Team']),
+      ...fuzzyFieldIds(fieldCatalog, ['squad', 'team']).slice(0, 6)
+    ])
+
+    const estimateSprintFieldIds = uniq([
+      ...exactFieldIds(fieldCatalog, ['Estimate Sprint', 'Estimated Sprint']),
+      ...fuzzyFieldIds(fieldCatalog, ['estimate sprint']).slice(0, 5)
+    ])
+
     const childFieldIds = uniq([
       ...exactFieldIds(fieldCatalog, ['Child work items', 'Child work item']),
-      ...fuzzyFieldIds(fieldCatalog, ['child work item']).slice(0, 4)
+      ...fuzzyFieldIds(fieldCatalog, ['child work item']).slice(0, 6)
     ])
+
     const linkedFieldIds = uniq([
       ...exactFieldIds(fieldCatalog, ['Linked work items', 'Linked work item']),
-      ...fuzzyFieldIds(fieldCatalog, ['linked work item']).slice(0, 4)
+      ...fuzzyFieldIds(fieldCatalog, ['linked work item']).slice(0, 6)
     ])
+
     const parentRefFieldIds = uniq([
       ...exactFieldIds(fieldCatalog, ['Parent Link', 'Parent work item', 'Initiative Link', 'Epic Link', 'Feature Link']),
-      ...fuzzyFieldIds(fieldCatalog, ['parent link', 'initiative link', 'epic link']).slice(0, 6)
+      ...fuzzyFieldIds(fieldCatalog, ['parent link', 'initiative link', 'epic link']).slice(0, 8)
     ])
 
     const baseFields = uniq([
@@ -445,33 +500,35 @@ export default async function handler(req, res) {
       'status',
       'assignee',
       'issuetype',
-      'created',
-      'updated',
       'project',
-      'parent',
+      'duedate',
+      'created',
       'subtasks',
       'issuelinks',
-      'duedate',
+      'labels',
+      'components',
       'progress',
       'aggregateprogress',
       ...sprintFieldIds,
       ...progressFieldIds,
+      ...squadFieldIds,
+      ...estimateSprintFieldIds,
       ...childFieldIds,
       ...linkedFieldIds,
       ...parentRefFieldIds
     ])
 
-    const cfg = { sprintFieldIds, progressFieldIds }
+    const cfg = { sprintFieldIds, progressFieldIds, squadFieldIds, estimateSprintFieldIds }
 
     const parentsRaw = await fetchAllByJql('project = FEPMF ORDER BY updated DESC', baseFields)
     const parentKeys = parentsRaw.map((x) => x.key)
 
-    const relationsByParent = new Map()
+    const relationMap = new Map()
     const relatedKeySet = new Set()
 
     for (const parentRaw of parentsRaw) {
-      const rels = extractRelationRecords(parentRaw, childFieldIds, linkedFieldIds)
-      relationsByParent.set(parentRaw.key, rels)
+      const rels = extractRelations(parentRaw, childFieldIds, linkedFieldIds)
+      relationMap.set(parentRaw.key, rels)
       for (const rel of rels) relatedKeySet.add(rel.key)
     }
 
@@ -490,181 +547,115 @@ export default async function handler(req, res) {
           const parentKey = readParentRefKey(hit?.fields?.[fieldId])
           if (!parentKey) continue
 
-          const current = relationsByParent.get(parentKey) || []
-          current.push({
-            key: String(hit.key).toUpperCase(),
-            direction: 'parent_ref_field',
-            relationType: 'parent_ref_field',
-            relationLabel: fieldId
-          })
-          relationsByParent.set(parentKey, current)
+          const current = relationMap.get(parentKey) || []
+          current.push({ key: String(hit.key).toUpperCase() })
+          relationMap.set(parentKey, current)
           relatedKeySet.add(String(hit.key).toUpperCase())
         }
       }
     }
 
     const relatedRaw = relatedKeySet.size ? await fetchIssuesByKeys([...relatedKeySet], baseFields) : []
-    const rawMap = new Map()
 
+    const rawMap = new Map()
     for (const row of parentsRaw) rawMap.set(row.key, row)
     for (const row of relatedRaw) rawMap.set(row.key, row)
 
-    const normalizedMap = new Map()
-    for (const issue of rawMap.values()) {
-      normalizedMap.set(issue.key, normalizeIssue(issue, cfg))
-    }
-
-    const sprintRangeMap = new Map()
-
-    function registerSprintRange(issue) {
-      const sprint = parseSprintFromIssue(issue, sprintFieldIds)
-      if (!sprint.name) return
-
-      if (!sprintRangeMap.has(sprint.name)) {
-        sprintRangeMap.set(sprint.name, { name: sprint.name, start: sprint.start || '', end: sprint.end || '' })
-        return
-      }
-
-      const current = sprintRangeMap.get(sprint.name)
-      if (!current.start || (sprint.start && sprint.start < current.start)) current.start = sprint.start
-      if (!current.end || (sprint.end && sprint.end > current.end)) current.end = sprint.end
-    }
-
-    for (const row of rawMap.values()) registerSprintRange(row)
+    const normalized = new Map()
+    for (const issue of rawMap.values()) normalized.set(issue.key, normalizeIssue(issue, cfg))
 
     const parents = parentsRaw.map((parentRaw) => {
-      const parent = normalizedMap.get(parentRaw.key)
-      const relationRows = mergeRelations(relationsByParent.get(parent.key) || [])
-      const workItems = []
+      const parent = normalized.get(parentRaw.key)
+      const keys = uniq((relationMap.get(parent.key) || []).map((x) => x.key))
 
-      for (const relation of relationRows) {
-        const linked = normalizedMap.get(relation.key)
-        if (!linked) continue
-        workItems.push({
-          ...linked,
-          relationTypes: relation.relationTypes,
-          relationLabels: relation.relationLabels,
-          relationDirections: relation.directions,
-          relationText: relation.relationLabels[0] || relation.relationTypes[0] || 'linked'
-        })
-      }
+      const children = sortChildren(
+        keys
+          .map((key) => normalized.get(key))
+          .filter(Boolean)
+          .map((item) => ({ ...item }))
+      )
 
-      const doneCount = workItems.filter((x) => x.statusGroup === 'done').length
-      const blockedCount = workItems.filter((x) => x.statusGroup === 'blocked').length
-      const progressCalculated = workItems.length ? Math.round((doneCount / workItems.length) * 100) : parent.statusGroup === 'done' ? 100 : 0
-      const progressFromJira = parent.progressFieldPercent
-      const progressPercent = progressFromJira != null ? progressFromJira : progressCalculated
+      const doneCount = children.filter((item) => {
+        const raw = rawMap.get(item.key)
+        return raw ? isDoneIssue(raw) : item.status === 'S7'
+      }).length
 
-      const riskFlags = []
-      if (!workItems.length) riskFlags.push('no_linked_item')
-      if (blockedCount > 0) riskFlags.push('blocked')
-      if (progressPercent < 50 && workItems.length > 0) riskFlags.push('slow_progress')
+      const linkedProgress = children.length ? Math.round((doneCount / children.length) * 100) : (isDoneIssue(parentRaw) ? 100 : 0)
 
-      const timelineItems = []
-      const allItems = [parent, ...workItems]
-      for (const item of allItems) {
-        const sprint = item.sprint
-        const range = sprint ? sprintRangeMap.get(sprint) : null
-        const start = range?.start || item.created?.slice(0, 10) || item.dueDate || ''
-        const end = range?.end || item.dueDate || start
-        if (!start || !end) continue
-
-        timelineItems.push({
-          key: item.key,
-          summary: item.summary,
-          status: item.status,
-          type: item.issueType,
-          sprint: sprint || '',
-          start,
-          end,
-          browseUrl: item.browseUrl,
-          source: item.key === parent.key ? 'parent' : 'linked'
-        })
-      }
+      const jiraProgress = parent.progressFieldPercent
+      const progressPercent = jiraProgress != null ? jiraProgress : linkedProgress
 
       return {
-        parent,
+        parent: {
+          ...parent,
+          cabDate: parent.dueDate || ''
+        },
+        linkedCount: children.length,
         progressPercent,
         progress: {
-          jiraPercent: progressFromJira,
-          linkedDonePercent: progressCalculated,
-          totalLinked: workItems.length,
+          source: jiraProgress != null ? 'jira_field' : 'linked_completion',
+          jiraPercent: jiraProgress,
+          linkedDonePercent: linkedProgress,
           doneLinked: doneCount,
-          source: progressFromJira != null ? 'jira_field' : 'linked_completion'
+          totalLinked: children.length
         },
-        linkedCount: workItems.length,
-        blockedCount,
-        riskFlags,
-        workItems,
-        timelineItems
+        workItems: children
       }
     })
 
-    const allWorkItems = parents.flatMap((row) => row.workItems)
-    const allTimeline = parents.flatMap((row) => row.timelineItems)
+    const sprintCalendar = buildSprintCalendar2026()
+    const today = toIsoDate(new Date())
+    const currentSprint = sprintCalendar.find((x) => x.start <= today && today <= x.end) || null
+    const workingDaysLeft = currentSprint ? workingDaysRemaining(today, currentSprint.end) : 0
 
-    const sprintCalendarMap = new Map()
-    for (const item of allTimeline) {
-      const sprintName = item.sprint || 'NoSprint'
-      if (!sprintCalendarMap.has(sprintName)) {
-        sprintCalendarMap.set(sprintName, {
-          name: sprintName,
-          start: item.start,
-          end: item.end,
-          items: []
-        })
-      }
-      const row = sprintCalendarMap.get(sprintName)
-      if (item.start < row.start) row.start = item.start
-      if (item.end > row.end) row.end = item.end
-      row.items.push({
-        key: item.key,
-        summary: item.summary,
-        type: item.type,
-        status: item.status,
-        source: item.source,
-        start: item.start,
-        end: item.end,
-        browseUrl: item.browseUrl
+    const timelineItems = parents
+      .map((row) => {
+        const sprintNum = parseNumberLike(row.parent.estimateSprint || row.parent.sprint || '')
+        const sprintMatch = sprintNum ? sprintCalendar.find((x) => x.sprint === sprintNum) : null
+
+        let start = sprintMatch?.start || row.parent.sprintStart || row.parent.created?.slice(0, 10) || ''
+        let end = sprintMatch?.end || row.parent.dueDate || row.parent.sprintEnd || start
+        if (!start) return null
+        if (!end) end = start
+
+        return {
+          key: row.parent.key,
+          summary: row.parent.summary,
+          squad: row.parent.squad,
+          status: row.parent.status,
+          start,
+          end,
+          browseUrl: row.parent.browseUrl,
+          source: 'parent'
+        }
       })
-    }
-
-    const sprintCalendar = [...sprintCalendarMap.values()]
-      .sort((a, b) => (a.start || '9999-12-31').localeCompare(b.start || '9999-12-31'))
-      .map((row) => ({
-        ...row,
-        rangeText: `${formatDateHuman(row.start)} - ${formatDateHuman(row.end)}`
-      }))
+      .filter(Boolean)
 
     const summary = {
       totalParents: parents.length,
-      totalLinkedItems: uniq(allWorkItems.map((x) => x.key)).length,
-      blockedLinkedItems: allWorkItems.filter((x) => x.statusGroup === 'blocked').length,
-      avgProgress: parents.length ? Math.round(parents.reduce((sum, row) => sum + row.progressPercent, 0) / parents.length) : 0,
-      noLinkedItemParents: parents.filter((x) => x.linkedCount === 0).length
+      totalLinkedItems: uniq(parents.flatMap((x) => x.workItems.map((w) => w.key))).length,
+      avgProgress: parents.length ? Math.round(parents.reduce((sum, x) => sum + x.progressPercent, 0) / parents.length) : 0,
+      noLinkedItemParents: parents.filter((x) => x.linkedCount === 0).length,
+      currentSprint: currentSprint ? currentSprint.sprint : null,
+      currentSprintName: currentSprint ? currentSprint.name : '-',
+      currentSprintStart: currentSprint ? currentSprint.start : '',
+      currentSprintEnd: currentSprint ? currentSprint.end : '',
+      workingDaysRemaining: workingDaysLeft
     }
 
     return res.status(200).json({
       generatedAt: new Date().toISOString(),
-      meta: {
-        discoveredFields: {
-          sprintFieldIds,
-          progressFieldIds,
-          childFieldIds,
-          linkedFieldIds,
-          parentRefFieldIds
-        },
-        available: {
-          parentStatuses: uniq(parents.map((x) => x.parent.status)).sort(),
-          linkedStatuses: uniq(allWorkItems.map((x) => x.status)).sort(),
-          sprints: uniq(allTimeline.map((x) => x.sprint).filter(Boolean)).sort((a, b) => parseNumberLike(a) - parseNumberLike(b)),
-          issueTypes: uniq(allWorkItems.map((x) => x.issueType)).sort(),
-          risks: ['blocked', 'slow_progress', 'no_linked_item']
-        }
-      },
       summary,
       sprintCalendar,
-      timelineItems: allTimeline,
+      timelineItems,
+      meta: {
+        statusOrder: STATUS_ORDER,
+        available: {
+          statuses: statusSort(uniq(parents.map((x) => x.parent.status))),
+          squads: uniq(parents.map((x) => x.parent.squad)).filter((x) => KNOWN_SQUADS.includes(x)),
+          cabDates: uniq(parents.map((x) => x.parent.cabDate)).filter(Boolean).sort()
+        }
+      },
       parents
     })
   } catch (error) {

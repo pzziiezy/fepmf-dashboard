@@ -1,9 +1,14 @@
-﻿const calendarState = {
+﻿const state = {
   dashboard: null,
   plans: [],
-  month: '',
   source: '',
-  editingId: ''
+  editingId: '',
+  filters: {
+    q: '',
+    status: ['S4', 'S5', 'S6']
+  },
+  statusOptions: [],
+  statusSearch: ''
 }
 
 function esc(v) {
@@ -17,14 +22,21 @@ function toIsoDate(value) {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
 }
 
-function getMonthRange(ym) {
-  const [year, month] = ym.split('-').map(Number)
-  const start = new Date(Date.UTC(year, month - 1, 1))
-  const end = new Date(Date.UTC(year, month, 0))
+function monthStart(year, month) {
+  return new Date(Date.UTC(year, month, 1))
+}
+
+function monthEnd(year, month) {
+  return new Date(Date.UTC(year, month + 1, 0))
+}
+
+function getTwoMonthRange() {
+  const now = new Date()
+  const y = now.getUTCFullYear()
+  const m = now.getUTCMonth()
   return {
-    start: toIsoDate(start),
-    end: toIsoDate(end),
-    days: end.getUTCDate()
+    start: toIsoDate(monthStart(y, m)),
+    end: toIsoDate(monthEnd(y, m + 1))
   }
 }
 
@@ -32,28 +44,167 @@ function overlaps(aStart, aEnd, bStart, bEnd) {
   return aStart <= bEnd && bStart <= aEnd
 }
 
-function enumerateEvents() {
-  const jiraEvents = (calendarState.dashboard?.timelineItems || []).map((x) => ({
-    key: x.key,
-    title: x.summary,
-    start: x.start,
-    end: x.end,
-    source: x.source === 'parent' ? 'parent' : 'linked',
-    url: x.browseUrl,
-    sprint: x.sprint || ''
-  }))
+function buildStatusFilter() {
+  const host = document.getElementById('calendarStatusFilter')
+  const selected = state.filters.status
+  const options = (state.statusOptions || []).filter((v) => String(v).toLowerCase().includes(state.statusSearch.toLowerCase()))
+  const label = selected.length ? `${selected[0]}${selected.length > 1 ? ` +${selected.length - 1}` : ''}` : 'เลือก Status'
 
-  const manualEvents = (calendarState.plans || []).map((x) => ({
+  host.innerHTML = `
+    <button class="multi-trigger" type="button"><span class="value">${esc(label)}</span><span class="muted">▾</span></button>
+    <div class="multi-panel">
+      <div class="multi-search"><input data-role="search" value="${esc(state.statusSearch)}" placeholder="ค้นหา Status" /></div>
+      <div class="multi-options">
+        ${options.map((value) => `
+          <label class="multi-option"><input type="checkbox" value="${esc(value)}" ${selected.includes(value) ? 'checked' : ''} /><span>${esc(value)}</span></label>
+        `).join('')}
+      </div>
+      <div class="multi-actions">
+        <button class="btn" data-role="clear" type="button" style="padding:6px 10px">ล้าง</button>
+        <button class="btn" data-role="close" type="button" style="padding:6px 10px">ปิด</button>
+      </div>
+    </div>
+  `
+
+  host.querySelector('.multi-trigger').addEventListener('click', (e) => {
+    e.stopPropagation()
+    host.classList.toggle('open')
+  })
+
+  host.querySelector('[data-role="search"]').addEventListener('input', (e) => {
+    state.statusSearch = e.target.value || ''
+    buildStatusFilter()
+    host.classList.add('open')
+  })
+
+  host.querySelectorAll('input[type="checkbox"]').forEach((el) => {
+    el.addEventListener('change', () => {
+      state.filters.status = [...host.querySelectorAll('input[type="checkbox"]:checked')].map((x) => x.value)
+      buildStatusFilter()
+      host.classList.add('open')
+      renderTimeline()
+    })
+  })
+
+  host.querySelector('[data-role="clear"]').addEventListener('click', () => {
+    state.filters.status = []
+    state.statusSearch = ''
+    buildStatusFilter()
+    host.classList.add('open')
+    renderTimeline()
+  })
+
+  host.querySelector('[data-role="close"]').addEventListener('click', () => host.classList.remove('open'))
+}
+
+function enumerateEvents() {
+  const jiraParents = (state.dashboard?.parents || []).map((row) => {
+    const timeline = (state.dashboard.timelineItems || []).find((x) => x.key === row.parent.key)
+    if (!timeline) return null
+
+    return {
+      id: row.parent.key,
+      key: row.parent.key,
+      title: row.parent.summary,
+      status: row.parent.status,
+      squad: row.parent.squad,
+      start: timeline.start,
+      end: timeline.end,
+      source: 'parent',
+      url: row.parent.browseUrl
+    }
+  }).filter(Boolean)
+
+  const manual = (state.plans || []).map((x) => ({
+    id: x.id,
     key: x.key || '-',
     title: x.title,
+    status: 'Manual',
+    squad: x.owner || '-',
     start: x.start,
     end: x.end,
     source: 'manual',
-    url: '',
-    sprint: x.sprint || ''
+    url: ''
   }))
 
-  return [...jiraEvents, ...manualEvents]
+  return [...jiraParents, ...manual]
+}
+
+function filteredEvents() {
+  const { start, end } = getTwoMonthRange()
+  const q = state.filters.q.toLowerCase().trim()
+
+  return enumerateEvents().filter((e) => {
+    if (!overlaps(e.start, e.end, start, end)) return false
+
+    if (e.source === 'parent') {
+      if (state.filters.status.length && !state.filters.status.includes(e.status)) return false
+    }
+
+    if (q) {
+      const blob = `${e.key} ${e.title} ${e.status} ${e.squad}`.toLowerCase()
+      if (!blob.includes(q)) return false
+    }
+
+    return true
+  })
+}
+
+function renderTimeline() {
+  const { start, end } = getTwoMonthRange()
+  const startDate = new Date(`${start}T00:00:00Z`)
+  const endDate = new Date(`${end}T00:00:00Z`)
+  const days = Math.floor((endDate - startDate) / 86400000) + 1
+
+  const events = filteredEvents().sort((a, b) => (a.start || '').localeCompare(b.start || ''))
+
+  const dayHeaders = Array.from({ length: days }, (_, i) => {
+    const d = new Date(startDate.getTime())
+    d.setUTCDate(d.getUTCDate() + i)
+    return `<div class="day-cell">${d.getUTCDate()}</div>`
+  }).join('')
+
+  const rows = events.map((e) => {
+    const eventStart = new Date(`${e.start}T00:00:00Z`)
+    const eventEnd = new Date(`${e.end}T00:00:00Z`)
+
+    const clampedStart = eventStart < startDate ? startDate : eventStart
+    const clampedEnd = eventEnd > endDate ? endDate : eventEnd
+
+    const startOffset = Math.floor((clampedStart - startDate) / 86400000)
+    const endOffset = Math.floor((clampedEnd - startDate) / 86400000)
+
+    const left = (startOffset / days) * 100
+    const width = (Math.max(1, endOffset - startOffset + 1) / days) * 100
+
+    const barClass = e.source === 'manual' ? 'bar-manual' : 'bar-parent'
+
+    return `
+      <div class="timeline-row" style="grid-template-columns:240px repeat(${days}, minmax(16px, 1fr));">
+        <div class="row-label">
+          <div style="display:flex;justify-content:space-between;gap:6px;align-items:center">
+            <strong>${e.url ? `<a href="${esc(e.url)}" target="_blank">${esc(e.key)}</a>` : esc(e.key)}</strong>
+            <span class="badge b-status" style="padding:2px 8px">${esc(e.status)}</span>
+          </div>
+          <div style="font-size:12px;color:var(--muted)">${esc(e.squad || '-')}</div>
+        </div>
+        ${Array.from({ length: days }, () => '<div class="row-day"></div>').join('')}
+        <div class="row-track">
+          <div class="event-bar ${barClass}" style="left:${left}%;width:${width}%" title="${esc(e.title)}">${esc(e.key)}</div>
+        </div>
+      </div>
+    `
+  }).join('')
+
+  document.getElementById('timelineGrid').innerHTML = `
+    <div class="timeline-head" style="grid-template-columns:240px repeat(${days}, minmax(16px, 1fr));">
+      <div class="time-label"><strong>Item</strong><div style="font-size:11px;color:var(--muted)">${start} ถึง ${end}</div></div>
+      ${dayHeaders}
+    </div>
+    ${rows || '<div class="empty">ไม่พบข้อมูลตามเงื่อนไข</div>'}
+  `
+
+  document.getElementById('calendarSummary').textContent = `แสดง ${events.length} รายการ | ช่วงวันที่ ${start} ถึง ${end} | Source: ${state.source || '-'}`
 }
 
 function setEditMode(item) {
@@ -63,7 +214,7 @@ function setEditMode(item) {
   const modeLabel = document.getElementById('editModeLabel')
 
   if (!item) {
-    calendarState.editingId = ''
+    state.editingId = ''
     form.reset()
     saveBtn.textContent = 'บันทึกแผนงาน'
     cancelBtn.style.display = 'none'
@@ -71,7 +222,7 @@ function setEditMode(item) {
     return
   }
 
-  calendarState.editingId = item.id
+  state.editingId = item.id
   form.elements.title.value = item.title || ''
   form.elements.key.value = item.key || ''
   form.elements.sprint.value = item.sprint || ''
@@ -85,86 +236,29 @@ function setEditMode(item) {
   modeLabel.style.display = ''
 }
 
-function renderTimeline() {
-  const ym = calendarState.month
-  const { start, end, days } = getMonthRange(ym)
-  const events = enumerateEvents().filter((event) => overlaps(event.start, event.end, start, end))
-
-  const dayHeaders = Array.from({ length: days }, (_, i) => `<div class="day-cell">${i + 1}</div>`).join('')
-
-  const rows = events
-    .sort((a, b) => (a.start || '').localeCompare(b.start || ''))
-    .slice(0, 120)
-    .map((event) => {
-      const clampedStart = event.start < start ? start : event.start
-      const clampedEnd = event.end > end ? end : event.end
-      const startDay = Number(clampedStart.slice(-2))
-      const endDay = Number(clampedEnd.slice(-2))
-
-      const left = ((startDay - 1) / days) * 100
-      const width = (Math.max(1, endDay - startDay + 1) / days) * 100
-
-      const sourceClass = event.source === 'manual' ? 'bar-manual' : event.source === 'parent' ? 'bar-parent' : 'bar-linked'
-      const label = `${event.key} ${event.title}`
-
-      return `
-        <div class="timeline-row">
-          <div class="row-label">
-            <div><strong>${event.url ? `<a href="${esc(event.url)}" target="_blank">${esc(event.key)}</a>` : esc(event.key)}</strong></div>
-            <div style="font-size:12px;color:var(--muted)">${esc(event.sprint || '-')}</div>
-          </div>
-          ${Array.from({ length: days }, () => '<div class="row-day"></div>').join('')}
-          <div class="row-track">
-            <div class="event-bar ${sourceClass}" style="left:${left}%;width:${width}%" title="${esc(label)}">${esc(label)}</div>
-          </div>
-        </div>
-      `
-    })
-    .join('')
-
-  document.getElementById('timelineGrid').innerHTML = `
-    <div class="timeline-head">
-      <div class="time-label"><strong>Item</strong><div style="font-size:11px;color:var(--muted)">${esc(ym)}</div></div>
-      ${dayHeaders}
-    </div>
-    ${rows || '<div class="empty">ไม่พบงานในช่วงเดือนนี้</div>'}
-  `
-
-  const manualCount = calendarState.plans.length
-  const jiraCount = events.filter((x) => x.source !== 'manual').length
-  document.getElementById('calendarSummary').textContent = `เดือน ${ym}: Jira events ${jiraCount} รายการ | Manual plans ${manualCount} รายการ | Source: ${calendarState.source || '-'}`
-}
-
 function renderManualList() {
   const list = document.getElementById('manualList')
-  if (!calendarState.plans.length) {
-    list.innerHTML = '<div class="empty">ยังไม่มีรายการที่บันทึกเพิ่ม</div>'
+  if (!state.plans.length) {
+    list.innerHTML = '<div class="empty">ยังไม่มีรายการ Manual</div>'
     return
   }
 
-  list.innerHTML = calendarState.plans
-    .map(
-      (item) => `
-      <div class="item-row">
-        <div class="item-top">
-          <div><strong>${esc(item.key || '-')}</strong> ${esc(item.title)}</div>
-          <div class="badge b-status">${esc(item.start)} - ${esc(item.end)}</div>
-        </div>
-        <div class="item-meta">Sprint: ${esc(item.sprint || '-')} | Owner: ${esc(item.owner || '-')}</div>
-        <div class="item-meta">${esc(item.note || '')}</div>
-        <div style="display:flex;gap:8px;margin-top:6px">
-          <button class="btn" data-action="edit" data-id="${esc(item.id)}">แก้ไข</button>
-          <button class="btn" data-action="delete" data-id="${esc(item.id)}">ลบ</button>
-        </div>
+  list.innerHTML = state.plans.map((item) => `
+    <div class="item-row">
+      <div class="item-top"><div><strong>${esc(item.key || '-')}</strong> ${esc(item.title)}</div><div class="badge b-status">${esc(item.start)} - ${esc(item.end)}</div></div>
+      <div class="item-meta">Owner: ${esc(item.owner || '-')} | Sprint: ${esc(item.sprint || '-')}</div>
+      <div class="item-meta">${esc(item.note || '')}</div>
+      <div style="display:flex;gap:8px;margin-top:6px">
+        <button class="btn" data-action="edit" data-id="${esc(item.id)}">แก้ไข</button>
+        <button class="btn" data-action="delete" data-id="${esc(item.id)}">ลบ</button>
       </div>
-    `
-    )
-    .join('')
+    </div>
+  `).join('')
 
   list.querySelectorAll('button[data-action="edit"]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const id = btn.getAttribute('data-id')
-      const item = calendarState.plans.find((x) => x.id === id)
+      const item = state.plans.find((x) => x.id === id)
       if (item) setEditMode(item)
     })
   })
@@ -175,23 +269,22 @@ function renderManualList() {
       if (!id) return
       if (!confirm('ยืนยันลบรายการนี้?')) return
 
-      const statusEl = document.getElementById('planStatus')
-      statusEl.textContent = 'กำลังลบ...'
+      const status = document.getElementById('planStatus')
+      status.textContent = 'กำลังลบ...'
 
       try {
-        const response = await fetch('/api/planner', {
+        const res = await fetch('/api/planner', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id })
         })
-        const data = await response.json()
+        const data = await res.json()
         if (data.error) throw new Error(data.error)
 
-        statusEl.textContent = 'ลบเรียบร้อย'
-        if (calendarState.editingId === id) setEditMode(null)
+        status.textContent = 'ลบเรียบร้อย'
         await loadAll()
       } catch (error) {
-        statusEl.textContent = `ลบไม่สำเร็จ: ${error.message || error}`
+        status.textContent = `ลบไม่สำเร็จ: ${error.message || error}`
       }
     })
   })
@@ -205,56 +298,57 @@ async function loadAll() {
   if (dashboard.error) throw new Error(dashboard.error)
   if (planner.error) throw new Error(planner.error)
 
-  calendarState.dashboard = dashboard
-  calendarState.plans = Array.isArray(planner.items) ? planner.items : []
-  calendarState.source = planner.source || ''
+  state.dashboard = dashboard
+  state.plans = Array.isArray(planner.items) ? planner.items : []
+  state.source = planner.source || ''
 
-  const timestamp = new Date(dashboard.generatedAt || Date.now()).toLocaleString('th-TH')
-  document.getElementById('calendarSync').textContent = `อัปเดตล่าสุด: ${timestamp}`
+  state.statusOptions = dashboard.meta?.available?.statuses || []
+  const defaults = ['S4', 'S5', 'S6'].filter((s) => state.statusOptions.includes(s))
+  if (!state.filters.status.length) state.filters.status = defaults
 
+  buildStatusFilter()
   renderManualList()
   renderTimeline()
+
+  document.getElementById('calendarSync').textContent = `อัปเดตล่าสุด: ${new Date(dashboard.generatedAt || Date.now()).toLocaleString('th-TH')}`
 }
 
 function bindEvents() {
-  const picker = document.getElementById('monthPicker')
-  const now = new Date()
-  const ym = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`
-  picker.value = ym
-  calendarState.month = ym
-
-  picker.addEventListener('change', (e) => {
-    calendarState.month = e.target.value || ym
+  document.getElementById('calendarSearch').addEventListener('input', (e) => {
+    state.filters.q = e.target.value || ''
     renderTimeline()
   })
 
-  document.getElementById('refreshTimeline').addEventListener('click', loadAll)
   document.getElementById('cancelEditBtn').addEventListener('click', () => setEditMode(null))
 
   document.getElementById('planForm').addEventListener('submit', async (e) => {
     e.preventDefault()
-    const formData = new FormData(e.currentTarget)
-    const payload = Object.fromEntries(formData.entries())
+    const payload = Object.fromEntries(new FormData(e.currentTarget).entries())
+    if (state.editingId) payload.id = state.editingId
 
-    if (calendarState.editingId) payload.id = calendarState.editingId
-
-    const statusEl = document.getElementById('planStatus')
-    statusEl.textContent = calendarState.editingId ? 'กำลังอัปเดต...' : 'กำลังบันทึก...'
+    const status = document.getElementById('planStatus')
+    status.textContent = state.editingId ? 'กำลังอัปเดต...' : 'กำลังบันทึก...'
 
     try {
-      const response = await fetch('/api/planner', {
-        method: calendarState.editingId ? 'PUT' : 'POST',
+      const res = await fetch('/api/planner', {
+        method: state.editingId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       })
-      const data = await response.json()
+      const data = await res.json()
       if (data.error) throw new Error(data.error)
 
-      statusEl.textContent = calendarState.editingId ? 'อัปเดตเรียบร้อย' : 'บันทึกเรียบร้อย'
+      status.textContent = state.editingId ? 'อัปเดตเรียบร้อย' : 'บันทึกเรียบร้อย'
       setEditMode(null)
       await loadAll()
     } catch (error) {
-      statusEl.textContent = `ไม่สำเร็จ: ${error.message || error}`
+      status.textContent = `ไม่สำเร็จ: ${error.message || error}`
+    }
+  })
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.multi')) {
+      document.querySelectorAll('.multi.open').forEach((el) => el.classList.remove('open'))
     }
   })
 }

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="th">
 <head>
   <meta charset="UTF-8" />
@@ -15,7 +15,7 @@
       <div class="header-top">
         <div>
           <h1 class="title">FEPMF Portfolio Control Center</h1>
-          <div class="subtitle">เห็นงานที่เชื่อมกับ FEPMF-xxx ครบทุกประเภท พร้อม Progress ที่โปร่งใสและตรวจสอบได้</div>
+          <div class="subtitle">Overview ระดับ FEPMF + Child พร้อม CAB Date และ %Progress ที่ตรง Jira มากขึ้น</div>
         </div>
         <nav class="nav">
           <a class="active" href="/">Overview</a>
@@ -29,12 +29,20 @@
     </section>
 
     <div class="toolbar">
-      <input id="search" class="search" placeholder="ค้นหา FEPMF / key / summary / status" />
+      <input id="search" class="search" placeholder="ค้นหา FEPMF / Child key / Summary" />
       <div style="display:flex;gap:8px;justify-content:flex-end">
         <button id="clearBtn" class="btn">ล้างค้นหา</button>
         <button id="refreshBtn" class="btn primary">Refresh</button>
       </div>
     </div>
+
+    <section class="panel" style="margin-top:12px;padding:12px">
+      <div class="filter-grid">
+        <div id="statusFilter" class="multi"></div>
+        <div id="squadFilter" class="multi"></div>
+        <div id="cabDateFilter" class="multi"></div>
+      </div>
+    </section>
 
     <section class="kpis" id="kpis"></section>
     <section class="content" id="content"></section>
