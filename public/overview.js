@@ -51,18 +51,33 @@ function formatDate(v) {
 
 function statusBadgeClass(status) {
   const s = String(status || '')
+  const l = s.toLowerCase()
   if (s === 'S7') return 'badge status-s7'
   if (s === 'S6') return 'badge status-s6'
   if (s === 'S5') return 'badge status-s5'
   if (s === 'S4') return 'badge status-s4'
   if (s === 'S3') return 'badge status-s3'
   if (s === 'Cancelled') return 'badge status-cancel'
+  if (l.includes('done') || l.includes('complete') || l.includes('closed') || l.includes('resolved') || l.includes('deliver')) return 'badge status-s7'
+  if (l.includes('review') || l.includes('test') || l.includes('uat') || l.includes('sit') || l.includes('qa')) return 'badge status-s6'
+  if (l.includes('progress') || l.includes('doing') || l.includes('develop')) return 'badge status-s5'
+  if (l.includes('todo') || l.includes('to do') || l.includes('open') || l.includes('backlog')) return 'badge status-s3'
   return 'badge status-default'
 }
 
 function workItemStatusClass(item) {
   if (String(item.key || '').startsWith('MISQA-')) return 'badge b-misqa'
   return statusBadgeClass(item.status)
+}
+
+function workItemRowClass(item) {
+  if (String(item.key || '').startsWith('MISQA-')) return 'misqa-item'
+  const s = String(item.status || '').toLowerCase()
+  if (s.includes('done') || s.includes('complete') || s.includes('closed') || s.includes('resolved') || s.includes('deliver') || s === 's7') return 'item-done'
+  if (s.includes('test') || s.includes('review') || s.includes('uat') || s.includes('sit') || s.includes('qa') || s === 's6') return 'item-test'
+  if (s.includes('progress') || s.includes('doing') || s.includes('develop') || s === 's5' || s === 's4') return 'item-progress'
+  if (s.includes('open') || s.includes('todo') || s.includes('to do') || s.includes('backlog') || s === 's3' || s === 's2' || s === 's1' || s === 's0') return 'item-open'
+  return 'item-default'
 }
 
 function renderKpis(summary, rows) {
@@ -114,9 +129,9 @@ function renderRows() {
     .map((row) => {
       const isOpen = state.expanded.has(row.parent.key)
       const childRows = (row.workItems || []).map((item) => {
-        const misqaClass = String(item.key || '').startsWith('MISQA-') ? 'misqa-item' : ''
+        const rowClass = workItemRowClass(item)
         return `
-          <div class="item-row ${misqaClass}">
+          <div class="item-row ${rowClass}">
             <div class="item-top">
               <div><a class="item-key" href="${esc(item.browseUrl)}" target="_blank">${esc(item.key)}</a> ${esc(item.summary || '')}</div>
               <div class="${workItemStatusClass(item)}">${esc(item.status || '-')}</div>
@@ -131,8 +146,8 @@ function renderRows() {
           <div class="parent-head">
             <div class="parent-main">
               <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                <button class="btn expand-btn" data-parent="${esc(row.parent.key)}" type="button">${isOpen ? 'Collapse' : 'Expand'}</button>
                 <a class="parent-key" href="${esc(row.parent.browseUrl)}" target="_blank">${esc(row.parent.key)}</a>
+                <span class="${statusBadgeClass(row.parent.status)}">${esc(row.parent.status || '-')}</span>
               </div>
               <div>${esc(row.parent.summary || '-')}</div>
               <div class="progress-line"><div style="width:${Math.max(0, Math.min(100, row.progressPercent || 0))}%"></div></div>
@@ -143,7 +158,10 @@ function renderRows() {
               </div>
             </div>
             <div class="badges">
-              <span class="${statusBadgeClass(row.parent.status)}">${esc(row.parent.status || '-')}</span>
+              <button class="expand-btn" data-parent="${esc(row.parent.key)}" type="button" aria-expanded="${isOpen ? 'true' : 'false'}">
+                <span class="expand-btn-icon">${isOpen ? '▾' : '▸'}</span>
+                <span>${isOpen ? 'Collapse' : 'Expand'}</span>
+              </button>
             </div>
           </div>
 

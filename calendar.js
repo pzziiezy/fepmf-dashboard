@@ -3,6 +3,8 @@
   plans: [],
   source: '',
   editingId: '',
+  timelineVisibleCount: 30,
+  selectedMonth: '',
   filters: {
     q: '',
     status: ['S4', 'S5', 'S6']
@@ -23,9 +25,17 @@ function toIsoDate(value) {
 }
 
 function getTwoMonthRange() {
-  const now = new Date()
-  const y = now.getUTCFullYear()
-  const m = now.getUTCMonth()
+  let y
+  let m
+  if (state.selectedMonth && /^\d{4}-\d{2}$/.test(state.selectedMonth)) {
+    const [yy, mm] = state.selectedMonth.split('-').map(Number)
+    y = yy
+    m = mm - 1
+  } else {
+    const now = new Date()
+    y = now.getUTCFullYear()
+    m = now.getUTCMonth()
+  }
   const start = new Date(Date.UTC(y, m, 1))
   const end = new Date(Date.UTC(y, m + 2, 0))
   return { start: toIsoDate(start), end: toIsoDate(end) }
@@ -82,6 +92,7 @@ function buildStatusFilter() {
   host.querySelectorAll('input[type="checkbox"]').forEach((el) => {
     el.addEventListener('change', () => {
       state.filters.status = [...host.querySelectorAll('input[type="checkbox"]:checked')].map((x) => x.value)
+      state.timelineVisibleCount = 30
       buildStatusFilter()
       host.classList.add('open')
       renderTimeline()
@@ -91,6 +102,7 @@ function buildStatusFilter() {
   host.querySelector('[data-role="clear"]').addEventListener('click', () => {
     state.filters.status = []
     state.statusSearch = ''
+    state.timelineVisibleCount = 30
     buildStatusFilter()
     host.classList.add('open')
     renderTimeline()
@@ -156,7 +168,9 @@ function renderTimeline() {
   const endDate = new Date(`${end}T00:00:00Z`)
   const days = Math.floor((endDate - startDate) / 86400000) + 1
 
-  const events = filteredEvents().sort((a, b) => (a.start || '').localeCompare(b.start || ''))
+  const allEvents = filteredEvents().sort((a, b) => (a.start || '').localeCompare(b.start || ''))
+  const visibleCount = Math.min(state.timelineVisibleCount, allEvents.length)
+  const events = allEvents.slice(0, visibleCount)
 
   const dayHeaders = Array.from({ length: days }, (_, i) => {
     const d = new Date(startDate.getTime())
@@ -178,18 +192,20 @@ function renderTimeline() {
     const width = (Math.max(1, endOffset - startOffset + 1) / days) * 100
 
     const barClass = e.source === 'manual' ? 'bar-manual' : 'bar-parent'
+    const rangeText = `${e.start} - ${e.end}`
+    const hoverText = `${e.title}\n${rangeText}`
 
     return `
       <div class="timeline-row" style="grid-template-columns:240px repeat(${days}, minmax(16px, 1fr));">
         <div class="row-label">
           <div style="display:flex;justify-content:space-between;gap:6px;align-items:center">
-            <strong>${e.url ? `<a href="${esc(e.url)}" target="_blank" title="${esc(e.title)}">${esc(e.key)}</a>` : `<span title="${esc(e.title)}">${esc(e.key)}</span>`}</strong>
+            <strong>${e.url ? `<a href="${esc(e.url)}" target="_blank" title="${esc(hoverText)}">${esc(e.key)}</a>` : `<span title="${esc(hoverText)}">${esc(e.key)}</span>`}</strong>
             <span class="${statusBadgeClass(e.status)}" style="padding:2px 8px">${esc(e.status)}</span>
           </div>
-          <div style="font-size:12px;color:var(--muted)">${esc(e.squad || '-')}</div>
+          <div style="font-size:11px;color:var(--muted);line-height:1.2">${esc(e.squad || '-')}</div>
         </div>
         <div class="row-track" style="grid-column:2 / -1;grid-row:1;">
-          <div class="event-bar ${barClass}" style="left:${left}%;width:${width}%" title="${esc(e.title)}">${esc(e.key)}</div>
+          <div class="event-bar ${barClass}" style="left:${left}%;width:${width}%" title="${esc(hoverText)}">${esc(e.key)}</div>
         </div>
         ${Array.from({ length: days }, () => '<div class="row-day"></div>').join('')}
       </div>
@@ -204,7 +220,32 @@ function renderTimeline() {
     ${rows || '<div class="empty">ไม่พบข้อมูลตามเงื่อนไข</div>'}
   `
 
-  document.getElementById('calendarSummary').textContent = `แสดง ${events.length} รายการ | ช่วงวันที่ ${start} ถึง ${end} | Source: ${state.source || '-'}`
+  document.getElementById('calendarSummary').textContent = `แสดง ${events.length}/${allEvents.length} รายการ | ช่วงวันที่ ${start} ถึง ${end} | Source: ${state.source || '-'}`
+
+  const controls = document.getElementById('timelineControls')
+  if (controls) {
+    if (visibleCount < allEvents.length) {
+      controls.innerHTML = `<button id="loadMoreTimelineBtn" class="btn" type="button">Load more (${allEvents.length - visibleCount} remaining)</button>`
+      const btn = document.getElementById('loadMoreTimelineBtn')
+      if (btn) {
+        btn.addEventListener('click', () => {
+          state.timelineVisibleCount += 30
+          renderTimeline()
+        })
+      }
+    } else if (allEvents.length > 30) {
+      controls.innerHTML = `<button id="showLessTimelineBtn" class="btn" type="button">Show less</button>`
+      const btn = document.getElementById('showLessTimelineBtn')
+      if (btn) {
+        btn.addEventListener('click', () => {
+          state.timelineVisibleCount = 30
+          renderTimeline()
+        })
+      }
+    } else {
+      controls.innerHTML = ''
+    }
+  }
 }
 
 function setEditMode(item) {
@@ -304,6 +345,7 @@ async function loadAll() {
 
   state.statusOptions = dashboard.meta?.available?.statuses || []
   state.filters.status = ['S4', 'S5', 'S6'].filter((s) => state.statusOptions.includes(s))
+  state.timelineVisibleCount = 30
 
   buildStatusFilter()
   renderManualList()
@@ -313,8 +355,22 @@ async function loadAll() {
 }
 
 function bindEvents() {
+  const monthPicker = document.getElementById('calendarMonthPicker')
+  if (monthPicker) {
+    const now = new Date()
+    const currentMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`
+    state.selectedMonth = currentMonth
+    monthPicker.value = currentMonth
+    monthPicker.addEventListener('change', (e) => {
+      state.selectedMonth = e.target.value || currentMonth
+      state.timelineVisibleCount = 30
+      renderTimeline()
+    })
+  }
+
   document.getElementById('calendarSearch').addEventListener('input', (e) => {
     state.filters.q = e.target.value || ''
+    state.timelineVisibleCount = 30
     renderTimeline()
   })
 
