@@ -1,0 +1,91 @@
+﻿<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FEPMF Calendar Planner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/app.css" />
+</head>
+<body>
+  <div class="page">
+    <section class="header">
+      <div class="header-top">
+        <div>
+          <h1 class="title">Sprint Calendar Planner</h1>
+          <div class="subtitle">มุมมองแบบ timeline คล้ายปฏิทิน เพื่อดูงานที่อยู่ใน sprint และงานที่กำลังจะเพิ่ม</div>
+        </div>
+        <nav class="nav">
+          <a href="/">Overview</a>
+          <a class="active" href="/calendar.html">Calendar Planner</a>
+        </nav>
+      </div>
+      <div class="header-meta">
+        <span class="tag" id="calendarSync">กำลังโหลดข้อมูล...</span>
+        <span class="tag">Month Scope View</span>
+      </div>
+    </section>
+
+    <section class="panel timeline-shell">
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">
+        <h2 style="margin:0;font-size:20px">Timeline</h2>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="month" id="monthPicker" class="search" style="width:auto" />
+          <button id="refreshTimeline" class="btn">Refresh</button>
+        </div>
+      </div>
+      <div class="notice" id="calendarSummary"></div>
+      <div class="timeline-grid" id="timelineGrid"></div>
+    </section>
+
+    <section class="panel" style="padding:14px;margin-top:14px">
+      <h2 style="margin:0;font-size:20px">เพิ่ม New Project / Initiative</h2>
+      <div class="notice">บันทึกเข้า Google Sheet โดยตรง (ไม่สร้าง Jira) ถ้ายังไม่ตั้งค่า credentials ระบบจะใช้ memory ชั่วคราว</div>
+      <form id="planForm" class="form-grid">
+        <label class="field">
+          <span>Project Title *</span>
+          <input name="title" required placeholder="เช่น Revamp Loan Journey" />
+        </label>
+        <label class="field">
+          <span>Key (ถ้ามี)</span>
+          <input name="key" placeholder="เช่น FEPMF-999" />
+        </label>
+        <label class="field">
+          <span>Sprint</span>
+          <input name="sprint" placeholder="เช่น Sprint14" />
+        </label>
+        <label class="field">
+          <span>Start Date *</span>
+          <input type="date" name="start" required />
+        </label>
+        <label class="field">
+          <span>End Date *</span>
+          <input type="date" name="end" required />
+        </label>
+        <label class="field">
+          <span>Owner</span>
+          <input name="owner" placeholder="ชื่อผู้รับผิดชอบ" />
+        </label>
+        <label class="field full">
+          <span>Note</span>
+          <textarea name="note" placeholder="รายละเอียดเพิ่มเติม"></textarea>
+        </label>
+        <div class="full" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button id="savePlanBtn" class="btn primary" type="submit">บันทึกแผนงาน</button>
+          <button id="cancelEditBtn" class="btn" type="button" style="display:none">ยกเลิกแก้ไข</button>
+          <span id="editModeLabel" class="badge b-status" style="display:none">Editing</span>
+          <span id="planStatus" class="notice"></span>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel" style="padding:14px;margin-top:14px">
+      <h2 style="margin:0;font-size:20px">Manual Plans</h2>
+      <div class="list" id="manualList"></div>
+    </section>
+  </div>
+  <script src="/calendar.js"></script>
+</body>
+</html>

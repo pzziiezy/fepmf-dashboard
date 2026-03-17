@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FEPMF Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/app.css" />
+</head>
+<body>
+  <div class="page">
+    <section class="header">
+      <div class="header-top">
+        <div>
+          <h1 class="title">FEPMF Portfolio Control Center</h1>
+          <div class="subtitle">เห็นงานที่เชื่อมกับ FEPMF-xxx ครบทุกประเภท พร้อม Progress ที่โปร่งใสและตรวจสอบได้</div>
+        </div>
+        <nav class="nav">
+          <a class="active" href="/">Overview</a>
+          <a href="/calendar.html">Calendar Planner</a>
+        </nav>
+      </div>
+      <div class="header-meta">
+        <span class="tag" id="syncTime">กำลังโหลดข้อมูล...</span>
+        <span class="tag">Data Source: Jira Cloud</span>
+      </div>
+    </section>
+
+    <div class="toolbar">
+      <input id="search" class="search" placeholder="ค้นหา FEPMF / key / summary / status" />
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button id="clearBtn" class="btn">ล้างค้นหา</button>
+        <button id="refreshBtn" class="btn primary">Refresh</button>
+      </div>
+    </div>
+
+    <section class="kpis" id="kpis"></section>
+    <section class="content" id="content"></section>
+  </div>
+  <script src="/overview.js"></script>
+</body>
+</html>
