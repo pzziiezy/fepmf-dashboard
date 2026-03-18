@@ -46,6 +46,7 @@
         <h2 style="margin:0;font-size:18px">เลือก FEPMF</h2>
         <div class="notice" id="pickerSummary">ยังไม่ได้เลือกโปรเจ็ค</div>
         <input id="pickerSearch" class="search" placeholder="ค้นหา FEPMF key หรือ Summary" style="margin-top:8px" />
+        <div id="pickerStatusFilter" class="multi" style="margin-top:8px"></div>
         <div style="display:flex;gap:8px;margin-top:8px">
           <button id="pickerSelectAll" class="btn" type="button">Select All</button>
           <button id="pickerClear" class="btn" type="button">Clear</button>
@@ -60,16 +61,7 @@
           <div class="shift-table-wrap">
             <table class="shift-table">
               <thead>
-                <tr>
-                  <th>Item</th>
-                  <th>Status</th>
-                  <th>Current Estimate</th>
-                  <th>Current Due</th>
-                  <th>New Estimate Sprint</th>
-                  <th>New Due Date</th>
-                  <th>Shift (Sprint)</th>
-                  <th>Shift (Man-day)</th>
-                </tr>
+                <tr id="shiftTableHead"></tr>
               </thead>
               <tbody id="shiftTableBody"></tbody>
             </table>

@@ -11,6 +11,10 @@ const state = {
     q: '',
     status: ['S4', 'S5']
   },
+  sort: {
+    key: 'item',
+    dir: 'asc'
+  },
   statusOptions: [],
   statusSearch: ''
 }
@@ -113,64 +117,96 @@ function sortByKey(a, b) {
 }
 
 function buildStatusFilter() {
-  const host = document.getElementById('shiftStatusFilter')
+  const hosts = [document.getElementById('shiftStatusFilter'), document.getElementById('pickerStatusFilter')].filter(Boolean)
   const selected = state.filters.status
   const options = state.statusOptions.filter((v) => String(v).toLowerCase().includes(state.statusSearch.toLowerCase()))
   const label = selected.length ? `${selected[0]}${selected.length > 1 ? ` +${selected.length - 1}` : ''}` : 'เลือก Status'
 
-  host.innerHTML = `
-    <button class="multi-trigger" type="button"><span class="value">${esc(label)}</span><span class="muted">▾</span></button>
-    <div class="multi-panel">
-      <div class="multi-search"><input data-role="search" value="${esc(state.statusSearch)}" placeholder="ค้นหา Status" /></div>
-      <div class="multi-options">
-        ${options.map((value) => `
-          <label class="multi-option"><input type="checkbox" value="${esc(value)}" ${selected.includes(value) ? 'checked' : ''} /><span>${esc(value)}</span></label>
-        `).join('') || '<div class="mini-empty">ไม่พบค่า</div>'}
-      </div>
-      <div class="multi-actions">
-        <button class="btn" data-role="clear" type="button" style="padding:6px 10px">ล้าง</button>
-        <button class="btn" data-role="close" type="button" style="padding:6px 10px">ปิด</button>
-      </div>
-    </div>
-  `
-
-  host.querySelector('.multi-trigger').addEventListener('click', (e) => {
-    e.stopPropagation()
-    host.classList.toggle('open')
-  })
-
-  host.querySelector('[data-role="search"]').addEventListener('input', (e) => {
-    state.statusSearch = e.target.value || ''
-    buildStatusFilter()
-    host.classList.add('open')
-  })
-
-  host.querySelectorAll('input[type="checkbox"]').forEach((el) => {
-    el.addEventListener('change', () => {
-      state.filters.status = [...host.querySelectorAll('input[type="checkbox"]:checked')].map((x) => x.value)
-      state.visibleCount = 30
-      buildStatusFilter()
-      host.classList.add('open')
-      renderProjectPicker()
-      applyFilters()
-    })
-  })
-
-  host.querySelector('[data-role="clear"]').addEventListener('click', () => {
-    state.filters.status = []
-    state.statusSearch = ''
+  function onFilterChanged(keepOpenHost) {
     state.visibleCount = 30
     buildStatusFilter()
-    host.classList.add('open')
+    if (keepOpenHost) keepOpenHost.classList.add('open')
     renderProjectPicker()
     applyFilters()
-  })
+  }
 
-  host.querySelector('[data-role="close"]').addEventListener('click', () => host.classList.remove('open'))
+  for (const host of hosts) {
+    host.innerHTML = `
+      <button class="multi-trigger" type="button"><span class="value">${esc(label)}</span><span class="muted">▾</span></button>
+      <div class="multi-panel">
+        <div class="multi-search"><input data-role="search" value="${esc(state.statusSearch)}" placeholder="ค้นหา Status" /></div>
+        <div class="multi-options">
+          ${options.map((value) => `
+            <label class="multi-option"><input type="checkbox" value="${esc(value)}" ${selected.includes(value) ? 'checked' : ''} /><span>${esc(value)}</span></label>
+          `).join('') || '<div class="mini-empty">ไม่พบค่า</div>'}
+        </div>
+        <div class="multi-actions">
+          <button class="btn" data-role="clear" type="button" style="padding:6px 10px">ล้าง</button>
+          <button class="btn" data-role="close" type="button" style="padding:6px 10px">ปิด</button>
+        </div>
+      </div>
+    `
+
+    host.querySelector('.multi-trigger').addEventListener('click', (e) => {
+      e.stopPropagation()
+      host.classList.toggle('open')
+    })
+
+    host.querySelector('[data-role="search"]').addEventListener('input', (e) => {
+      state.statusSearch = e.target.value || ''
+      buildStatusFilter()
+      host.classList.add('open')
+    })
+
+    host.querySelectorAll('input[type="checkbox"]').forEach((el) => {
+      el.addEventListener('change', () => {
+        state.filters.status = [...host.querySelectorAll('input[type="checkbox"]:checked')].map((x) => x.value)
+        onFilterChanged(host)
+      })
+    })
+
+    host.querySelector('[data-role="clear"]').addEventListener('click', () => {
+      state.filters.status = []
+      state.statusSearch = ''
+      onFilterChanged(host)
+    })
+
+    host.querySelector('[data-role="close"]').addEventListener('click', () => host.classList.remove('open'))
+  }
 }
 
 function getSprintMap() {
   return new Map((state.dashboard?.sprintCalendar || []).map((x) => [Number(x.sprint), x]))
+}
+
+function sortIndicator(key) {
+  if (state.sort.key !== key) return '↕'
+  return state.sort.dir === 'asc' ? '↑' : '↓'
+}
+
+function renderTableHead() {
+  const head = document.getElementById('shiftTableHead')
+  if (!head) return
+
+  const cols = [
+    { key: 'item', label: 'Item' },
+    { key: 'status', label: 'Status' },
+    { key: 'currentEstimate', label: 'Current Estimate' },
+    { key: 'currentDue', label: 'Current Due' },
+    { key: 'newEstimate', label: 'New Estimate Sprint' },
+    { key: 'newDue', label: 'New Due Date' },
+    { key: 'shiftSprint', label: 'Shift (Sprint)' },
+    { key: 'shiftManDay', label: 'Shift (Man-day)' }
+  ]
+
+  head.innerHTML = cols.map((c) => `
+    <th>
+      <button class="sort-btn" type="button" data-sort="${esc(c.key)}">
+        <span>${esc(c.label)}</span>
+        <span class="sort-mark">${sortIndicator(c.key)}</span>
+      </button>
+    </th>
+  `).join('')
 }
 
 function getPickerVisibleRows() {
@@ -203,7 +239,11 @@ function renderProjectPicker() {
       <label class="picker-item">
         <input type="checkbox" data-role="pick-project" data-key="${esc(key)}" ${checked} />
         <div>
-          <div><strong>${esc(key)}</strong> <span class="${statusBadgeClass(row.parent.status)}">${esc(row.parent.status || '-')}</span></div>
+          <div>
+            <strong>${esc(key)}</strong>
+            <span class="${statusBadgeClass(row.parent.status)}">${esc(row.parent.status || '-')}</span>
+            <span class="picker-estimate">${esc(row.parent.estimateSprint || '-')}</span>
+          </div>
           <div class="picker-sub">${esc(row.parent.summary || '-')}</div>
         </div>
       </label>
@@ -384,15 +424,58 @@ function renderTimeline() {
 function renderTable() {
   const body = document.getElementById('shiftTableBody')
   const sprintOptions = state.dashboard?.sprintCalendar || []
-  const visible = state.filtered.slice(0, state.visibleCount)
+  const models = state.filtered.map((row) => computeRowModel(row))
+
+  function cmpText(a, b) {
+    return String(a || '').localeCompare(String(b || ''), undefined, { numeric: true, sensitivity: 'base' })
+  }
+
+  function cmpNum(a, b) {
+    return Number(a || 0) - Number(b || 0)
+  }
+
+  models.sort((a, b) => {
+    let diff = 0
+    switch (state.sort.key) {
+      case 'status':
+        diff = cmpText(a.row.parent.status, b.row.parent.status)
+        break
+      case 'currentEstimate':
+        diff = cmpNum(parseSprintNumber(a.row.parent.estimateSprint), parseSprintNumber(b.row.parent.estimateSprint))
+        break
+      case 'currentDue':
+        diff = cmpText(a.row.parent.cabDate, b.row.parent.cabDate)
+        break
+      case 'newEstimate':
+        diff = cmpNum(parseSprintNumber(a.plan.newEstimateSprint), parseSprintNumber(b.plan.newEstimateSprint))
+        break
+      case 'newDue':
+        diff = cmpText(a.plan.newDueDate, b.plan.newDueDate)
+        break
+      case 'shiftSprint':
+        diff = cmpNum(a.sprintShift, b.sprintShift)
+        break
+      case 'shiftManDay':
+        diff = cmpNum(a.manDayShift, b.manDayShift)
+        break
+      case 'item':
+      default:
+        diff = cmpText(a.row.parent.key, b.row.parent.key)
+        break
+    }
+    return state.sort.dir === 'asc' ? diff : -diff
+  })
+
+  const visible = models.slice(0, state.visibleCount)
 
   if (!visible.length) {
     body.innerHTML = `<tr><td colspan="8" class="empty">${state.selectedKeys.size ? 'ไม่พบข้อมูล' : 'ยังไม่ได้เลือกโปรเจ็คจากฝั่งซ้าย'}</td></tr>`
+    renderTableHead()
     return
   }
 
-  body.innerHTML = visible.map((row) => {
-    const model = computeRowModel(row)
+  body.innerHTML = visible.map((model) => {
+    const row = model.row
     const sprintShiftText = model.sprintShift > 0 ? `+${model.sprintShift}` : `${model.sprintShift}`
     const dayShiftText = model.manDayShift > 0 ? `+${model.manDayShift}` : `${model.manDayShift}`
     const sprintClass = model.sprintShift > 0 ? 'impact-bad' : model.sprintShift < 0 ? 'impact-good' : 'impact-neutral'
@@ -422,6 +505,8 @@ function renderTable() {
       </tr>
     `
   }).join('')
+
+  renderTableHead()
 }
 
 function bindEvents() {
@@ -488,6 +573,21 @@ function bindEvents() {
     renderTable()
   })
 
+  document.getElementById('shiftTableHead').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-sort]')
+    if (!btn) return
+    const key = btn.getAttribute('data-sort')
+    if (!key) return
+
+    if (state.sort.key === key) {
+      state.sort.dir = state.sort.dir === 'asc' ? 'desc' : 'asc'
+    } else {
+      state.sort.key = key
+      state.sort.dir = 'asc'
+    }
+    renderTable()
+  })
+
   document.addEventListener('click', (e) => {
     if (!e.target.closest('.multi')) {
       document.querySelectorAll('.multi.open').forEach((el) => el.classList.remove('open'))
@@ -506,6 +606,8 @@ async function load() {
   state.filters.status = ['S4', 'S5'].filter((x) => state.statusOptions.includes(x))
   state.visibleCount = 30
   state.selectedKeys.clear()
+  state.sort.key = 'item'
+  state.sort.dir = 'asc'
 
   for (const row of state.rows) ensurePlan(row.parent.key, row)
 
