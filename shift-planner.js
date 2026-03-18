@@ -5,6 +5,8 @@ const state = {
   selectedMonth: '',
   visibleCount: 30,
   plans: {},
+  selectedKeys: new Set(),
+  pickerSearch: '',
   filters: {
     q: '',
     status: ['S4', 'S5']
@@ -149,6 +151,7 @@ function buildStatusFilter() {
       state.visibleCount = 30
       buildStatusFilter()
       host.classList.add('open')
+      renderProjectPicker()
       applyFilters()
     })
   })
@@ -159,6 +162,7 @@ function buildStatusFilter() {
     state.visibleCount = 30
     buildStatusFilter()
     host.classList.add('open')
+    renderProjectPicker()
     applyFilters()
   })
 
@@ -167,6 +171,44 @@ function buildStatusFilter() {
 
 function getSprintMap() {
   return new Map((state.dashboard?.sprintCalendar || []).map((x) => [Number(x.sprint), x]))
+}
+
+function getPickerVisibleRows() {
+  const q = state.pickerSearch.toLowerCase().trim()
+  return state.rows.filter((row) => {
+    if (state.filters.status.length && !state.filters.status.includes(row.parent.status)) return false
+    if (!q) return true
+    const blob = `${row.parent.key} ${row.parent.summary} ${row.parent.squad} ${row.parent.status}`.toLowerCase()
+    return blob.includes(q)
+  })
+}
+
+function renderProjectPicker() {
+  const list = document.getElementById('pickerList')
+  const summary = document.getElementById('pickerSummary')
+  const rows = getPickerVisibleRows()
+  const selectedCount = state.selectedKeys.size
+
+  summary.textContent = `เลือกแล้ว ${selectedCount} โปรเจ็ค | แสดงใน list ${rows.length}`
+
+  if (!rows.length) {
+    list.innerHTML = '<div class="empty">ไม่พบ FEPMF ตามเงื่อนไข</div>'
+    return
+  }
+
+  list.innerHTML = rows.map((row) => {
+    const key = row.parent.key
+    const checked = state.selectedKeys.has(key) ? 'checked' : ''
+    return `
+      <label class="picker-item">
+        <input type="checkbox" data-role="pick-project" data-key="${esc(key)}" ${checked} />
+        <div>
+          <div><strong>${esc(key)}</strong> <span class="${statusBadgeClass(row.parent.status)}">${esc(row.parent.status || '-')}</span></div>
+          <div class="picker-sub">${esc(row.parent.summary || '-')}</div>
+        </div>
+      </label>
+    `
+  }).join('')
 }
 
 function ensurePlan(key, row) {
@@ -226,7 +268,7 @@ function applyFilters() {
   const { start, end } = getThreeMonthRange()
   const q = state.filters.q.toLowerCase().trim()
 
-  state.filtered = state.rows
+  const selectedRows = state.rows
     .filter((row) => {
       if (state.filters.status.length && !state.filters.status.includes(row.parent.status)) return false
 
@@ -235,12 +277,16 @@ function applyFilters() {
         if (!blob.includes(q)) return false
       }
 
+      if (!state.selectedKeys.has(row.parent.key)) return false
+
       const model = computeRowModel(row)
       const hasBaseline = model.baselineStart && model.baselineEnd && overlaps(model.baselineStart, model.baselineEnd, start, end)
       const hasPlan = model.plannedStart && model.plannedEnd && overlaps(model.plannedStart, model.plannedEnd, start, end)
       return hasBaseline || hasPlan
     })
     .sort(sortByKey)
+
+  state.filtered = state.selectedKeys.size ? selectedRows : []
 
   renderTimeline()
   renderTable()
@@ -307,7 +353,11 @@ function renderTimeline() {
     ${rowsHtml || '<div class="empty">ไม่พบรายการตามเงื่อนไข</div>'}
   `
 
-  document.getElementById('shiftSummary').textContent = `แสดง ${visible.length}/${state.filtered.length} รายการ | ช่วง ${start} ถึง ${end} | Baseline เทียบ New Plan`
+  if (!state.selectedKeys.size) {
+    document.getElementById('shiftSummary').textContent = `ยังไม่ได้เลือกโปรเจ็คจากฝั่งซ้าย | ช่วง ${start} ถึง ${end}`
+  } else {
+    document.getElementById('shiftSummary').textContent = `แสดง ${visible.length}/${state.filtered.length} รายการ | ช่วง ${start} ถึง ${end} | Baseline เทียบ New Plan`
+  }
 
   const controls = document.getElementById('shiftControls')
   if (!controls) return
@@ -337,7 +387,7 @@ function renderTable() {
   const visible = state.filtered.slice(0, state.visibleCount)
 
   if (!visible.length) {
-    body.innerHTML = '<tr><td colspan="8" class="empty">ไม่พบข้อมูล</td></tr>'
+    body.innerHTML = `<tr><td colspan="8" class="empty">${state.selectedKeys.size ? 'ไม่พบข้อมูล' : 'ยังไม่ได้เลือกโปรเจ็คจากฝั่งซ้าย'}</td></tr>`
     return
   }
 
@@ -393,6 +443,38 @@ function bindEvents() {
     applyFilters()
   })
 
+  document.getElementById('pickerSearch').addEventListener('input', (e) => {
+    state.pickerSearch = e.target.value || ''
+    renderProjectPicker()
+  })
+
+  document.getElementById('pickerSelectAll').addEventListener('click', () => {
+    for (const row of getPickerVisibleRows()) state.selectedKeys.add(row.parent.key)
+    state.visibleCount = 30
+    renderProjectPicker()
+    applyFilters()
+  })
+
+  document.getElementById('pickerClear').addEventListener('click', () => {
+    state.selectedKeys.clear()
+    state.visibleCount = 30
+    renderProjectPicker()
+    applyFilters()
+  })
+
+  document.getElementById('pickerList').addEventListener('change', (e) => {
+    const role = e.target.getAttribute('data-role')
+    const key = e.target.getAttribute('data-key')
+    if (role !== 'pick-project' || !key) return
+
+    if (e.target.checked) state.selectedKeys.add(key)
+    else state.selectedKeys.delete(key)
+
+    state.visibleCount = 30
+    renderProjectPicker()
+    applyFilters()
+  })
+
   document.getElementById('shiftTableBody').addEventListener('change', (e) => {
     const role = e.target.getAttribute('data-role')
     const key = e.target.getAttribute('data-key')
@@ -423,10 +505,12 @@ async function load() {
   state.statusOptions = (data.meta?.available?.statuses || []).filter((x) => x === 'S4' || x === 'S5')
   state.filters.status = ['S4', 'S5'].filter((x) => state.statusOptions.includes(x))
   state.visibleCount = 30
+  state.selectedKeys.clear()
 
   for (const row of state.rows) ensurePlan(row.parent.key, row)
 
   buildStatusFilter()
+  renderProjectPicker()
   applyFilters()
   document.getElementById('shiftSync').textContent = `อัปเดตล่าสุด: ${new Date(data.generatedAt || Date.now()).toLocaleString('th-TH')}`
 }
