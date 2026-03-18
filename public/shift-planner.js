@@ -11,7 +11,7 @@ const state = {
   pickerSprint: [],
   filters: {
     q: '',
-    status: ['S4', 'S5']
+    status: ['S3', 'S4', 'S5']
   },
   sort: {
     key: 'item',
@@ -672,9 +672,9 @@ async function load() {
   if (data.error) throw new Error(data.error)
 
   state.dashboard = data
-  state.rows = (data.parents || []).filter((row) => ['S4', 'S5'].includes(row?.parent?.status)).sort(sortByKey)
-  state.statusOptions = (data.meta?.available?.statuses || []).filter((x) => x === 'S4' || x === 'S5')
-  state.filters.status = ['S4', 'S5'].filter((x) => state.statusOptions.includes(x))
+  state.rows = (data.parents || []).filter((row) => ['S3', 'S4', 'S5'].includes(row?.parent?.status)).sort(sortByKey)
+  state.statusOptions = (data.meta?.available?.statuses || []).filter((x) => x === 'S3' || x === 'S4' || x === 'S5')
+  state.filters.status = ['S3', 'S4', 'S5'].filter((x) => state.statusOptions.includes(x))
   state.visibleCount = 30
   state.selectedKeys.clear()
   state.sort.key = 'item'
