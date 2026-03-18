@@ -566,7 +566,7 @@ function renderTable() {
             <option value="">-</option>
             ${sprintOptions.map((sp) => {
               const val = `Sprint${sp.sprint}`
-              return `<option value="${esc(val)}" ${model.plan.newEstimateSprint === val ? 'selected' : ''}>${esc(val)}</option>`
+              return `<option value="${esc(val)}" ${model.plan.newEstimateSprint === val ? 'selected' : ''}>${esc(val)} (${esc(sp.start)} - ${esc(sp.end)})</option>`
             }).join('')}
           </select>
         </td>
