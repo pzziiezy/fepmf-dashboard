@@ -274,7 +274,7 @@ textarea {
 .shift-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 980px;
+  min-width: 900px;
   background: #fff;
 }
 
@@ -318,7 +318,8 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 8px 10px;
-  font: inherit;
+  font-size: 12px;
+  font-family: inherit;
   background: #fff;
   color: var(--text);
 }
@@ -424,6 +425,40 @@ textarea {
 .shift-table th:nth-child(8),
 .shift-table td:nth-child(8) {
   min-width: 96px;
+}
+
+.shift-table th:nth-child(5),
+.shift-table td:nth-child(5) {
+  min-width: 155px;
+}
+
+.shift-table th:nth-child(6),
+.shift-table td:nth-child(6) {
+  min-width: 135px;
+}
+
+.shift-table td:nth-child(5) select {
+  width: 150px;
+  max-width: 100%;
+}
+
+.shift-table td:nth-child(6) input[type="date"] {
+  width: 128px;
+  max-width: 100%;
+}
+
+.picker-control {
+  font-size: 12px;
+  padding: 7px 9px;
+}
+
+.shift-left-panel .multi-trigger {
+  min-height: 34px;
+}
+
+.shift-left-panel .btn {
+  padding: 7px 10px;
+  font-size: 12px;
 }
 
 @media (max-width: 1100px) {

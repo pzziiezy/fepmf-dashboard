@@ -7,6 +7,8 @@ const state = {
   plans: {},
   selectedKeys: new Set(),
   pickerSearch: '',
+  pickerSprintSearch: '',
+  pickerSprint: [],
   filters: {
     q: '',
     status: ['S4', 'S5']
@@ -179,6 +181,15 @@ function getSprintMap() {
   return new Map((state.dashboard?.sprintCalendar || []).map((x) => [Number(x.sprint), x]))
 }
 
+function sortSprintValues(values = []) {
+  return [...values].sort((a, b) => {
+    const na = parseSprintNumber(a)
+    const nb = parseSprintNumber(b)
+    if (na != null && nb != null && na !== nb) return na - nb
+    return String(a || '').localeCompare(String(b || ''), undefined, { numeric: true, sensitivity: 'base' })
+  })
+}
+
 function sortIndicator(key) {
   if (state.sort.key !== key) return '↕'
   return state.sort.dir === 'asc' ? '↑' : '↓'
@@ -209,10 +220,70 @@ function renderTableHead() {
   `).join('')
 }
 
+function buildPickerSprintFilter() {
+  const host = document.getElementById('pickerSprintFilter')
+  if (!host) return
+  const allValues = sortSprintValues([...new Set(state.rows.map((r) => r.parent.estimateSprint).filter(Boolean))])
+  const options = allValues.filter((v) => String(v).toLowerCase().includes(state.pickerSprintSearch.toLowerCase()))
+  const selected = state.pickerSprint
+  const label = selected.length ? `${selected[0]}${selected.length > 1 ? ` +${selected.length - 1}` : ''}` : 'เลือก Estimate Sprint'
+
+  host.innerHTML = `
+    <button class="multi-trigger picker-control" type="button"><span class="value">${esc(label)}</span><span class="muted">▾</span></button>
+    <div class="multi-panel">
+      <div class="multi-search"><input data-role="search" value="${esc(state.pickerSprintSearch)}" placeholder="ค้นหา Sprint" /></div>
+      <div class="multi-options">
+        ${options.map((value) => `
+          <label class="multi-option"><input type="checkbox" value="${esc(value)}" ${selected.includes(value) ? 'checked' : ''} /><span>${esc(value)}</span></label>
+        `).join('') || '<div class="mini-empty">ไม่พบค่า</div>'}
+      </div>
+      <div class="multi-actions">
+        <button class="btn" data-role="clear" type="button" style="padding:6px 10px">ล้าง</button>
+        <button class="btn" data-role="close" type="button" style="padding:6px 10px">ปิด</button>
+      </div>
+    </div>
+  `
+
+  host.querySelector('.multi-trigger').addEventListener('click', (e) => {
+    e.stopPropagation()
+    host.classList.toggle('open')
+  })
+
+  host.querySelector('[data-role="search"]').addEventListener('input', (e) => {
+    state.pickerSprintSearch = e.target.value || ''
+    buildPickerSprintFilter()
+    host.classList.add('open')
+  })
+
+  host.querySelectorAll('input[type="checkbox"]').forEach((el) => {
+    el.addEventListener('change', () => {
+      state.pickerSprint = [...host.querySelectorAll('input[type="checkbox"]:checked')].map((x) => x.value)
+      state.visibleCount = 30
+      buildPickerSprintFilter()
+      host.classList.add('open')
+      renderProjectPicker()
+      applyFilters()
+    })
+  })
+
+  host.querySelector('[data-role="clear"]').addEventListener('click', () => {
+    state.pickerSprint = []
+    state.pickerSprintSearch = ''
+    state.visibleCount = 30
+    buildPickerSprintFilter()
+    host.classList.add('open')
+    renderProjectPicker()
+    applyFilters()
+  })
+
+  host.querySelector('[data-role="close"]').addEventListener('click', () => host.classList.remove('open'))
+}
+
 function getPickerVisibleRows() {
   const q = state.pickerSearch.toLowerCase().trim()
   return state.rows.filter((row) => {
     if (state.filters.status.length && !state.filters.status.includes(row.parent.status)) return false
+    if (state.pickerSprint.length && !state.pickerSprint.includes(row.parent.estimateSprint || '')) return false
     if (!q) return true
     const blob = `${row.parent.key} ${row.parent.summary} ${row.parent.squad} ${row.parent.status}`.toLowerCase()
     return blob.includes(q)
@@ -495,7 +566,7 @@ function renderTable() {
             <option value="">-</option>
             ${sprintOptions.map((sp) => {
               const val = `Sprint${sp.sprint}`
-              return `<option value="${esc(val)}" ${model.plan.newEstimateSprint === val ? 'selected' : ''}>${esc(val)} (${esc(sp.start)} - ${esc(sp.end)})</option>`
+              return `<option value="${esc(val)}" ${model.plan.newEstimateSprint === val ? 'selected' : ''}>${esc(val)}</option>`
             }).join('')}
           </select>
         </td>
@@ -608,10 +679,13 @@ async function load() {
   state.selectedKeys.clear()
   state.sort.key = 'item'
   state.sort.dir = 'asc'
+  state.pickerSprint = []
+  state.pickerSprintSearch = ''
 
   for (const row of state.rows) ensurePlan(row.parent.key, row)
 
   buildStatusFilter()
+  buildPickerSprintFilter()
   renderProjectPicker()
   applyFilters()
   document.getElementById('shiftSync').textContent = `อัปเดตล่าสุด: ${new Date(data.generatedAt || Date.now()).toLocaleString('th-TH')}`
