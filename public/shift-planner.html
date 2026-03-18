@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FEPMF Shift Planner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/app.css" />
+</head>
+<body>
+  <div class="page">
+    <section class="header">
+      <div class="header-top">
+        <div>
+          <h1 class="title">Estimate Shift Planner</h1>
+          <div class="subtitle">ทดลองเลื่อนแผน FEPMF (S4,S5): เปรียบเทียบ Timeline เดิม กับ New Estimate Sprint</div>
+        </div>
+        <nav class="nav">
+          <a href="/">Overview</a>
+          <a href="/calendar.html">Calendar Planner</a>
+          <a class="active" href="/shift-planner.html">Shift Planner</a>
+        </nav>
+      </div>
+      <div class="header-meta">
+        <span class="tag" id="shiftSync">กำลังโหลดข้อมูล...</span>
+      </div>
+    </section>
+
+    <section class="panel" style="margin-top:12px;padding:12px">
+      <div class="filter-grid">
+        <input id="shiftSearch" class="search" placeholder="ค้นหา FEPMF key หรือ Summary" />
+        <div id="shiftStatusFilter" class="multi"></div>
+        <input id="shiftMonthPicker" class="search" type="month" />
+      </div>
+    </section>
+
+    <section class="panel timeline-shell">
+      <div class="notice" id="shiftSummary"></div>
+      <div class="timeline-grid" id="shiftTimelineGrid"></div>
+    </section>
+
+    <section class="panel" style="padding:14px;margin-top:14px">
+      <h2 style="margin:0;font-size:20px">What-if Inputs (New Estimate Sprint / New Due Date)</h2>
+      <div class="notice">คำนวณผลกระทบจาก Sprint เดิมเทียบกับ New Estimate Sprint โดยนับ Man-day เฉพาะวันทำงาน</div>
+      <div class="shift-table-wrap">
+        <table class="shift-table">
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Status</th>
+              <th>Current Estimate</th>
+              <th>Current Due</th>
+              <th>New Estimate Sprint</th>
+              <th>New Due Date</th>
+              <th>Shift (Sprint)</th>
+              <th>Shift (Man-day)</th>
+            </tr>
+          </thead>
+          <tbody id="shiftTableBody"></tbody>
+        </table>
+      </div>
+      <div id="shiftControls" style="margin-top:10px;display:flex;justify-content:center"></div>
+    </section>
+  </div>
+  <script src="/shift-planner.js"></script>
+</body>
+</html>
