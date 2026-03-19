@@ -86,6 +86,15 @@ textarea {
 .kpi-label { color: var(--muted); font-size: 12px; text-transform: uppercase; font-weight: 700; }
 .kpi-value { font-size: 30px; margin-top: 8px; font-weight: 800; }
 .kpi-sub { color: var(--muted); font-size: 12px; }
+.kpi-focus-sprint {
+  background: linear-gradient(135deg, #eef6ff 0%, #e2f0ff 100%);
+  border-color: #bfd9fb;
+}
+
+.kpi-focus-days {
+  background: linear-gradient(135deg, #eefbf4 0%, #e3f7ec 100%);
+  border-color: #bde7cf;
+}
 
 .content { margin-top: 16px; display: grid; gap: 12px; }
 .parent-card { padding: 14px; }

@@ -91,12 +91,12 @@ function renderKpis(summary, rows) {
     ['Total FEPMF', rows.length, 'จำนวนตามผลการค้นหา/กรอง'],
     ['Linked Items', rows.reduce((sum, r) => sum + (r.linkedCount || 0), 0), 'รวม Child/Linked ของผลลัพธ์'],
     ['Average Progress', `${rows.length ? Math.round(rows.reduce((sum, r) => sum + (r.progressPercent || 0), 0) / rows.length) : 0}%`, 'คำนวณจาก Status ของ Child'],
-    ['Current Sprint', summary.currentSprintName || '-', 'สปรินต์ปัจจุบัน'],
-    ['Working Days Left', summary.workingDaysRemaining ?? 0, 'ไม่นับเสาร์-อาทิตย์']
+    ['Current Sprint', summary.currentSprintName || '-', 'สปรินต์ปัจจุบัน', 'kpi-focus-sprint'],
+    ['Working Days Left', summary.workingDaysRemaining ?? 0, 'ไม่นับเสาร์-อาทิตย์', 'kpi-focus-days']
   ]
 
   document.getElementById('boardKpis').innerHTML = cards
-    .map((c) => `<article class="panel kpi"><div class="kpi-label">${c[0]}</div><div class="kpi-value">${esc(c[1])}</div><div class="kpi-sub">${c[2]}</div></article>`)
+    .map((c) => `<article class="panel kpi ${esc(c[3] || '')}"><div class="kpi-label">${c[0]}</div><div class="kpi-value">${esc(c[1])}</div><div class="kpi-sub">${c[2]}</div></article>`)
     .join('')
 }
 
