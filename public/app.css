@@ -87,13 +87,30 @@ textarea {
 .kpi-value { font-size: 30px; margin-top: 8px; font-weight: 800; }
 .kpi-sub { color: var(--muted); font-size: 12px; }
 .kpi-focus-sprint {
-  background: linear-gradient(135deg, #eef6ff 0%, #e2f0ff 100%);
-  border-color: #bfd9fb;
+  background: linear-gradient(135deg, #fff1d6 0%, #ffe6b8 100%);
+  border-color: #efc06a;
+  box-shadow: 0 10px 24px rgba(173, 118, 20, 0.18);
 }
 
 .kpi-focus-days {
-  background: linear-gradient(135deg, #eefbf4 0%, #e3f7ec 100%);
-  border-color: #bde7cf;
+  background: linear-gradient(135deg, #fff1d6 0%, #ffe6b8 100%);
+  border-color: #efc06a;
+  box-shadow: 0 10px 24px rgba(173, 118, 20, 0.18);
+}
+
+.kpi-focus-sprint .kpi-label,
+.kpi-focus-sprint .kpi-sub {
+  color: #7a5717;
+}
+
+.kpi-focus-days .kpi-label,
+.kpi-focus-days .kpi-sub {
+  color: #7a5717;
+}
+
+.kpi-focus-sprint .kpi-value,
+.kpi-focus-days .kpi-value {
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
 }
 
 .content { margin-top: 16px; display: grid; gap: 12px; }
