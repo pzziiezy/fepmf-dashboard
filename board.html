@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FEPMF Kanban Board</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/app.css" />
+</head>
+<body>
+  <div class="page board-page">
+    <section class="header">
+      <div class="header-top">
+        <div>
+          <h1 class="title">FEPMF Kanban Board</h1>
+          <div class="subtitle">มุมมองการ์ดตาม Status พร้อมความสามารถแบบ Overview</div>
+        </div>
+        <nav class="nav">
+          <a href="/">List View</a>
+          <a class="active" href="/board.html">Board View</a>
+          <a href="/calendar.html">Calendar Planner</a>
+          <a href="/shift-planner.html">Shift Planner</a>
+        </nav>
+      </div>
+      <div class="header-meta">
+        <span class="tag" id="boardSyncTime">กำลังโหลดข้อมูล...</span>
+        <span class="tag">Data Source: Jira Cloud</span>
+      </div>
+    </section>
+
+    <div class="toolbar">
+      <input id="boardSearch" class="search" placeholder="ค้นหา FEPMF / Child key / Summary" />
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button id="boardClearBtn" class="btn">ล้างค้นหา</button>
+        <button id="boardRefreshBtn" class="btn primary">Refresh</button>
+      </div>
+    </div>
+
+    <section class="panel" style="margin-top:12px;padding:12px">
+      <div class="list-filter-grid">
+        <div id="boardStatusFilter" class="multi"></div>
+        <div id="boardSquadFilter" class="multi"></div>
+        <div id="boardEstimateSprintFilter" class="multi"></div>
+        <div id="boardCabDateFilter" class="multi"></div>
+      </div>
+    </section>
+
+    <section class="panel board-scroll-shell">
+      <div id="boardTopScroll" class="board-top-scroll"><div id="boardTopScrollInner"></div></div>
+    </section>
+    <section class="kpis" id="boardKpis"></section>
+    <section id="boardContent" class="board-grid"></section>
+  </div>
+  <script src="/board.js"></script>
+</body>
+</html>

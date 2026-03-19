@@ -6,16 +6,19 @@
   filters: {
     status: ['S4', 'S5', 'S6'],
     squad: [],
+    estimateSprint: [],
     cabDate: []
   },
   options: {
     status: [],
     squad: [],
+    estimateSprint: [],
     cabDate: []
   },
   searchInFilter: {
     status: '',
     squad: '',
+    estimateSprint: '',
     cabDate: ''
   }
 }
@@ -23,6 +26,7 @@
 const filterConfig = {
   status: { host: 'statusFilter', label: 'Status', placeholder: 'เลือก Status' },
   squad: { host: 'squadFilter', label: 'Squad', placeholder: 'เลือก Squad' },
+  estimateSprint: { host: 'estimateSprintFilter', label: 'Estimate Sprint', placeholder: 'เลือก Estimate Sprint' },
   cabDate: { host: 'cabDateFilter', label: 'CAB Date', placeholder: 'เลือก CAB Date' }
 }
 
@@ -104,6 +108,7 @@ function filterRows() {
 
     if (state.filters.status.length && !state.filters.status.includes(row.parent.status)) return false
     if (state.filters.squad.length && !state.filters.squad.includes(row.parent.squad)) return false
+    if (state.filters.estimateSprint.length && !state.filters.estimateSprint.includes(row.parent.estimateSprint || row.parent.sprint || '')) return false
     if (state.filters.cabDate.length && !state.filters.cabDate.includes(row.parent.cabDate || '')) return false
 
     return true
@@ -256,6 +261,7 @@ function renderOneFilter(key) {
 function renderFilters() {
   renderOneFilter('status')
   renderOneFilter('squad')
+  renderOneFilter('estimateSprint')
   renderOneFilter('cabDate')
 }
 
@@ -273,6 +279,13 @@ async function load() {
     state.data = data
     state.options.status = data.meta?.available?.statuses || []
     state.options.squad = data.meta?.available?.squads || []
+    state.options.estimateSprint = [...new Set((data.parents || []).map((x) => x.parent.estimateSprint || x.parent.sprint || '').filter(Boolean))]
+      .sort((a, b) => {
+        const na = Number((String(a).match(/\d+/) || [])[0] || Number.MAX_SAFE_INTEGER)
+        const nb = Number((String(b).match(/\d+/) || [])[0] || Number.MAX_SAFE_INTEGER)
+        if (na !== nb) return na - nb
+        return String(a).localeCompare(String(b))
+      })
     state.options.cabDate = data.meta?.available?.cabDates || []
 
     const defaults = ['S4', 'S5', 'S6'].filter((s) => state.options.status.includes(s))
@@ -299,9 +312,11 @@ function bindEvents() {
     document.getElementById('search').value = ''
     state.filters.status = ['S4', 'S5', 'S6'].filter((s) => state.options.status.includes(s))
     state.filters.squad = []
+    state.filters.estimateSprint = []
     state.filters.cabDate = []
     state.searchInFilter.status = ''
     state.searchInFilter.squad = ''
+    state.searchInFilter.estimateSprint = ''
     state.searchInFilter.cabDate = ''
     state.expanded.clear()
     renderFilters()

@@ -2,8 +2,9 @@
   "name": "fepmf-dashboard",
   "version": "2.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "node api/jira.js",
+    "dev": "node dev-server.cjs",
     "build": "echo 'static build'"
   },
   "dependencies": {

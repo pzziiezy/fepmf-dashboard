@@ -1,4 +1,4 @@
-﻿const state = {
+const state = {
   data: null,
   query: '',
   rows: [],
@@ -23,11 +23,13 @@
   }
 }
 
+const FIXED_STATUSES = ['S0', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7']
+
 const filterConfig = {
-  status: { host: 'statusFilter', label: 'Status', placeholder: 'เลือก Status' },
-  squad: { host: 'squadFilter', label: 'Squad', placeholder: 'เลือก Squad' },
-  estimateSprint: { host: 'estimateSprintFilter', label: 'Estimate Sprint', placeholder: 'เลือก Estimate Sprint' },
-  cabDate: { host: 'cabDateFilter', label: 'CAB Date', placeholder: 'เลือก CAB Date' }
+  status: { host: 'boardStatusFilter', label: 'Status', placeholder: 'เลือก Status' },
+  squad: { host: 'boardSquadFilter', label: 'Squad', placeholder: 'เลือก Squad' },
+  estimateSprint: { host: 'boardEstimateSprintFilter', label: 'Estimate Sprint', placeholder: 'เลือก Estimate Sprint' },
+  cabDate: { host: 'boardCabDateFilter', label: 'CAB Date', placeholder: 'เลือก CAB Date' }
 }
 
 function esc(v) {
@@ -62,11 +64,10 @@ function statusBadgeClass(status) {
   if (s === 'S4') return 'badge status-s4'
   if (s === 'S3') return 'badge status-s3'
   if (s === 'Cancelled') return 'badge status-cancel'
-  if (l.includes('cab approved') || l.includes('approved')) return 'badge status-s7'
   if (l.includes('done') || l.includes('complete') || l.includes('closed') || l.includes('resolved') || l.includes('deliver')) return 'badge status-s7'
   if (l.includes('review') || l.includes('test') || l.includes('uat') || l.includes('sit') || l.includes('qa')) return 'badge status-s6'
   if (l.includes('progress') || l.includes('doing') || l.includes('develop')) return 'badge status-s5'
-  if (l.includes('todo') || l.includes('to do') || l.includes('open') || l.includes('backlog')) return 'badge status-s3'
+  if (l.includes('todo') || l.includes('open') || l.includes('backlog')) return 'badge status-s3'
   return 'badge status-default'
 }
 
@@ -78,7 +79,6 @@ function workItemStatusClass(item) {
 function workItemRowClass(item) {
   if (String(item.key || '').startsWith('MISQA-')) return 'misqa-item'
   const s = String(item.status || '').toLowerCase()
-  if (s.includes('cab approved') || s.includes('approved')) return 'item-done'
   if (s.includes('done') || s.includes('complete') || s.includes('closed') || s.includes('resolved') || s.includes('deliver') || s === 's7') return 'item-done'
   if (s.includes('test') || s.includes('review') || s.includes('uat') || s.includes('sit') || s.includes('qa') || s === 's6') return 'item-test'
   if (s.includes('progress') || s.includes('doing') || s.includes('develop') || s === 's5' || s === 's4') return 'item-progress'
@@ -95,7 +95,7 @@ function renderKpis(summary, rows) {
     ['Working Days Left', summary.workingDaysRemaining ?? 0, 'ไม่นับเสาร์-อาทิตย์']
   ]
 
-  document.getElementById('kpis').innerHTML = cards
+  document.getElementById('boardKpis').innerHTML = cards
     .map((c) => `<article class="panel kpi"><div class="kpi-label">${c[0]}</div><div class="kpi-value">${esc(c[1])}</div><div class="kpi-sub">${c[2]}</div></article>`)
     .join('')
 }
@@ -105,12 +105,10 @@ function filterRows() {
 
   state.rows = (state.data?.parents || []).filter((row) => {
     if (q && !textBlob(row).includes(q)) return false
-
     if (state.filters.status.length && !state.filters.status.includes(row.parent.status)) return false
     if (state.filters.squad.length && !state.filters.squad.includes(row.parent.squad)) return false
     if (state.filters.estimateSprint.length && !state.filters.estimateSprint.includes(row.parent.estimateSprint || row.parent.sprint || '')) return false
     if (state.filters.cabDate.length && !state.filters.cabDate.includes(row.parent.cabDate || '')) return false
-
     return true
   })
 }
@@ -118,22 +116,38 @@ function filterRows() {
 function toggleParent(key) {
   if (state.expanded.has(key)) state.expanded.delete(key)
   else state.expanded.add(key)
-  renderRows()
+  renderBoard()
 }
 
-function renderRows() {
-  const host = document.getElementById('content')
-  const rows = state.rows || []
+function syncBoardScroll() {
+  const content = document.getElementById('boardContent')
+  const top = document.getElementById('boardTopScroll')
+  const inner = document.getElementById('boardTopScrollInner')
+  if (!content || !top || !inner) return
+  inner.style.width = `${content.scrollWidth}px`
+}
 
+function renderBoard() {
+  const host = document.getElementById('boardContent')
+  const rows = state.rows || []
   renderKpis(state.data?.summary || {}, rows)
 
   if (!rows.length) {
     host.innerHTML = '<div class="panel empty">ไม่พบข้อมูลตามเงื่อนไขที่เลือก</div>'
+    syncBoardScroll()
     return
   }
 
-  host.innerHTML = rows
-    .map((row) => {
+  const grouped = new Map()
+  for (const row of rows) {
+    const s = row.parent.status || 'Unknown'
+    if (!grouped.has(s)) grouped.set(s, [])
+    grouped.get(s).push(row)
+  }
+
+  host.innerHTML = FIXED_STATUSES.map((status) => {
+    const list = grouped.get(status) || []
+    const cards = list.map((row) => {
       const isOpen = state.expanded.has(row.parent.key)
       const childRows = (row.workItems || []).map((item) => {
         const rowClass = workItemRowClass(item)
@@ -149,45 +163,46 @@ function renderRows() {
       }).join('')
 
       return `
-        <article class="panel parent-card">
-          <div class="parent-head">
-            <div class="parent-main">
-              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                <a class="parent-key" href="${esc(row.parent.browseUrl)}" target="_blank">${esc(row.parent.key)}</a>
-                <span class="${statusBadgeClass(row.parent.status)}">${esc(row.parent.status || '-')}</span>
-              </div>
-              <div>${esc(row.parent.summary || '-')}</div>
-              <div class="progress-line"><div style="width:${Math.max(0, Math.min(100, row.progressPercent || 0))}%"></div></div>
-              <div class="progress-meta">
-                <span><strong>${esc(row.progressPercent || 0)}%</strong></span>
-                <span>Based on child status formula</span>
-                <span>Children Done: ${esc(row.progress.doneLinked || 0)}/${esc(row.progress.totalLinked || 0)}</span>
-              </div>
-            </div>
-            <div class="badges">
-              <button class="expand-btn" data-parent="${esc(row.parent.key)}" type="button" aria-expanded="${isOpen ? 'true' : 'false'}">
-                <span class="expand-btn-icon">${isOpen ? '▾' : '▸'}</span>
-                <span>${isOpen ? 'Less' : 'More'}</span>
-              </button>
-            </div>
+        <article class="panel board-card">
+          <div class="board-card-head">
+            <a class="parent-key" href="${esc(row.parent.browseUrl)}" target="_blank">${esc(row.parent.key)}</a>
+            <button class="expand-btn" data-parent="${esc(row.parent.key)}" type="button" aria-expanded="${isOpen ? 'true' : 'false'}">
+              <span class="expand-btn-icon">${isOpen ? '▾' : '▸'}</span>
+              <span>${isOpen ? 'Less' : 'More'}</span>
+            </button>
           </div>
-
-          <div class="meta-grid">
-            <div><strong>Squad:</strong> ${esc(row.parent.squad || '-')}</div>
-            <div><strong>Estimate Sprint:</strong> ${esc(row.parent.estimateSprint || row.parent.sprint || '-')}</div>
-            <div><strong>CAB Date:</strong> ${esc(formatDate(row.parent.cabDate))}</div>
-            <div><strong>Child Count:</strong> ${esc(row.linkedCount || 0)}</div>
+          <div class="board-summary">${esc(row.parent.summary || '-')}</div>
+          <div class="progress-line"><div style="width:${Math.max(0, Math.min(100, row.progressPercent || 0))}%"></div></div>
+          <div class="progress-meta">
+            <span><strong>${esc(row.progressPercent || 0)}%</strong></span>
+            <span>Children Done: ${esc(row.progress.doneLinked || 0)}/${esc(row.progress.totalLinked || 0)}</span>
           </div>
-
+          <div class="board-meta">
+            <span><strong>Squad:</strong> ${esc(row.parent.squad || '-')}</span>
+            <span><strong>Estimate:</strong> ${esc(row.parent.estimateSprint || '-')}</span>
+            <span><strong>CAB:</strong> ${esc(formatDate(row.parent.cabDate))}</span>
+          </div>
           ${isOpen ? `<div class="work-items">${childRows || '<div class="empty">ไม่มี Child/Linked Items</div>'}</div>` : ''}
         </article>
       `
-    })
-    .join('')
+    }).join('')
+
+    return `
+      <section class="panel board-column">
+        <div class="board-column-head">
+          <span class="${statusBadgeClass(status)}">${esc(status)}</span>
+          <span class="tag" style="background:#edf5ff;color:#2f5d9b">${list.length}</span>
+        </div>
+        <div class="board-column-body">${cards}</div>
+      </section>
+    `
+  }).join('')
 
   host.querySelectorAll('.expand-btn').forEach((btn) => {
     btn.addEventListener('click', () => toggleParent(btn.getAttribute('data-parent')))
   })
+
+  syncBoardScroll()
 }
 
 function selectedText(key) {
@@ -267,7 +282,7 @@ function renderFilters() {
 
 function applyAll() {
   filterRows()
-  renderRows()
+  renderBoard()
 }
 
 async function load() {
@@ -277,7 +292,8 @@ async function load() {
     if (data.error) throw new Error(data.error)
 
     state.data = data
-    state.options.status = data.meta?.available?.statuses || []
+    const fromApi = data.meta?.available?.statuses || []
+    state.options.status = [...new Set([...FIXED_STATUSES, ...fromApi])]
     state.options.squad = data.meta?.available?.squads || []
     state.options.estimateSprint = [...new Set((data.parents || []).map((x) => x.parent.estimateSprint || x.parent.sprint || '').filter(Boolean))]
       .sort((a, b) => {
@@ -290,26 +306,27 @@ async function load() {
 
     const defaults = ['S4', 'S5', 'S6'].filter((s) => state.options.status.includes(s))
     state.filters.status = defaults.length ? defaults : []
+    state.filters.estimateSprint = []
 
     renderFilters()
     applyAll()
 
-    document.getElementById('syncTime').textContent = `อัปเดตล่าสุด: ${new Date(data.generatedAt || Date.now()).toLocaleString('th-TH')}`
+    document.getElementById('boardSyncTime').textContent = `อัปเดตล่าสุด: ${new Date(data.generatedAt || Date.now()).toLocaleString('th-TH')}`
   } catch (error) {
-    document.getElementById('content').innerHTML = `<div class="panel empty">โหลดข้อมูลไม่สำเร็จ: ${esc(error.message || error)}</div>`
-    document.getElementById('syncTime').textContent = 'โหลดข้อมูลล้มเหลว'
+    document.getElementById('boardContent').innerHTML = `<div class="panel empty">โหลดข้อมูลไม่สำเร็จ: ${esc(error.message || error)}</div>`
+    document.getElementById('boardSyncTime').textContent = 'โหลดข้อมูลล้มเหลว'
   }
 }
 
 function bindEvents() {
-  document.getElementById('search').addEventListener('input', (e) => {
+  document.getElementById('boardSearch').addEventListener('input', (e) => {
     state.query = e.target.value || ''
     applyAll()
   })
 
-  document.getElementById('clearBtn').addEventListener('click', () => {
+  document.getElementById('boardClearBtn').addEventListener('click', () => {
     state.query = ''
-    document.getElementById('search').value = ''
+    document.getElementById('boardSearch').value = ''
     state.filters.status = ['S4', 'S5', 'S6'].filter((s) => state.options.status.includes(s))
     state.filters.squad = []
     state.filters.estimateSprint = []
@@ -323,7 +340,19 @@ function bindEvents() {
     applyAll()
   })
 
-  document.getElementById('refreshBtn').addEventListener('click', load)
+  document.getElementById('boardRefreshBtn').addEventListener('click', load)
+
+  const content = document.getElementById('boardContent')
+  const top = document.getElementById('boardTopScroll')
+  if (content && top) {
+    top.addEventListener('scroll', () => {
+      content.scrollLeft = top.scrollLeft
+    })
+    content.addEventListener('scroll', () => {
+      top.scrollLeft = content.scrollLeft
+    })
+    window.addEventListener('resize', syncBoardScroll)
+  }
 
   document.addEventListener('click', (e) => {
     if (!e.target.closest('.multi')) {
