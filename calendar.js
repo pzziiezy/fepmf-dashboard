@@ -1,16 +1,25 @@
-﻿const state = {
+const state = {
   dashboard: null,
   plans: [],
+  qaAssignments: [],
   source: '',
   editingId: '',
   timelineVisibleCount: 30,
   selectedMonth: '',
+  activeTab: 'manual',
   filters: {
     q: '',
     status: ['S4', 'S5', 'S6']
   },
   statusOptions: [],
-  statusSearch: ''
+  statusSearch: '',
+  qa: {
+    q: '',
+    status: ['S3', 'S4', 'S5', 'S6'],
+    statusOptions: ['S3', 'S4', 'S5', 'S6'],
+    statusSearch: '',
+    selectedKeys: new Set()
+  }
 }
 
 function esc(v) {
@@ -27,7 +36,6 @@ function toIsoDate(value) {
 function getTwoMonthRange() {
   let y
   let m
-
   if (state.selectedMonth && /^\d{4}-\d{2}$/.test(state.selectedMonth)) {
     const [yy, mm] = state.selectedMonth.split('-').map(Number)
     y = yy
@@ -37,7 +45,6 @@ function getTwoMonthRange() {
     y = now.getUTCFullYear()
     m = now.getUTCMonth()
   }
-
   const start = new Date(Date.UTC(y, m, 1))
   const end = new Date(Date.UTC(y, m + 2, 0))
   return { start: toIsoDate(start), end: toIsoDate(end) }
@@ -50,6 +57,7 @@ function overlaps(aStart, aEnd, bStart, bEnd) {
 function statusBadgeClass(status) {
   const s = String(status || '')
   if (s === 'Manual') return 'badge status-manual'
+  if (s === 'QA Plan') return 'badge status-s3'
   if (s === 'S7') return 'badge status-s7'
   if (s === 'S6') return 'badge status-s6'
   if (s === 'S5') return 'badge status-s5'
@@ -59,18 +67,17 @@ function statusBadgeClass(status) {
   return 'badge status-default'
 }
 
-function buildStatusFilter() {
-  const host = document.getElementById('calendarStatusFilter')
-  const selected = state.filters.status
-  const options = (state.statusOptions || []).filter((v) => String(v).toLowerCase().includes(state.statusSearch.toLowerCase()))
-  const label = selected.length ? `${selected[0]}${selected.length > 1 ? ` +${selected.length - 1}` : ''}` : 'เลือก Status'
+function buildMultiFilter(hostId, selected, options, searchText, placeholder, onChange, onSearch) {
+  const host = document.getElementById(hostId)
+  const filtered = (options || []).filter((v) => String(v).toLowerCase().includes(searchText.toLowerCase()))
+  const label = selected.length ? `${selected[0]}${selected.length > 1 ? ` +${selected.length - 1}` : ''}` : placeholder
 
   host.innerHTML = `
     <button class="multi-trigger" type="button"><span class="value">${esc(label)}</span><span class="muted">▾</span></button>
     <div class="multi-panel">
-      <div class="multi-search"><input data-role="search" value="${esc(state.statusSearch)}" placeholder="ค้นหา Status" /></div>
+      <div class="multi-search"><input data-role="search" value="${esc(searchText)}" placeholder="ค้นหา" /></div>
       <div class="multi-options">
-        ${options.map((value) => `
+        ${filtered.map((value) => `
           <label class="multi-option"><input type="checkbox" value="${esc(value)}" ${selected.includes(value) ? 'checked' : ''} /><span>${esc(value)}</span></label>
         `).join('') || '<div class="mini-empty">ไม่พบค่า</div>'}
       </div>
@@ -85,40 +92,69 @@ function buildStatusFilter() {
     e.stopPropagation()
     host.classList.toggle('open')
   })
-
   host.querySelector('[data-role="search"]').addEventListener('input', (e) => {
-    state.statusSearch = e.target.value || ''
-    buildStatusFilter()
+    onSearch(e.target.value || '')
     host.classList.add('open')
   })
-
   host.querySelectorAll('input[type="checkbox"]').forEach((el) => {
     el.addEventListener('change', () => {
-      state.filters.status = [...host.querySelectorAll('input[type="checkbox"]:checked')].map((x) => x.value)
-      state.timelineVisibleCount = 30
-      buildStatusFilter()
+      const next = [...host.querySelectorAll('input[type="checkbox"]:checked')].map((x) => x.value)
+      onChange(next)
       host.classList.add('open')
-      renderTimeline()
     })
   })
-
   host.querySelector('[data-role="clear"]').addEventListener('click', () => {
-    state.filters.status = []
-    state.statusSearch = ''
-    state.timelineVisibleCount = 30
-    buildStatusFilter()
+    onSearch('')
+    onChange([])
     host.classList.add('open')
-    renderTimeline()
   })
-
   host.querySelector('[data-role="close"]').addEventListener('click', () => host.classList.remove('open'))
+}
+
+function buildStatusFilter() {
+  buildMultiFilter(
+    'calendarStatusFilter',
+    state.filters.status,
+    state.statusOptions,
+    state.statusSearch,
+    'เลือก Status',
+    (next) => {
+      state.filters.status = next
+      state.timelineVisibleCount = 30
+      buildStatusFilter()
+      renderTimeline()
+    },
+    (nextSearch) => {
+      state.statusSearch = nextSearch
+      buildStatusFilter()
+    }
+  )
+}
+
+function buildQaStatusFilter() {
+  buildMultiFilter(
+    'qaStatusFilter',
+    state.qa.status,
+    state.qa.statusOptions,
+    state.qa.statusSearch,
+    'เลือก Status (S3-S6)',
+    (next) => {
+      state.qa.status = next
+      buildQaStatusFilter()
+      renderQaProjectList()
+      renderQaCounter()
+    },
+    (nextSearch) => {
+      state.qa.statusSearch = nextSearch
+      buildQaStatusFilter()
+    }
+  )
 }
 
 function enumerateEvents() {
   const jiraParents = (state.dashboard?.parents || []).map((row) => {
     const timeline = (state.dashboard.timelineItems || []).find((x) => x.key === row.parent.key)
     if (!timeline) return null
-
     return {
       id: row.parent.key,
       key: row.parent.key,
@@ -144,22 +180,35 @@ function enumerateEvents() {
     url: ''
   }))
 
-  return [...jiraParents, ...manual]
+  const qaRows = (state.qaAssignments || []).map((x) => {
+    const base = (state.dashboard?.timelineItems || []).find((t) => t.key === x.projectKey)
+    if (!base) return null
+    return {
+      id: x.id,
+      key: x.projectKey,
+      title: `${x.projectKey} QA: ${x.qaName}`,
+      status: 'QA Plan',
+      squad: x.qaName,
+      start: base.start,
+      end: base.end,
+      source: 'qa',
+      url: ''
+    }
+  }).filter(Boolean)
+
+  return [...jiraParents, ...manual, ...qaRows]
 }
 
 function filteredEvents() {
   const { start, end } = getTwoMonthRange()
   const q = state.filters.q.toLowerCase().trim()
-
   return enumerateEvents().filter((e) => {
     if (!overlaps(e.start, e.end, start, end)) return false
-    if (state.filters.status.length && !state.filters.status.includes(e.status)) return false
-
+    if (state.filters.status.length && e.source !== 'qa' && !state.filters.status.includes(e.status)) return false
     if (q) {
       const blob = `${e.key} ${e.title} ${e.status} ${e.squad}`.toLowerCase()
       if (!blob.includes(q)) return false
     }
-
     return true
   })
 }
@@ -169,45 +218,48 @@ function renderTimeline() {
   const startDate = new Date(`${start}T00:00:00Z`)
   const endDate = new Date(`${end}T00:00:00Z`)
   const days = Math.floor((endDate - startDate) / 86400000) + 1
-
   const allEvents = filteredEvents().sort((a, b) => (a.start || '').localeCompare(b.start || ''))
   const visibleCount = Math.min(state.timelineVisibleCount, allEvents.length)
   const events = allEvents.slice(0, visibleCount)
+  const todayIso = toIsoDate(new Date())
+  const todayDate = new Date(`${todayIso}T00:00:00Z`)
+  const todayVisible = todayDate >= startDate && todayDate <= endDate
+  const todayOffset = todayVisible ? Math.floor((todayDate - startDate) / 86400000) : -1
+  const todayLeft = todayVisible ? (todayOffset / days) * 100 : -1
+  const todayWidth = 100 / days
 
   const dayHeaders = Array.from({ length: days }, (_, i) => {
     const d = new Date(startDate.getTime())
     d.setUTCDate(d.getUTCDate() + i)
-    return `<div class="day-cell">${d.getUTCDate()}</div>`
+    return `<div class="day-cell ${todayVisible && i === todayOffset ? 'today-cell' : ''}">${d.getUTCDate()}</div>`
   }).join('')
 
   const rows = events.map((e) => {
     const eventStart = new Date(`${e.start}T00:00:00Z`)
     const eventEnd = new Date(`${e.end}T00:00:00Z`)
-
     const clampedStart = eventStart < startDate ? startDate : eventStart
     const clampedEnd = eventEnd > endDate ? endDate : eventEnd
-
     const startOffset = Math.floor((clampedStart - startDate) / 86400000)
     const endOffset = Math.floor((clampedEnd - startDate) / 86400000)
-
     const left = (startOffset / days) * 100
     const width = (Math.max(1, endOffset - startOffset + 1) / days) * 100
-
-    const barClass = e.source === 'manual' ? 'bar-manual' : 'bar-parent'
+    const barClass = e.source === 'manual' ? 'bar-manual' : e.source === 'qa' ? 'bar-qa' : 'bar-parent'
     const rangeText = `${e.start} - ${e.end}`
     const hoverText = `${e.title}\n${rangeText}`
-    const itemLabel = e.source === 'manual' ? e.title : e.key
+    const isProjectLike = e.source === 'parent' || e.source === 'qa'
+    const itemLabel = isProjectLike ? `${e.key}${e.squad ? ` (${e.squad})` : ''}` : e.title
 
     return `
-      <div class="timeline-row" style="grid-template-columns:240px repeat(${days}, minmax(16px, 1fr));">
+      <div class="timeline-row calendar-row-compact" style="grid-template-columns:240px repeat(${days}, minmax(14px, 1fr));">
         <div class="row-label">
           <div style="display:flex;justify-content:space-between;gap:6px;align-items:center">
             <strong>${e.url ? `<a href="${esc(e.url)}" target="_blank" title="${esc(hoverText)}">${esc(itemLabel)}</a>` : `<span title="${esc(hoverText)}">${esc(itemLabel)}</span>`}</strong>
             <span class="${statusBadgeClass(e.status)}" style="padding:2px 8px">${esc(e.status)}</span>
           </div>
-          <div style="font-size:11px;color:var(--muted);line-height:1.2">${esc(e.squad || '-')}</div>
+          <div class="calendar-item-summary">${esc(e.title || '-')}</div>
         </div>
         <div class="row-track" style="grid-column:2 / -1;grid-row:1;">
+          ${todayVisible ? `<div class="today-bg" style="left:${todayLeft}%;width:${todayWidth}%"></div>` : ''}
           <div class="event-bar ${barClass}" style="left:${left}%;width:${width}%" title="${esc(hoverText)}">${esc(e.key)}</div>
         </div>
         ${Array.from({ length: days }, () => '<div class="row-day"></div>').join('')}
@@ -216,8 +268,8 @@ function renderTimeline() {
   }).join('')
 
   document.getElementById('timelineGrid').innerHTML = `
-    <div class="timeline-head" style="grid-template-columns:240px repeat(${days}, minmax(16px, 1fr));">
-      <div class="time-label"><strong>Item</strong><div style="font-size:11px;color:var(--muted)">${start} ถึง ${end}</div></div>
+    <div class="timeline-head calendar-row-compact" style="grid-template-columns:240px repeat(${days}, minmax(14px, 1fr));position:relative;">
+      <div class="time-label"><strong>Item</strong><div style="font-size:10px;color:var(--muted)">${start} ถึง ${end}</div></div>
       ${dayHeaders}
     </div>
     ${rows || '<div class="empty">ไม่พบข้อมูลตามเงื่อนไข</div>'}
@@ -226,28 +278,21 @@ function renderTimeline() {
   document.getElementById('calendarSummary').textContent = `แสดง ${events.length}/${allEvents.length} รายการ | ช่วงวันที่ ${start} ถึง ${end} | Source: ${state.source || '-'}`
 
   const controls = document.getElementById('timelineControls')
-  if (controls) {
-    if (visibleCount < allEvents.length) {
-      controls.innerHTML = `<button id="loadMoreTimelineBtn" class="btn" type="button">Load more (${allEvents.length - visibleCount} remaining)</button>`
-      const btn = document.getElementById('loadMoreTimelineBtn')
-      if (btn) {
-        btn.addEventListener('click', () => {
-          state.timelineVisibleCount += 30
-          renderTimeline()
-        })
-      }
-    } else if (allEvents.length > 30) {
-      controls.innerHTML = `<button id="showLessTimelineBtn" class="btn" type="button">Show less</button>`
-      const btn = document.getElementById('showLessTimelineBtn')
-      if (btn) {
-        btn.addEventListener('click', () => {
-          state.timelineVisibleCount = 30
-          renderTimeline()
-        })
-      }
-    } else {
-      controls.innerHTML = ''
-    }
+  if (!controls) return
+  if (visibleCount < allEvents.length) {
+    controls.innerHTML = `<button id="loadMoreTimelineBtn" class="btn" type="button">Load more (${allEvents.length - visibleCount} remaining)</button>`
+    document.getElementById('loadMoreTimelineBtn').addEventListener('click', () => {
+      state.timelineVisibleCount += 30
+      renderTimeline()
+    })
+  } else if (allEvents.length > 30) {
+    controls.innerHTML = `<button id="showLessTimelineBtn" class="btn" type="button">Show less</button>`
+    document.getElementById('showLessTimelineBtn').addEventListener('click', () => {
+      state.timelineVisibleCount = 30
+      renderTimeline()
+    })
+  } else {
+    controls.innerHTML = ''
   }
 }
 
@@ -256,7 +301,6 @@ function setEditMode(item) {
   const saveBtn = document.getElementById('savePlanBtn')
   const cancelBtn = document.getElementById('cancelEditBtn')
   const modeLabel = document.getElementById('editModeLabel')
-
   if (!item) {
     state.editingId = ''
     form.reset()
@@ -265,7 +309,6 @@ function setEditMode(item) {
     modeLabel.style.display = 'none'
     return
   }
-
   state.editingId = item.id
   form.elements.title.value = item.title || ''
   form.elements.key.value = item.key || ''
@@ -274,7 +317,6 @@ function setEditMode(item) {
   form.elements.end.value = item.end || ''
   form.elements.owner.value = item.owner || ''
   form.elements.note.value = item.note || ''
-
   saveBtn.textContent = 'อัปเดตแผนงาน'
   cancelBtn.style.display = ''
   modeLabel.style.display = ''
@@ -286,7 +328,6 @@ function renderManualList() {
     list.innerHTML = '<div class="empty">ยังไม่มีรายการ Manual</div>'
     return
   }
-
   list.innerHTML = state.plans.map((item) => `
     <div class="item-row">
       <div class="item-top"><div><strong>${esc(item.key || '-')}</strong> ${esc(item.title)}</div><div class="badge status-default">${esc(item.start)} - ${esc(item.end)}</div></div>
@@ -294,7 +335,7 @@ function renderManualList() {
       <div class="item-meta">${esc(item.note || '')}</div>
       <div style="display:flex;gap:8px;margin-top:6px">
         <button class="btn" data-action="edit" data-id="${esc(item.id)}">แก้ไข</button>
-        <button class="btn" data-action="delete" data-id="${esc(item.id)}">ลบ</button>
+        <button class="btn" data-action="delete" data-id="${esc(item.id)}">ลบ (Soft Delete)</button>
       </div>
     </div>
   `).join('')
@@ -310,12 +351,9 @@ function renderManualList() {
   list.querySelectorAll('button[data-action="delete"]').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const id = btn.getAttribute('data-id')
-      if (!id) return
-      if (!confirm('ยืนยันลบรายการนี้?')) return
-
+      if (!id || !confirm('ยืนยันลบรายการนี้? (Soft Delete)')) return
       const status = document.getElementById('planStatus')
       status.textContent = 'กำลังลบ...'
-
       try {
         const res = await fetch('/api/planner', {
           method: 'DELETE',
@@ -324,8 +362,7 @@ function renderManualList() {
         })
         const data = await res.json()
         if (data.error) throw new Error(data.error)
-
-        status.textContent = 'ลบเรียบร้อย'
+        status.textContent = 'ลบเรียบร้อย (Soft Delete)'
         await loadAll()
       } catch (error) {
         status.textContent = `ลบไม่สำเร็จ: ${error.message || error}`
@@ -334,17 +371,137 @@ function renderManualList() {
   })
 }
 
+function getQaCandidates() {
+  const q = state.qa.q.toLowerCase().trim()
+  return (state.dashboard?.parents || []).filter((row) => {
+    const status = row.parent.status
+    if (!['S3', 'S4', 'S5', 'S6'].includes(status)) return false
+    if (state.qa.status.length && !state.qa.status.includes(status)) return false
+    if (!q) return true
+    return `${row.parent.key} ${row.parent.summary} ${row.parent.squad}`.toLowerCase().includes(q)
+  })
+}
+
+function renderQaProjectList() {
+  const host = document.getElementById('qaProjectList')
+  const rows = getQaCandidates()
+  if (!rows.length) {
+    host.innerHTML = '<div class="empty">ไม่พบโปรเจ็คตามเงื่อนไข</div>'
+    return
+  }
+  host.innerHTML = rows.map((row) => {
+    const checked = state.qa.selectedKeys.has(row.parent.key) ? 'checked' : ''
+    return `
+      <label class="item-row" style="display:flex;gap:8px;align-items:flex-start">
+        <input type="checkbox" data-role="qa-pick" data-key="${esc(row.parent.key)}" ${checked} />
+        <div>
+          <div><strong>${esc(row.parent.key)}</strong> ${esc(row.parent.summary || '')}</div>
+          <div class="item-meta">Status: ${esc(row.parent.status || '-')} | Squad: ${esc(row.parent.squad || '-')}</div>
+        </div>
+      </label>
+    `
+  }).join('')
+}
+
+function renderQaAssignmentList() {
+  const host = document.getElementById('qaAssignmentList')
+  if (!state.qaAssignments.length) {
+    host.innerHTML = '<div class="empty">ยังไม่มี QA Assignment</div>'
+    return
+  }
+  host.innerHTML = state.qaAssignments.map((item) => `
+    <div class="item-row">
+      <div class="item-top">
+        <div><strong>${esc(item.projectKey)}</strong> ${esc(item.projectTitle || '')}</div>
+        <div class="badge b-status">${esc(item.qaName || '-')}</div>
+      </div>
+      <div class="item-meta">Status: ${esc(item.status || '-')} | Assigned: ${esc(item.assignedAt || '-')}</div>
+      <div style="display:flex;gap:8px;margin-top:6px">
+        <input data-role="qa-reassign-input" data-id="${esc(item.id)}" class="search" style="max-width:220px;padding:6px 10px" placeholder="ชื่อ QA คนใหม่" />
+        <button class="btn" data-action="qa-reassign" data-id="${esc(item.id)}">Re-assign</button>
+        <button class="btn" data-action="qa-delete" data-id="${esc(item.id)}">ลบ Assign (Soft Delete)</button>
+      </div>
+    </div>
+  `).join('')
+
+  host.querySelectorAll('button[data-action="qa-reassign"]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-id')
+      const input = host.querySelector(`input[data-role="qa-reassign-input"][data-id="${CSS.escape(id)}"]`)
+      const qaName = String(input?.value || '').trim()
+      if (!id || !qaName) return
+      await updateQaAssignment(id, qaName)
+    })
+  })
+
+  host.querySelectorAll('button[data-action="qa-delete"]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-id')
+      if (!id || !confirm('ยืนยันลบการ assign นี้? (Soft Delete)')) return
+      const status = document.getElementById('qaAssignStatus')
+      status.textContent = 'กำลังลบ assignment...'
+      try {
+        const res = await fetch('/api/qa-plan', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id })
+        })
+        const data = await res.json()
+        if (data.error) throw new Error(data.error)
+        status.textContent = 'ลบ assignment แล้ว (Soft Delete)'
+        await loadAll()
+      } catch (error) {
+        status.textContent = `ลบไม่สำเร็จ: ${error.message || error}`
+      }
+    })
+  })
+}
+
+function renderQaCounter() {
+  const active = (state.qaAssignments || []).filter((x) => ['S3', 'S4', 'S5', 'S6'].includes(String(x.status || '').toUpperCase()))
+  const uniqueQa = [...new Set(active.map((x) => String(x.qaName || '').trim()).filter(Boolean))]
+  document.getElementById('qaCounter').textContent = `QA Assigned (S3-S6): ${uniqueQa.length} คน (ไม่นับชื่อซ้ำ) | รายการ: ${active.length}`
+}
+
+async function updateQaAssignment(id, qaName) {
+  const status = document.getElementById('qaAssignStatus')
+  status.textContent = 'กำลัง re-assign...'
+  try {
+    const res = await fetch('/api/qa-plan', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, qaName })
+    })
+    const data = await res.json()
+    if (data.error) throw new Error(data.error)
+    status.textContent = 'Re-assign สำเร็จ'
+    await loadAll()
+  } catch (error) {
+    status.textContent = `Re-assign ไม่สำเร็จ: ${error.message || error}`
+  }
+}
+
+function switchTab(tab) {
+  state.activeTab = tab
+  document.getElementById('tabManual').style.display = tab === 'manual' ? '' : 'none'
+  document.getElementById('tabQa').style.display = tab === 'qa' ? '' : 'none'
+  document.getElementById('tabManualBtn').classList.toggle('active', tab === 'manual')
+  document.getElementById('tabQaBtn').classList.toggle('active', tab === 'qa')
+}
+
 async function loadAll() {
-  const [dashboardRes, plannerRes] = await Promise.all([fetch('/api/dashboard'), fetch('/api/planner')])
+  const [dashboardRes, plannerRes, qaRes] = await Promise.all([fetch('/api/dashboard'), fetch('/api/planner'), fetch('/api/qa-plan')])
   const dashboard = await dashboardRes.json()
   const planner = await plannerRes.json()
-
+  const qa = await qaRes.json()
   if (dashboard.error) throw new Error(dashboard.error)
   if (planner.error) throw new Error(planner.error)
+  if (qa.error) throw new Error(qa.error)
 
   state.dashboard = dashboard
   state.plans = Array.isArray(planner.items) ? planner.items : []
-  state.source = planner.source || ''
+  state.qaAssignments = Array.isArray(qa.items) ? qa.items : []
+  state.source = planner.source || qa.source || ''
 
   state.statusOptions = dashboard.meta?.available?.statuses || []
   if (!state.statusOptions.includes('Manual')) state.statusOptions.push('Manual')
@@ -352,9 +509,12 @@ async function loadAll() {
   state.timelineVisibleCount = 30
 
   buildStatusFilter()
+  buildQaStatusFilter()
   renderManualList()
+  renderQaProjectList()
+  renderQaAssignmentList()
+  renderQaCounter()
   renderTimeline()
-
   document.getElementById('calendarSync').textContent = `อัปเดตล่าสุด: ${new Date(dashboard.generatedAt || Date.now()).toLocaleString('th-TH')}`
 }
 
@@ -365,7 +525,6 @@ function bindEvents() {
     const currentMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`
     state.selectedMonth = currentMonth
     monthPicker.value = currentMonth
-
     monthPicker.addEventListener('change', (e) => {
       state.selectedMonth = e.target.value || currentMonth
       state.timelineVisibleCount = 30
@@ -385,10 +544,8 @@ function bindEvents() {
     e.preventDefault()
     const payload = Object.fromEntries(new FormData(e.currentTarget).entries())
     if (state.editingId) payload.id = state.editingId
-
     const status = document.getElementById('planStatus')
     status.textContent = state.editingId ? 'กำลังอัปเดต...' : 'กำลังบันทึก...'
-
     try {
       const res = await fetch('/api/planner', {
         method: state.editingId ? 'PUT' : 'POST',
@@ -397,12 +554,65 @@ function bindEvents() {
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
-
       status.textContent = state.editingId ? 'อัปเดตเรียบร้อย' : 'บันทึกเรียบร้อย'
       setEditMode(null)
       await loadAll()
     } catch (error) {
       status.textContent = `ไม่สำเร็จ: ${error.message || error}`
+    }
+  })
+
+  document.getElementById('tabManualBtn').addEventListener('click', () => switchTab('manual'))
+  document.getElementById('tabQaBtn').addEventListener('click', () => switchTab('qa'))
+
+  document.getElementById('qaSearch').addEventListener('input', (e) => {
+    state.qa.q = e.target.value || ''
+    renderQaProjectList()
+  })
+
+  document.getElementById('qaProjectList').addEventListener('change', (e) => {
+    if (e.target.getAttribute('data-role') !== 'qa-pick') return
+    const key = e.target.getAttribute('data-key')
+    if (!key) return
+    if (e.target.checked) state.qa.selectedKeys.add(key)
+    else state.qa.selectedKeys.delete(key)
+  })
+
+  document.getElementById('qaAssignBtn').addEventListener('click', async () => {
+    const qaName = String(document.getElementById('qaNameInput').value || '').trim()
+    const selectedKeys = [...state.qa.selectedKeys]
+    const status = document.getElementById('qaAssignStatus')
+    if (!qaName) {
+      status.textContent = 'กรุณาระบุชื่อ QA'
+      return
+    }
+    if (!selectedKeys.length) {
+      status.textContent = 'กรุณาเลือกโปรเจ็คอย่างน้อย 1 รายการ'
+      return
+    }
+
+    const candidatesByKey = new Map(getQaCandidates().map((x) => [x.parent.key, x.parent]))
+    const projects = selectedKeys.map((k) => candidatesByKey.get(k)).filter(Boolean).map((p) => ({
+      projectKey: p.key,
+      projectTitle: p.summary,
+      status: p.status
+    }))
+
+    status.textContent = 'กำลัง assign QA...'
+    try {
+      const res = await fetch('/api/qa-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qaName, projects })
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      status.textContent = 'Assign QA สำเร็จ'
+      state.qa.selectedKeys.clear()
+      document.getElementById('qaNameInput').value = ''
+      await loadAll()
+    } catch (error) {
+      status.textContent = `Assign ไม่สำเร็จ: ${error.message || error}`
     }
   })
 

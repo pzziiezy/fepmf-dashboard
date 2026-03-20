@@ -44,28 +44,58 @@
     </section>
 
     <section class="panel" style="padding:14px;margin-top:14px">
-      <h2 style="margin:0;font-size:20px">เพิ่ม New Project / Initiative</h2>
-      <div class="notice">รายการ Manual ใช้สำหรับวางแผนทับซ้อน โดยไม่สร้างงานใน Jira</div>
-      <form id="planForm" class="form-grid">
-        <label class="field"><span>Project Title *</span><input name="title" required /></label>
-        <label class="field"><span>Key (optional)</span><input name="key" /></label>
-        <label class="field"><span>Sprint</span><input name="sprint" /></label>
-        <label class="field"><span>Start Date *</span><input type="date" name="start" required /></label>
-        <label class="field"><span>End Date *</span><input type="date" name="end" required /></label>
-        <label class="field"><span>Owner</span><input name="owner" /></label>
-        <label class="field full"><span>Note</span><textarea name="note"></textarea></label>
-        <div class="full" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <button id="savePlanBtn" class="btn primary" type="submit">บันทึกแผนงาน</button>
-          <button id="cancelEditBtn" class="btn" type="button" style="display:none">ยกเลิกแก้ไข</button>
-          <span id="editModeLabel" class="badge b-status" style="display:none">Editing</span>
-          <span id="planStatus" class="notice"></span>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between">
+        <h2 style="margin:0;font-size:20px">Planning Workspace</h2>
+        <div class="tab-switch">
+          <button id="tabManualBtn" class="tab-btn active" type="button">New Project / Initiative</button>
+          <button id="tabQaBtn" class="tab-btn" type="button">QA Plan</button>
         </div>
-      </form>
-    </section>
+      </div>
 
-    <section class="panel" style="padding:14px;margin-top:14px">
-      <h2 style="margin:0;font-size:20px">Manual Plans</h2>
-      <div class="list" id="manualList"></div>
+      <div id="tabManual" style="margin-top:10px">
+        <div class="notice">รายการ Manual ใช้สำหรับวางแผนทับซ้อน โดยไม่สร้างงานใน Jira</div>
+        <form id="planForm" class="form-grid">
+          <label class="field"><span>Project Title *</span><input name="title" required /></label>
+          <label class="field"><span>Key (optional)</span><input name="key" /></label>
+          <label class="field"><span>Sprint</span><input name="sprint" /></label>
+          <label class="field"><span>Start Date *</span><input type="date" name="start" required /></label>
+          <label class="field"><span>End Date *</span><input type="date" name="end" required /></label>
+          <label class="field"><span>Owner</span><input name="owner" /></label>
+          <label class="field full"><span>Note</span><textarea name="note"></textarea></label>
+          <div class="full" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <button id="savePlanBtn" class="btn primary" type="submit">บันทึกแผนงาน</button>
+            <button id="cancelEditBtn" class="btn" type="button" style="display:none">ยกเลิกแก้ไข</button>
+            <span id="editModeLabel" class="badge b-status" style="display:none">Editing</span>
+            <span id="planStatus" class="notice"></span>
+          </div>
+        </form>
+
+        <h2 style="margin:14px 0 0 0;font-size:20px">Manual Plans</h2>
+        <div class="list" id="manualList"></div>
+      </div>
+
+      <div id="tabQa" style="display:none;margin-top:10px">
+        <div class="filter-grid">
+          <input id="qaSearch" class="search" placeholder="ค้นหา FEPMF สำหรับ assign QA" />
+          <div id="qaStatusFilter" class="multi"></div>
+          <input id="qaNameInput" class="search" placeholder="ชื่อ QA ที่ต้องการ assign" />
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">
+          <button id="qaAssignBtn" class="btn primary" type="button">Assign QA ให้รายการที่เลือก</button>
+          <span id="qaAssignStatus" class="notice"></span>
+          <span id="qaCounter" class="badge qa-counter-badge"></span>
+        </div>
+        <div class="qa-split">
+          <section class="panel qa-pane">
+            <h2 style="margin:0;font-size:18px">FEPMF List</h2>
+            <div class="list qa-pane-list" id="qaProjectList" style="margin-top:10px"></div>
+          </section>
+          <section class="panel qa-pane">
+            <h2 style="margin:0;font-size:18px">QA Assignments</h2>
+            <div class="list qa-pane-list" id="qaAssignmentList" style="margin-top:10px"></div>
+          </section>
+        </div>
+      </div>
     </section>
   </div>
   <script src="/calendar.js"></script>

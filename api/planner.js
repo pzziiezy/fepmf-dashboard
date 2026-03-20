@@ -1,4 +1,4 @@
-﻿import crypto from 'crypto'
+import crypto from 'crypto'
 
 const memoryStore = []
 const tokenCache = {
@@ -6,7 +6,7 @@ const tokenCache = {
   expiresAt: 0
 }
 
-const SHEET_COLUMNS = ['id', 'key', 'title', 'sprint', 'start', 'end', 'owner', 'note', 'createdAt', 'updatedAt']
+const SHEET_COLUMNS = ['id', 'key', 'title', 'sprint', 'start', 'end', 'owner', 'note', 'createdAt', 'updatedAt', 'isDeleted', 'deletedAt', 'entityType']
 
 function nowIso() {
   return new Date().toISOString()
@@ -23,14 +23,12 @@ function normalizeItem(raw = {}, forUpdate = false) {
   const note = String(raw.note || '').trim()
   const createdAt = String(raw.createdAt || '').trim() || nowIso()
   const updatedAt = nowIso()
+  const isDeleted = String(raw.isDeleted || '').trim().toLowerCase() === 'true' ? 'true' : 'false'
+  const deletedAt = String(raw.deletedAt || '').trim()
+  const entityType = String(raw.entityType || 'manual').trim() || 'manual'
 
-  if (!forUpdate && (!title || !start || !end)) {
-    throw new Error('title, start, end are required')
-  }
-
-  if (forUpdate && !id) {
-    throw new Error('id is required for update')
-  }
+  if (!forUpdate && (!title || !start || !end)) throw new Error('title, start, end are required')
+  if (forUpdate && !id) throw new Error('id is required for update')
 
   return {
     id,
@@ -43,6 +41,9 @@ function normalizeItem(raw = {}, forUpdate = false) {
     note,
     createdAt,
     updatedAt,
+    isDeleted,
+    deletedAt,
+    entityType,
     source: 'manual'
   }
 }
@@ -55,39 +56,24 @@ function parseSpreadsheetId() {
 }
 
 function isGoogleSheetsConfigured() {
-  return Boolean(
-    parseSpreadsheetId() &&
-      process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL &&
-      process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY
-  )
+  return Boolean(parseSpreadsheetId() && process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY)
 }
 
 function getPrivateKey() {
-  return String(process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || '')
-    .replace(/\\n/g, '\n')
-    .trim()
+  return String(process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || '').replace(/\\n/g, '\n').trim()
 }
 
 function base64url(input) {
-  return Buffer.from(input)
-    .toString('base64')
-    .replace(/=/g, '')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
+  return Buffer.from(input).toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
 }
 
 async function getGoogleAccessToken() {
   const now = Math.floor(Date.now() / 1000)
-  if (tokenCache.accessToken && tokenCache.expiresAt > now + 60) {
-    return tokenCache.accessToken
-  }
+  if (tokenCache.accessToken && tokenCache.expiresAt > now + 60) return tokenCache.accessToken
 
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL
   const privateKey = getPrivateKey()
-
-  if (!email || !privateKey) {
-    throw new Error('Missing Google service account credentials')
-  }
+  if (!email || !privateKey) throw new Error('Missing Google service account credentials')
 
   const header = { alg: 'RS256', typ: 'JWT' }
   const claimSet = {
@@ -118,9 +104,7 @@ async function getGoogleAccessToken() {
   })
 
   const payload = await response.json()
-  if (!response.ok) {
-    throw new Error(`Google token error: ${payload.error || response.statusText}`)
-  }
+  if (!response.ok) throw new Error(`Google token error: ${payload.error || response.statusText}`)
 
   tokenCache.accessToken = payload.access_token
   tokenCache.expiresAt = now + Number(payload.expires_in || 3600)
@@ -147,16 +131,14 @@ async function googleRequest(path, options = {}) {
     const message = data?.error?.message || response.statusText
     throw new Error(`Google Sheets API error: ${message}`)
   }
-
   return data
 }
 
 async function ensureSheetHeader(sheetName) {
-  const range = `${sheetName}!A1:J1`
+  const range = `${sheetName}!A1:M1`
   const result = await googleRequest(`/values/${encodeURIComponent(range)}`)
   const current = result.values?.[0] || []
   const expected = SHEET_COLUMNS
-
   const isSame = expected.length === current.length && expected.every((v, i) => v === current[i])
   if (isSame) return
 
@@ -177,7 +159,10 @@ function toRowValues(item) {
     item.owner,
     item.note,
     item.createdAt,
-    item.updatedAt
+    item.updatedAt,
+    item.isDeleted || 'false',
+    item.deletedAt || '',
+    item.entityType || 'manual'
   ]
 }
 
@@ -193,23 +178,25 @@ function rowToItem(row = [], rowNumber = 0) {
     note: String(row[7] || '').trim(),
     createdAt: String(row[8] || '').trim(),
     updatedAt: String(row[9] || '').trim(),
+    isDeleted: String(row[10] || '').trim().toLowerCase() === 'true',
+    deletedAt: String(row[11] || '').trim(),
+    entityType: String(row[12] || 'manual').trim() || 'manual',
     source: 'manual',
     _rowNumber: rowNumber
   }
 }
 
-async function listGoogleSheetItems(sheetName) {
+async function listGoogleSheetItems(sheetName, includeDeleted = false) {
   await ensureSheetHeader(sheetName)
-  const range = `${sheetName}!A2:J`
+  const range = `${sheetName}!A2:M`
   const result = await googleRequest(`/values/${encodeURIComponent(range)}`)
   const rows = result.values || []
-  return rows
-    .map((row, idx) => rowToItem(row, idx + 2))
-    .filter((item) => item.id && item.title)
+  const all = rows.map((row, idx) => rowToItem(row, idx + 2)).filter((item) => item.id && item.title)
+  return includeDeleted ? all : all.filter((x) => !x.isDeleted)
 }
 
 async function appendGoogleSheetItem(sheetName, item) {
-  const range = `${sheetName}!A:J`
+  const range = `${sheetName}!A:M`
   await googleRequest(`/values/${encodeURIComponent(range)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {
     method: 'POST',
     body: JSON.stringify({ values: [toRowValues(item)] })
@@ -218,56 +205,33 @@ async function appendGoogleSheetItem(sheetName, item) {
 }
 
 async function updateGoogleSheetItem(sheetName, id, patch) {
-  const items = await listGoogleSheetItems(sheetName)
+  const items = await listGoogleSheetItems(sheetName, true)
   const target = items.find((x) => x.id === id)
   if (!target) throw new Error('Item not found')
 
   const merged = normalizeItem({ ...target, ...patch, id, createdAt: target.createdAt || nowIso() }, true)
-  if (!merged.title || !merged.start || !merged.end) {
-    throw new Error('title, start, end are required')
-  }
+  if (!merged.title || !merged.start || !merged.end) throw new Error('title, start, end are required')
 
-  const range = `${sheetName}!A${target._rowNumber}:J${target._rowNumber}`
+  const range = `${sheetName}!A${target._rowNumber}:M${target._rowNumber}`
   await googleRequest(`/values/${encodeURIComponent(range)}?valueInputOption=RAW`, {
     method: 'PUT',
     body: JSON.stringify({ values: [toRowValues(merged)] })
   })
-
   return merged
 }
 
-async function deleteGoogleSheetItem(sheetName, id) {
-  const spreadsheetId = parseSpreadsheetId()
-  const items = await listGoogleSheetItems(sheetName)
+async function softDeleteGoogleSheetItem(sheetName, id) {
+  const items = await listGoogleSheetItems(sheetName, true)
   const target = items.find((x) => x.id === id)
   if (!target) throw new Error('Item not found')
 
-  await googleRequest(`:batchUpdate`, {
-    method: 'POST',
-    body: JSON.stringify({
-      requests: [
-        {
-          deleteDimension: {
-            range: {
-              sheetId: Number(process.env.GOOGLE_SHEET_GID || 0),
-              dimension: 'ROWS',
-              startIndex: target._rowNumber - 1,
-              endIndex: target._rowNumber
-            }
-          }
-        }
-      ]
-    })
+  const deleted = normalizeItem({ ...target, isDeleted: 'true', deletedAt: nowIso() }, true)
+  const range = `${sheetName}!A${target._rowNumber}:M${target._rowNumber}`
+  await googleRequest(`/values/${encodeURIComponent(range)}?valueInputOption=RAW`, {
+    method: 'PUT',
+    body: JSON.stringify({ values: [toRowValues(deleted)] })
   })
-
-  return { ok: true, id, spreadsheetId }
-}
-
-async function getSheetIdByName(sheetName) {
-  const meta = await googleRequest('')
-  const sheet = (meta.sheets || []).find((s) => s.properties?.title === sheetName)
-  if (!sheet) throw new Error(`Sheet not found: ${sheetName}`)
-  return sheet.properties.sheetId
+  return { ok: true, id, softDeleted: true }
 }
 
 function parseBody(req) {
@@ -286,7 +250,6 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-
   if (req.method === 'OPTIONS') return res.status(200).end()
 
   const sheetName = process.env.GOOGLE_SHEETS_TAB_NAME || 'Planner'
@@ -294,13 +257,13 @@ export default async function handler(req, res) {
   try {
     if (isGoogleSheetsConfigured()) {
       if (req.method === 'GET') {
-        const items = await listGoogleSheetItems(sheetName)
+        const includeDeleted = String(req.query?.includeDeleted || '').toLowerCase() === 'true'
+        const items = await listGoogleSheetItems(sheetName, includeDeleted)
         return res.status(200).json({ items, source: 'google_sheets' })
       }
 
       if (req.method === 'POST') {
-        const body = parseBody(req)
-        const item = normalizeItem(body)
+        const item = normalizeItem(parseBody(req))
         const saved = await appendGoogleSheetItem(sheetName, item)
         return res.status(201).json({ ok: true, item: saved, source: 'google_sheets' })
       }
@@ -309,7 +272,6 @@ export default async function handler(req, res) {
         const body = parseBody(req)
         const id = String(body.id || '').trim()
         if (!id) return res.status(400).json({ error: 'id is required' })
-
         const updated = await updateGoogleSheetItem(sheetName, id, body)
         return res.status(200).json({ ok: true, item: updated, source: 'google_sheets' })
       }
@@ -318,13 +280,7 @@ export default async function handler(req, res) {
         const body = parseBody(req)
         const id = String(body.id || req.query?.id || '').trim()
         if (!id) return res.status(400).json({ error: 'id is required' })
-
-        const sheetId = Number.isFinite(Number(process.env.GOOGLE_SHEET_GID))
-          ? Number(process.env.GOOGLE_SHEET_GID)
-          : await getSheetIdByName(sheetName)
-        process.env.GOOGLE_SHEET_GID = String(sheetId)
-
-        const deleted = await deleteGoogleSheetItem(sheetName, id)
+        const deleted = await softDeleteGoogleSheetItem(sheetName, id)
         return res.status(200).json({ ...deleted, source: 'google_sheets' })
       }
 
@@ -332,7 +288,9 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'GET') {
-      return res.status(200).json({ items: memoryStore, source: 'memory', warning: 'Google Sheets not configured' })
+      const includeDeleted = String(req.query?.includeDeleted || '').toLowerCase() === 'true'
+      const items = includeDeleted ? memoryStore : memoryStore.filter((x) => String(x.isDeleted || 'false') !== 'true')
+      return res.status(200).json({ items, source: 'memory', warning: 'Google Sheets not configured' })
     }
 
     if (req.method === 'POST') {
@@ -345,15 +303,11 @@ export default async function handler(req, res) {
       const body = parseBody(req)
       const id = String(body.id || '').trim()
       if (!id) return res.status(400).json({ error: 'id is required' })
-
       const idx = memoryStore.findIndex((x) => x.id === id)
       if (idx < 0) return res.status(404).json({ error: 'Item not found' })
 
       const merged = normalizeItem({ ...memoryStore[idx], ...body, id }, true)
-      if (!merged.title || !merged.start || !merged.end) {
-        return res.status(400).json({ error: 'title, start, end are required' })
-      }
-
+      if (!merged.title || !merged.start || !merged.end) return res.status(400).json({ error: 'title, start, end are required' })
       memoryStore[idx] = merged
       return res.status(200).json({ ok: true, item: merged, source: 'memory', warning: 'Google Sheets not configured' })
     }
@@ -362,15 +316,10 @@ export default async function handler(req, res) {
       const body = parseBody(req)
       const id = String(body.id || req.query?.id || '').trim()
       if (!id) return res.status(400).json({ error: 'id is required' })
-
-      const next = memoryStore.filter((x) => x.id !== id)
-      if (next.length === memoryStore.length) {
-        return res.status(404).json({ error: 'Item not found' })
-      }
-
-      memoryStore.length = 0
-      memoryStore.push(...next)
-      return res.status(200).json({ ok: true, id, source: 'memory', warning: 'Google Sheets not configured' })
+      const idx = memoryStore.findIndex((x) => x.id === id)
+      if (idx < 0) return res.status(404).json({ error: 'Item not found' })
+      memoryStore[idx] = normalizeItem({ ...memoryStore[idx], isDeleted: 'true', deletedAt: nowIso(), id }, true)
+      return res.status(200).json({ ok: true, id, softDeleted: true, source: 'memory', warning: 'Google Sheets not configured' })
     }
 
     return res.status(405).json({ error: 'Method not allowed' })

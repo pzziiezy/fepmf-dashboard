@@ -409,13 +409,19 @@ function renderTimeline() {
   const startDate = new Date(`${start}T00:00:00Z`)
   const endDate = new Date(`${end}T00:00:00Z`)
   const days = Math.floor((endDate - startDate) / 86400000) + 1
+  const todayIso = toIsoDate(new Date())
+  const todayDate = new Date(`${todayIso}T00:00:00Z`)
+  const todayVisible = todayDate >= startDate && todayDate <= endDate
+  const todayOffset = todayVisible ? Math.floor((todayDate - startDate) / 86400000) : -1
+  const todayLeft = todayVisible ? (todayOffset / days) * 100 : -1
+  const todayWidth = 100 / days
 
   const visible = state.filtered.slice(0, state.visibleCount)
 
   const dayHeaders = Array.from({ length: days }, (_, i) => {
     const d = new Date(startDate.getTime())
     d.setUTCDate(d.getUTCDate() + i)
-    return `<div class="day-cell">${d.getUTCDate()}</div>`
+    return `<div class="day-cell ${todayVisible && i === todayOffset ? 'today-cell' : ''}">${d.getUTCDate()}</div>`
   }).join('')
 
   const rowsHtml = visible.map((row) => {
@@ -448,6 +454,7 @@ function renderTimeline() {
           <div style="font-size:11px;color:var(--muted)">${esc(row.parent.summary || '-')}</div>
         </div>
         <div class="row-track shift-track" style="grid-column:2 / -1;grid-row:1;">
+          ${todayVisible ? `<div class="today-bg" style="left:${todayLeft}%;width:${todayWidth}%"></div>` : ''}
           ${makeBar(model.baselineStart, model.baselineEnd, 'bar-baseline', 'Baseline', baseTip, 4)}
           ${makeBar(model.plannedStart, model.plannedEnd, 'bar-plan', 'New', planTip, 22)}
         </div>
