@@ -67,6 +67,32 @@ function statusBadgeClass(status) {
   return 'badge status-default'
 }
 
+function setNotice(el, message, type = 'info') {
+  if (!el) return
+  el.textContent = message || ''
+  el.classList.remove('notice-success', 'notice-error')
+  if (type === 'success') el.classList.add('notice-success')
+  if (type === 'error') el.classList.add('notice-error')
+}
+
+function parseQaNamesInput(rawValue) {
+  const raw = String(rawValue || '').trim()
+  if (!raw) return []
+  return [...new Set(raw.split(/[,\n]+/).map((x) => x.trim()).filter(Boolean))]
+}
+
+function getActiveQaByProjectKey() {
+  const map = new Map()
+  for (const item of state.qaAssignments || []) {
+    const projectKey = String(item.projectKey || '').trim()
+    const qaName = String(item.qaName || '').trim()
+    if (!projectKey || !qaName) continue
+    if (!map.has(projectKey)) map.set(projectKey, [])
+    map.get(projectKey).push(item)
+  }
+  return map
+}
+
 function buildMultiFilter(hostId, selected, options, searchText, placeholder, onChange, onSearch) {
   const host = document.getElementById(hostId)
   const filtered = (options || []).filter((v) => String(v).toLowerCase().includes(searchText.toLowerCase()))
@@ -179,24 +205,7 @@ function enumerateEvents() {
     source: 'manual',
     url: ''
   }))
-
-  const qaRows = (state.qaAssignments || []).map((x) => {
-    const base = (state.dashboard?.timelineItems || []).find((t) => t.key === x.projectKey)
-    if (!base) return null
-    return {
-      id: x.id,
-      key: x.projectKey,
-      title: `${x.projectKey} QA: ${x.qaName}`,
-      status: 'QA Plan',
-      squad: x.qaName,
-      start: base.start,
-      end: base.end,
-      source: 'qa',
-      url: ''
-    }
-  }).filter(Boolean)
-
-  return [...jiraParents, ...manual, ...qaRows]
+  return [...jiraParents, ...manual]
 }
 
 function filteredEvents() {
@@ -204,7 +213,7 @@ function filteredEvents() {
   const q = state.filters.q.toLowerCase().trim()
   return enumerateEvents().filter((e) => {
     if (!overlaps(e.start, e.end, start, end)) return false
-    if (state.filters.status.length && e.source !== 'qa' && !state.filters.status.includes(e.status)) return false
+    if (state.filters.status.length && !state.filters.status.includes(e.status)) return false
     if (q) {
       const blob = `${e.key} ${e.title} ${e.status} ${e.squad}`.toLowerCase()
       if (!blob.includes(q)) return false
@@ -234,7 +243,10 @@ function renderTimeline() {
     return `<div class="day-cell ${todayVisible && i === todayOffset ? 'today-cell' : ''}">${d.getUTCDate()}</div>`
   }).join('')
 
+  const qaByProject = getActiveQaByProjectKey()
   const rows = events.map((e) => {
+    const qaRows = e.source === 'parent' ? (qaByProject.get(e.key) || []) : []
+    const qaNames = [...new Set(qaRows.map((x) => String(x.qaName || '').trim()).filter(Boolean))]
     const eventStart = new Date(`${e.start}T00:00:00Z`)
     const eventEnd = new Date(`${e.end}T00:00:00Z`)
     const clampedStart = eventStart < startDate ? startDate : eventStart
@@ -243,14 +255,15 @@ function renderTimeline() {
     const endOffset = Math.floor((clampedEnd - startDate) / 86400000)
     const left = (startOffset / days) * 100
     const width = (Math.max(1, endOffset - startOffset + 1) / days) * 100
-    const barClass = e.source === 'manual' ? 'bar-manual' : e.source === 'qa' ? 'bar-qa' : 'bar-parent'
+    const barClass = e.source === 'manual' ? 'bar-manual' : 'bar-parent'
     const rangeText = `${e.start} - ${e.end}`
     const hoverText = `${e.title}\n${rangeText}`
-    const isProjectLike = e.source === 'parent' || e.source === 'qa'
+    const isProjectLike = e.source === 'parent'
     const itemLabel = isProjectLike ? `${e.key}${e.squad ? ` (${e.squad})` : ''}` : e.title
+    const qaHoverText = qaNames.length ? `QA Plan: ${qaNames.join(', ')}\n${rangeText}` : ''
 
     return `
-      <div class="timeline-row calendar-row-compact" style="grid-template-columns:240px repeat(${days}, minmax(14px, 1fr));">
+      <div class="timeline-row calendar-row-compact ${qaNames.length ? 'has-qa' : ''}" style="grid-template-columns:240px repeat(${days}, minmax(14px, 1fr));">
         <div class="row-label">
           <div style="display:flex;justify-content:space-between;gap:6px;align-items:center">
             <strong>${e.url ? `<a href="${esc(e.url)}" target="_blank" title="${esc(hoverText)}">${esc(itemLabel)}</a>` : `<span title="${esc(hoverText)}">${esc(itemLabel)}</span>`}</strong>
@@ -261,6 +274,7 @@ function renderTimeline() {
         <div class="row-track" style="grid-column:2 / -1;grid-row:1;">
           ${todayVisible ? `<div class="today-bg" style="left:${todayLeft}%;width:${todayWidth}%"></div>` : ''}
           <div class="event-bar ${barClass}" style="left:${left}%;width:${width}%" title="${esc(hoverText)}">${esc(e.key)}</div>
+          ${qaNames.length ? `<div class="event-bar bar-qa event-bar-secondary" style="left:${left}%;width:${width}%" title="${esc(qaHoverText)}">${esc(qaNames.join(', '))}</div>` : ''}
         </div>
         ${Array.from({ length: days }, () => '<div class="row-day"></div>').join('')}
       </div>
@@ -335,7 +349,7 @@ function renderManualList() {
       <div class="item-meta">${esc(item.note || '')}</div>
       <div style="display:flex;gap:8px;margin-top:6px">
         <button class="btn" data-action="edit" data-id="${esc(item.id)}">แก้ไข</button>
-        <button class="btn" data-action="delete" data-id="${esc(item.id)}">ลบ (Soft Delete)</button>
+        <button class="btn" data-action="delete" data-id="${esc(item.id)}">ลบ</button>
       </div>
     </div>
   `).join('')
@@ -351,9 +365,9 @@ function renderManualList() {
   list.querySelectorAll('button[data-action="delete"]').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const id = btn.getAttribute('data-id')
-      if (!id || !confirm('ยืนยันลบรายการนี้? (Soft Delete)')) return
+      if (!id || !confirm('ยืนยันลบรายการนี้?')) return
       const status = document.getElementById('planStatus')
-      status.textContent = 'กำลังลบ...'
+      setNotice(status, 'กำลังลบ...')
       try {
         const res = await fetch('/api/planner', {
           method: 'DELETE',
@@ -362,10 +376,10 @@ function renderManualList() {
         })
         const data = await res.json()
         if (data.error) throw new Error(data.error)
-        status.textContent = 'ลบเรียบร้อย (Soft Delete)'
+        setNotice(status, 'ลบเรียบร้อย', 'success')
         await loadAll()
       } catch (error) {
-        status.textContent = `ลบไม่สำเร็จ: ${error.message || error}`
+        setNotice(status, `ลบไม่สำเร็จ: ${error.message || error}`, 'error')
       }
     })
   })
@@ -419,7 +433,7 @@ function renderQaAssignmentList() {
       <div style="display:flex;gap:8px;margin-top:6px">
         <input data-role="qa-reassign-input" data-id="${esc(item.id)}" class="search" style="max-width:220px;padding:6px 10px" placeholder="ชื่อ QA คนใหม่" />
         <button class="btn" data-action="qa-reassign" data-id="${esc(item.id)}">Re-assign</button>
-        <button class="btn" data-action="qa-delete" data-id="${esc(item.id)}">ลบ Assign (Soft Delete)</button>
+        <button class="btn" data-action="qa-delete" data-id="${esc(item.id)}">ลบ Assign</button>
       </div>
     </div>
   `).join('')
@@ -427,7 +441,8 @@ function renderQaAssignmentList() {
   host.querySelectorAll('button[data-action="qa-reassign"]').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const id = btn.getAttribute('data-id')
-      const input = host.querySelector(`input[data-role="qa-reassign-input"][data-id="${CSS.escape(id)}"]`)
+      const row = btn.closest('.item-row')
+      const input = row ? row.querySelector('input[data-role="qa-reassign-input"]') : null
       const qaName = String(input?.value || '').trim()
       if (!id || !qaName) return
       await updateQaAssignment(id, qaName)
@@ -437,9 +452,9 @@ function renderQaAssignmentList() {
   host.querySelectorAll('button[data-action="qa-delete"]').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const id = btn.getAttribute('data-id')
-      if (!id || !confirm('ยืนยันลบการ assign นี้? (Soft Delete)')) return
+      if (!id || !confirm('ยืนยันลบการ assign นี้?')) return
       const status = document.getElementById('qaAssignStatus')
-      status.textContent = 'กำลังลบ assignment...'
+      setNotice(status, 'กำลังลบ assignment...')
       try {
         const res = await fetch('/api/qa-plan', {
           method: 'DELETE',
@@ -448,10 +463,10 @@ function renderQaAssignmentList() {
         })
         const data = await res.json()
         if (data.error) throw new Error(data.error)
-        status.textContent = 'ลบ assignment แล้ว (Soft Delete)'
+        setNotice(status, 'ลบ assignment แล้ว', 'success')
         await loadAll()
       } catch (error) {
-        status.textContent = `ลบไม่สำเร็จ: ${error.message || error}`
+        setNotice(status, `ลบไม่สำเร็จ: ${error.message || error}`, 'error')
       }
     })
   })
@@ -460,12 +475,12 @@ function renderQaAssignmentList() {
 function renderQaCounter() {
   const active = (state.qaAssignments || []).filter((x) => ['S3', 'S4', 'S5', 'S6'].includes(String(x.status || '').toUpperCase()))
   const uniqueQa = [...new Set(active.map((x) => String(x.qaName || '').trim()).filter(Boolean))]
-  document.getElementById('qaCounter').textContent = `QA Assigned (S3-S6): ${uniqueQa.length} คน (ไม่นับชื่อซ้ำ) | รายการ: ${active.length}`
+  document.getElementById('qaCounter').textContent = `QA Assigned (S3-S6): ${uniqueQa.length} คน | รายการ: ${active.length}`
 }
 
 async function updateQaAssignment(id, qaName) {
   const status = document.getElementById('qaAssignStatus')
-  status.textContent = 'กำลัง re-assign...'
+  setNotice(status, 'กำลัง re-assign...')
   try {
     const res = await fetch('/api/qa-plan', {
       method: 'PUT',
@@ -474,10 +489,10 @@ async function updateQaAssignment(id, qaName) {
     })
     const data = await res.json()
     if (data.error) throw new Error(data.error)
-    status.textContent = 'Re-assign สำเร็จ'
+    setNotice(status, 'Re-assign สำเร็จ', 'success')
     await loadAll()
   } catch (error) {
-    status.textContent = `Re-assign ไม่สำเร็จ: ${error.message || error}`
+    setNotice(status, `Re-assign ไม่สำเร็จ: ${error.message || error}`, 'error')
   }
 }
 
@@ -545,7 +560,7 @@ function bindEvents() {
     const payload = Object.fromEntries(new FormData(e.currentTarget).entries())
     if (state.editingId) payload.id = state.editingId
     const status = document.getElementById('planStatus')
-    status.textContent = state.editingId ? 'กำลังอัปเดต...' : 'กำลังบันทึก...'
+    setNotice(status, state.editingId ? 'กำลังอัปเดต...' : 'กำลังบันทึก...')
     try {
       const res = await fetch('/api/planner', {
         method: state.editingId ? 'PUT' : 'POST',
@@ -554,11 +569,11 @@ function bindEvents() {
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
-      status.textContent = state.editingId ? 'อัปเดตเรียบร้อย' : 'บันทึกเรียบร้อย'
+      setNotice(status, state.editingId ? 'อัปเดตเรียบร้อย' : 'บันทึกเรียบร้อย', 'success')
       setEditMode(null)
       await loadAll()
     } catch (error) {
-      status.textContent = `ไม่สำเร็จ: ${error.message || error}`
+      setNotice(status, `ไม่สำเร็จ: ${error.message || error}`, 'error')
     }
   })
 
@@ -579,15 +594,16 @@ function bindEvents() {
   })
 
   document.getElementById('qaAssignBtn').addEventListener('click', async () => {
-    const qaName = String(document.getElementById('qaNameInput').value || '').trim()
+    const qaInput = document.getElementById('qaNameInput')
+    const qaNames = parseQaNamesInput(qaInput.value)
     const selectedKeys = [...state.qa.selectedKeys]
     const status = document.getElementById('qaAssignStatus')
-    if (!qaName) {
-      status.textContent = 'กรุณาระบุชื่อ QA'
+    if (!qaNames.length) {
+      setNotice(status, 'กรุณาระบุชื่อ QA', 'error')
       return
     }
     if (!selectedKeys.length) {
-      status.textContent = 'กรุณาเลือกโปรเจ็คอย่างน้อย 1 รายการ'
+      setNotice(status, 'กรุณาเลือกโปรเจ็คอย่างน้อย 1 รายการ', 'error')
       return
     }
 
@@ -598,21 +614,21 @@ function bindEvents() {
       status: p.status
     }))
 
-    status.textContent = 'กำลัง assign QA...'
+    setNotice(status, 'กำลัง assign QA...')
     try {
       const res = await fetch('/api/qa-plan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ qaName, projects })
+        body: JSON.stringify({ qaNames, projects })
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
-      status.textContent = 'Assign QA สำเร็จ'
+      setNotice(status, 'Assign QA สำเร็จ', 'success')
       state.qa.selectedKeys.clear()
-      document.getElementById('qaNameInput').value = ''
+      qaInput.value = ''
       await loadAll()
     } catch (error) {
-      status.textContent = `Assign ไม่สำเร็จ: ${error.message || error}`
+      setNotice(status, `Assign ไม่สำเร็จ: ${error.message || error}`, 'error')
     }
   })
 

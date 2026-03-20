@@ -121,6 +121,15 @@ function parseBody(req) {
   return req.body
 }
 
+function parseQaNames(body = {}) {
+  if (Array.isArray(body.qaNames)) {
+    return [...new Set(body.qaNames.map((x) => String(x || '').trim()).filter(Boolean))]
+  }
+  const raw = String(body.qaName || '').trim()
+  if (!raw) return []
+  return [...new Set(raw.split(/[,\n]+/).map((x) => x.trim()).filter(Boolean))]
+}
+
 async function listItems(sheetName, includeDeleted = false) {
   await ensureHeader(sheetName)
   const result = await googleRequest(`/values/${encodeURIComponent(`${sheetName}!A2:J`)}`)
@@ -141,10 +150,10 @@ export default async function handler(req, res) {
       if (req.method === 'GET') return res.status(200).json({ items: memoryStore.filter((x) => !x.isDeleted), source: 'memory', warning: 'Google Sheets not configured' })
       if (req.method === 'POST') {
         const body = parseBody(req)
-        const qaName = String(body.qaName || '').trim()
+        const qaNames = parseQaNames(body)
         const projects = Array.isArray(body.projects) ? body.projects : []
-        if (!qaName || !projects.length) return res.status(400).json({ error: 'qaName and projects are required' })
-        const added = projects.map((p) => ({
+        if (!qaNames.length || !projects.length) return res.status(400).json({ error: 'qaName(s) and projects are required' })
+        const added = projects.flatMap((p) => qaNames.map((qaName) => ({
           id: `qa_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
           projectKey: String(p.projectKey || '').trim().toUpperCase(),
           projectTitle: String(p.projectTitle || '').trim(),
@@ -155,7 +164,7 @@ export default async function handler(req, res) {
           isDeleted: false,
           deletedAt: '',
           note: String(body.note || '').trim()
-        }))
+        })))
         memoryStore.unshift(...added)
         return res.status(201).json({ ok: true, items: added, source: 'memory', warning: 'Google Sheets not configured' })
       }
@@ -187,12 +196,12 @@ export default async function handler(req, res) {
 
     if (req.method === 'POST') {
       const body = parseBody(req)
-      const qaName = String(body.qaName || '').trim()
+      const qaNames = parseQaNames(body)
       const projects = Array.isArray(body.projects) ? body.projects : []
-      if (!qaName || !projects.length) return res.status(400).json({ error: 'qaName and projects are required' })
+      if (!qaNames.length || !projects.length) return res.status(400).json({ error: 'qaName(s) and projects are required' })
 
       await ensureHeader(sheetName)
-      const created = projects.map((p) => ({
+      const created = projects.flatMap((p) => qaNames.map((qaName) => ({
         id: `qa_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         projectKey: String(p.projectKey || '').trim().toUpperCase(),
         projectTitle: String(p.projectTitle || '').trim(),
@@ -203,7 +212,7 @@ export default async function handler(req, res) {
         isDeleted: 'false',
         deletedAt: '',
         note: String(body.note || '').trim()
-      }))
+      })))
 
       await googleRequest(`/values/${encodeURIComponent(`${sheetName}!A:J`)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {
         method: 'POST',
