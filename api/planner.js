@@ -7,6 +7,15 @@ const tokenCache = {
 }
 
 const SHEET_COLUMNS = ['id', 'key', 'title', 'sprint', 'start', 'end', 'owner', 'note', 'createdAt', 'updatedAt', 'isDeleted', 'deletedAt', 'entityType']
+const DEFAULT_GOOGLE_SHEETS_URL = 'https://docs.google.com/spreadsheets/d/1FzgaU35q3dvDVAf3vAqirRcUFemd_OThXr1o7NdJrGI/edit?usp=sharing'
+
+function firstEnv(...names) {
+  for (const name of names) {
+    const value = String(process.env[name] || '').trim()
+    if (value) return value
+  }
+  return ''
+}
 
 function nowIso() {
   return new Date().toISOString()
@@ -49,18 +58,40 @@ function normalizeItem(raw = {}, forUpdate = false) {
 }
 
 function parseSpreadsheetId() {
-  if (process.env.GOOGLE_SHEETS_SPREADSHEET_ID) return process.env.GOOGLE_SHEETS_SPREADSHEET_ID
-  const url = String(process.env.GOOGLE_SHEETS_URL || '').trim()
+  const directId = firstEnv('GOOGLE_SHEETS_SPREADSHEET_ID', 'GOOGLE_SPREADSHEET_ID')
+  if (directId) return directId
+  const url = firstEnv('GOOGLE_SHEETS_URL', 'GOOGLE_SHEET_URL') || DEFAULT_GOOGLE_SHEETS_URL
   const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/)
   return match ? match[1] : ''
 }
 
-function isGoogleSheetsConfigured() {
-  return Boolean(parseSpreadsheetId() && process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY)
+function getServiceAccountEmail() {
+  if (firstEnv('GOOGLE_SERVICE_ACCOUNT_EMAIL', 'GOOGLE_CLIENT_EMAIL', 'GOOGLE_SERVICE_ACCOUNT_CLIENT_EMAIL')) {
+    return firstEnv('GOOGLE_SERVICE_ACCOUNT_EMAIL', 'GOOGLE_CLIENT_EMAIL', 'GOOGLE_SERVICE_ACCOUNT_CLIENT_EMAIL')
+  }
+  const jsonRaw = firstEnv('GOOGLE_SERVICE_ACCOUNT_JSON')
+  if (!jsonRaw) return ''
+  try {
+    return String(JSON.parse(jsonRaw).client_email || '').trim()
+  } catch {
+    return ''
+  }
 }
 
 function getPrivateKey() {
-  return String(process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || '').replace(/\\n/g, '\n').trim()
+  const directKey = firstEnv('GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY', 'GOOGLE_PRIVATE_KEY', 'GOOGLE_SHEETS_PRIVATE_KEY')
+  if (directKey) return directKey.replace(/\\n/g, '\n').trim()
+  const jsonRaw = firstEnv('GOOGLE_SERVICE_ACCOUNT_JSON')
+  if (!jsonRaw) return ''
+  try {
+    return String(JSON.parse(jsonRaw).private_key || '').replace(/\\n/g, '\n').trim()
+  } catch {
+    return ''
+  }
+}
+
+function isGoogleSheetsConfigured() {
+  return Boolean(parseSpreadsheetId() && getServiceAccountEmail() && getPrivateKey())
 }
 
 function base64url(input) {
@@ -71,7 +102,7 @@ async function getGoogleAccessToken() {
   const now = Math.floor(Date.now() / 1000)
   if (tokenCache.accessToken && tokenCache.expiresAt > now + 60) return tokenCache.accessToken
 
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL
+  const email = getServiceAccountEmail()
   const privateKey = getPrivateKey()
   if (!email || !privateKey) throw new Error('Missing Google service account credentials')
 
@@ -134,7 +165,20 @@ async function googleRequest(path, options = {}) {
   return data
 }
 
+async function ensureSheetExists(sheetName) {
+  const meta = await googleRequest('?fields=sheets.properties.title')
+  const titles = (meta.sheets || []).map((sheet) => String(sheet?.properties?.title || '').trim())
+  if (titles.includes(sheetName)) return
+  await googleRequest(':batchUpdate', {
+    method: 'POST',
+    body: JSON.stringify({
+      requests: [{ addSheet: { properties: { title: sheetName } } }]
+    })
+  })
+}
+
 async function ensureSheetHeader(sheetName) {
+  await ensureSheetExists(sheetName)
   const range = `${sheetName}!A1:M1`
   const result = await googleRequest(`/values/${encodeURIComponent(range)}`)
   const current = result.values?.[0] || []
@@ -252,7 +296,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
   if (req.method === 'OPTIONS') return res.status(200).end()
 
-  const sheetName = process.env.GOOGLE_SHEETS_TAB_NAME || 'Planner'
+  const sheetName = firstEnv('GOOGLE_SHEETS_TAB_NAME', 'GOOGLE_PLANNER_SHEET_TAB_NAME') || 'Planner'
 
   try {
     if (isGoogleSheetsConfigured()) {
