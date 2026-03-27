@@ -22,6 +22,8 @@ const state = {
   }
 }
 
+const DEFAULT_MANUAL_COLOR = '#b66a00'
+
 function esc(v) {
   return String(v ?? '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]))
 }
@@ -91,6 +93,15 @@ function getActiveQaByProjectKey() {
     map.get(projectKey).push(item)
   }
   return map
+}
+
+function syncManualColorUi(colorValue) {
+  const normalized = /^#[0-9a-fA-F]{6}$/.test(String(colorValue || '').trim()) ? String(colorValue || '').trim().toLowerCase() : DEFAULT_MANUAL_COLOR
+  const input = document.getElementById('manualColorInput')
+  if (input && input.value.toLowerCase() !== normalized) input.value = normalized
+  document.querySelectorAll('.manual-color-chip').forEach((chip) => {
+    chip.classList.toggle('active', String(chip.getAttribute('data-color') || '').toLowerCase() === normalized)
+  })
 }
 
 function buildMultiFilter(hostId, selected, options, searchText, placeholder, onChange, onSearch) {
@@ -257,7 +268,7 @@ function renderTimeline() {
     const left = (startOffset / days) * 100
     const width = (Math.max(1, endOffset - startOffset + 1) / days) * 100
     const barClass = e.source === 'manual' ? 'bar-manual' : 'bar-parent'
-    const manualStyle = e.source === 'manual' ? `background:${esc(e.color || '#b66a00')};` : ''
+    const manualStyle = e.source === 'manual' ? `background:${esc(e.color || DEFAULT_MANUAL_COLOR)};` : ''
     const rangeText = `${e.start} - ${e.end}`
     const hoverText = `${e.title}\n${rangeText}`
     const isProjectLike = e.source === 'parent'
@@ -320,7 +331,8 @@ function setEditMode(item) {
   if (!item) {
     state.editingId = ''
     form.reset()
-    form.elements.color.value = '#b66a00'
+    form.elements.color.value = DEFAULT_MANUAL_COLOR
+    syncManualColorUi(DEFAULT_MANUAL_COLOR)
     saveBtn.textContent = 'บันทึกแผนงาน'
     cancelBtn.style.display = 'none'
     modeLabel.style.display = 'none'
@@ -333,7 +345,8 @@ function setEditMode(item) {
   form.elements.start.value = item.start || ''
   form.elements.end.value = item.end || ''
   form.elements.owner.value = item.owner || ''
-  form.elements.color.value = item.color || '#b66a00'
+  form.elements.color.value = item.color || DEFAULT_MANUAL_COLOR
+  syncManualColorUi(item.color || DEFAULT_MANUAL_COLOR)
   form.elements.note.value = item.note || ''
   saveBtn.textContent = 'อัปเดตแผนงาน'
   cancelBtn.style.display = ''
@@ -349,7 +362,7 @@ function renderManualList() {
   list.innerHTML = state.plans.map((item) => `
     <div class="item-row">
       <div class="item-top"><div><strong>${esc(item.key || '-')}</strong> ${esc(item.title)}</div><div class="badge status-default">${esc(item.start)} - ${esc(item.end)}</div></div>
-      <div class="item-meta">Owner: ${esc(item.owner || '-')} | Sprint: ${esc(item.sprint || '-')} | <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:999px;background:${esc(item.color || '#b66a00')};display:inline-block;border:1px solid rgba(0,0,0,0.12)"></span>Timeline Color</span></div>
+      <div class="item-meta">Owner: ${esc(item.owner || '-')} | Sprint: ${esc(item.sprint || '-')} | <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:999px;background:${esc(item.color || DEFAULT_MANUAL_COLOR)};display:inline-block;border:1px solid rgba(0,0,0,0.12)"></span>Timeline Color</span></div>
       <div class="item-meta">${esc(item.note || '')}</div>
       <div style="display:flex;gap:8px;margin-top:6px">
         <button class="btn" data-action="edit" data-id="${esc(item.id)}">แก้ไข</button>
@@ -584,6 +597,18 @@ function bindEvents() {
   document.getElementById('tabManualBtn').addEventListener('click', () => switchTab('manual'))
   document.getElementById('tabQaBtn').addEventListener('click', () => switchTab('qa'))
 
+  document.getElementById('manualColorPresets').addEventListener('click', (e) => {
+    const chip = e.target.closest('.manual-color-chip')
+    if (!chip) return
+    syncManualColorUi(chip.getAttribute('data-color') || DEFAULT_MANUAL_COLOR)
+  })
+
+  document.getElementById('manualColorInput').addEventListener('input', (e) => {
+    const nextColor = String(e.target.value || '').trim().toLowerCase()
+    if (!/^#[0-9a-fA-F]{6}$/.test(nextColor)) return
+    syncManualColorUi(nextColor)
+  })
+
   document.getElementById('qaSearch').addEventListener('input', (e) => {
     state.qa.q = e.target.value || ''
     renderQaProjectList()
@@ -644,6 +669,7 @@ function bindEvents() {
 }
 
 bindEvents()
+syncManualColorUi(DEFAULT_MANUAL_COLOR)
 loadAll().catch((error) => {
   document.getElementById('timelineGrid').innerHTML = `<div class="empty">โหลดข้อมูลไม่สำเร็จ: ${esc(error.message || error)}</div>`
   document.getElementById('calendarSync').textContent = 'โหลดข้อมูลล้มเหลว'

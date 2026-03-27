@@ -156,6 +156,43 @@ textarea {
 .item-top { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; align-items: center; }
 .item-key { font-weight: 800; }
 .item-meta { color: var(--muted); font-size: 12px; }
+.manual-color-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.manual-color-control input[type="color"] {
+  width: 46px;
+  height: 40px;
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #fff;
+  cursor: pointer;
+}
+.manual-color-presets {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.manual-color-chip {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 2px solid rgba(255,255,255,0.95);
+  box-shadow: 0 0 0 1px rgba(27, 44, 74, 0.14);
+  background: var(--chip);
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+.manual-color-chip:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(27, 44, 74, 0.18);
+}
+.manual-color-chip.active {
+  box-shadow: 0 0 0 2px rgba(13, 89, 182, 0.26), 0 6px 18px rgba(27, 44, 74, 0.16);
+}
 
 .filter-grid {
   display: grid;

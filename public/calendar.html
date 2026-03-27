@@ -61,7 +61,20 @@
           <label class="field"><span>Start Date *</span><input type="date" name="start" required /></label>
           <label class="field"><span>End Date *</span><input type="date" name="end" required /></label>
           <label class="field"><span>Owner</span><input name="owner" /></label>
-          <label class="field"><span>Timeline Color</span><input type="color" name="color" value="#b66a00" /></label>
+          <label class="field">
+            <span>Timeline Color</span>
+            <div class="manual-color-control">
+              <input id="manualColorInput" type="color" name="color" value="#b66a00" />
+              <div id="manualColorPresets" class="manual-color-presets">
+                <button class="manual-color-chip active" type="button" data-color="#b66a00" style="--chip:#b66a00" title="Amber"></button>
+                <button class="manual-color-chip" type="button" data-color="#0f766e" style="--chip:#0f766e" title="Teal"></button>
+                <button class="manual-color-chip" type="button" data-color="#7c3aed" style="--chip:#7c3aed" title="Violet"></button>
+                <button class="manual-color-chip" type="button" data-color="#c2410c" style="--chip:#c2410c" title="Orange"></button>
+                <button class="manual-color-chip" type="button" data-color="#be123c" style="--chip:#be123c" title="Rose"></button>
+                <button class="manual-color-chip" type="button" data-color="#1d4ed8" style="--chip:#1d4ed8" title="Blue"></button>
+              </div>
+            </div>
+          </label>
           <label class="field full"><span>Note</span><textarea name="note"></textarea></label>
           <div class="full" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
             <button id="savePlanBtn" class="btn primary" type="submit">บันทึกแผนงาน</button>
