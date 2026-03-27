@@ -9,7 +9,7 @@ const state = {
   activeTab: 'manual',
   filters: {
     q: '',
-    status: ['S4', 'S5', 'S6']
+    status: ['Manual']
   },
   statusOptions: [],
   statusSearch: '',
@@ -537,7 +537,7 @@ async function loadAll() {
 
   state.statusOptions = dashboard.meta?.available?.statuses || []
   if (!state.statusOptions.includes('Manual')) state.statusOptions.push('Manual')
-  state.filters.status = ['S4', 'S5', 'S6'].filter((s) => state.statusOptions.includes(s))
+  state.filters.status = ['Manual'].filter((s) => state.statusOptions.includes(s))
   state.timelineVisibleCount = 30
 
   buildStatusFilter()
