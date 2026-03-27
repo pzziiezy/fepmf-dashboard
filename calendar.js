@@ -202,6 +202,7 @@ function enumerateEvents() {
     squad: x.owner || '-',
     start: x.start,
     end: x.end,
+    color: x.color || '#b66a00',
     source: 'manual',
     url: ''
   }))
@@ -256,6 +257,7 @@ function renderTimeline() {
     const left = (startOffset / days) * 100
     const width = (Math.max(1, endOffset - startOffset + 1) / days) * 100
     const barClass = e.source === 'manual' ? 'bar-manual' : 'bar-parent'
+    const manualStyle = e.source === 'manual' ? `background:${esc(e.color || '#b66a00')};` : ''
     const rangeText = `${e.start} - ${e.end}`
     const hoverText = `${e.title}\n${rangeText}`
     const isProjectLike = e.source === 'parent'
@@ -273,7 +275,7 @@ function renderTimeline() {
         </div>
         <div class="row-track" style="grid-column:2 / -1;grid-row:1;">
           ${todayVisible ? `<div class="today-bg" style="left:${todayLeft}%;width:${todayWidth}%"></div>` : ''}
-          <div class="event-bar ${barClass}" style="left:${left}%;width:${width}%" title="${esc(hoverText)}">${esc(e.key)}</div>
+          <div class="event-bar ${barClass}" style="left:${left}%;width:${width};${manualStyle}" title="${esc(hoverText)}">${esc(e.key)}</div>
           ${qaNames.length ? `<div class="event-bar bar-qa event-bar-secondary" style="left:${left}%;width:${width}%" title="${esc(qaHoverText)}">${esc(qaNames.join(', '))}</div>` : ''}
         </div>
         ${Array.from({ length: days }, () => '<div class="row-day"></div>').join('')}
@@ -318,6 +320,7 @@ function setEditMode(item) {
   if (!item) {
     state.editingId = ''
     form.reset()
+    form.elements.color.value = '#b66a00'
     saveBtn.textContent = 'บันทึกแผนงาน'
     cancelBtn.style.display = 'none'
     modeLabel.style.display = 'none'
@@ -330,6 +333,7 @@ function setEditMode(item) {
   form.elements.start.value = item.start || ''
   form.elements.end.value = item.end || ''
   form.elements.owner.value = item.owner || ''
+  form.elements.color.value = item.color || '#b66a00'
   form.elements.note.value = item.note || ''
   saveBtn.textContent = 'อัปเดตแผนงาน'
   cancelBtn.style.display = ''
@@ -345,7 +349,7 @@ function renderManualList() {
   list.innerHTML = state.plans.map((item) => `
     <div class="item-row">
       <div class="item-top"><div><strong>${esc(item.key || '-')}</strong> ${esc(item.title)}</div><div class="badge status-default">${esc(item.start)} - ${esc(item.end)}</div></div>
-      <div class="item-meta">Owner: ${esc(item.owner || '-')} | Sprint: ${esc(item.sprint || '-')}</div>
+      <div class="item-meta">Owner: ${esc(item.owner || '-')} | Sprint: ${esc(item.sprint || '-')} | <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:999px;background:${esc(item.color || '#b66a00')};display:inline-block;border:1px solid rgba(0,0,0,0.12)"></span>Timeline Color</span></div>
       <div class="item-meta">${esc(item.note || '')}</div>
       <div style="display:flex;gap:8px;margin-top:6px">
         <button class="btn" data-action="edit" data-id="${esc(item.id)}">แก้ไข</button>

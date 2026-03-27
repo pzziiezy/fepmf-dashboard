@@ -6,8 +6,9 @@ const tokenCache = {
   expiresAt: 0
 }
 
-const SHEET_COLUMNS = ['id', 'key', 'title', 'sprint', 'start', 'end', 'owner', 'note', 'createdAt', 'updatedAt', 'isDeleted', 'deletedAt', 'entityType']
+const SHEET_COLUMNS = ['id', 'key', 'title', 'sprint', 'start', 'end', 'owner', 'note', 'color', 'createdAt', 'updatedAt', 'isDeleted', 'deletedAt', 'entityType']
 const DEFAULT_GOOGLE_SHEETS_URL = 'https://docs.google.com/spreadsheets/d/1FzgaU35q3dvDVAf3vAqirRcUFemd_OThXr1o7NdJrGI/edit?usp=sharing'
+const DEFAULT_MANUAL_COLOR = '#b66a00'
 
 function firstEnv(...names) {
   for (const name of names) {
@@ -30,6 +31,7 @@ function normalizeItem(raw = {}, forUpdate = false) {
   const end = String(raw.end || '').trim()
   const owner = String(raw.owner || '').trim()
   const note = String(raw.note || '').trim()
+  const color = /^#[0-9a-fA-F]{6}$/.test(String(raw.color || '').trim()) ? String(raw.color || '').trim() : DEFAULT_MANUAL_COLOR
   const createdAt = String(raw.createdAt || '').trim() || nowIso()
   const updatedAt = nowIso()
   const isDeleted = String(raw.isDeleted || '').trim().toLowerCase() === 'true' ? 'true' : 'false'
@@ -48,6 +50,7 @@ function normalizeItem(raw = {}, forUpdate = false) {
     end,
     owner,
     note,
+    color,
     createdAt,
     updatedAt,
     isDeleted,
@@ -179,7 +182,7 @@ async function ensureSheetExists(sheetName) {
 
 async function ensureSheetHeader(sheetName) {
   await ensureSheetExists(sheetName)
-  const range = `${sheetName}!A1:M1`
+  const range = `${sheetName}!A1:N1`
   const result = await googleRequest(`/values/${encodeURIComponent(range)}`)
   const current = result.values?.[0] || []
   const expected = SHEET_COLUMNS
@@ -202,6 +205,7 @@ function toRowValues(item) {
     item.end,
     item.owner,
     item.note,
+    item.color || DEFAULT_MANUAL_COLOR,
     item.createdAt,
     item.updatedAt,
     item.isDeleted || 'false',
@@ -211,6 +215,7 @@ function toRowValues(item) {
 }
 
 function rowToItem(row = [], rowNumber = 0) {
+  const hasColorColumn = row.length >= 14
   return {
     id: String(row[0] || '').trim(),
     key: String(row[1] || '').trim(),
@@ -220,11 +225,12 @@ function rowToItem(row = [], rowNumber = 0) {
     end: String(row[5] || '').trim(),
     owner: String(row[6] || '').trim(),
     note: String(row[7] || '').trim(),
-    createdAt: String(row[8] || '').trim(),
-    updatedAt: String(row[9] || '').trim(),
-    isDeleted: String(row[10] || '').trim().toLowerCase() === 'true',
-    deletedAt: String(row[11] || '').trim(),
-    entityType: String(row[12] || 'manual').trim() || 'manual',
+    color: String(row[8] || '').trim() || DEFAULT_MANUAL_COLOR,
+    createdAt: String(row[hasColorColumn ? 9 : 8] || '').trim(),
+    updatedAt: String(row[hasColorColumn ? 10 : 9] || '').trim(),
+    isDeleted: String(row[hasColorColumn ? 11 : 10] || '').trim().toLowerCase() === 'true',
+    deletedAt: String(row[hasColorColumn ? 12 : 11] || '').trim(),
+    entityType: String(row[hasColorColumn ? 13 : 12] || 'manual').trim() || 'manual',
     source: 'manual',
     _rowNumber: rowNumber
   }
@@ -232,7 +238,7 @@ function rowToItem(row = [], rowNumber = 0) {
 
 async function listGoogleSheetItems(sheetName, includeDeleted = false) {
   await ensureSheetHeader(sheetName)
-  const range = `${sheetName}!A2:M`
+  const range = `${sheetName}!A2:N`
   const result = await googleRequest(`/values/${encodeURIComponent(range)}`)
   const rows = result.values || []
   const all = rows.map((row, idx) => rowToItem(row, idx + 2)).filter((item) => item.id && item.title)
@@ -240,7 +246,7 @@ async function listGoogleSheetItems(sheetName, includeDeleted = false) {
 }
 
 async function appendGoogleSheetItem(sheetName, item) {
-  const range = `${sheetName}!A:M`
+  const range = `${sheetName}!A:N`
   await googleRequest(`/values/${encodeURIComponent(range)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {
     method: 'POST',
     body: JSON.stringify({ values: [toRowValues(item)] })
@@ -256,7 +262,7 @@ async function updateGoogleSheetItem(sheetName, id, patch) {
   const merged = normalizeItem({ ...target, ...patch, id, createdAt: target.createdAt || nowIso() }, true)
   if (!merged.title || !merged.start || !merged.end) throw new Error('title, start, end are required')
 
-  const range = `${sheetName}!A${target._rowNumber}:M${target._rowNumber}`
+  const range = `${sheetName}!A${target._rowNumber}:N${target._rowNumber}`
   await googleRequest(`/values/${encodeURIComponent(range)}?valueInputOption=RAW`, {
     method: 'PUT',
     body: JSON.stringify({ values: [toRowValues(merged)] })
@@ -270,7 +276,7 @@ async function softDeleteGoogleSheetItem(sheetName, id) {
   if (!target) throw new Error('Item not found')
 
   const deleted = normalizeItem({ ...target, isDeleted: 'true', deletedAt: nowIso() }, true)
-  const range = `${sheetName}!A${target._rowNumber}:M${target._rowNumber}`
+  const range = `${sheetName}!A${target._rowNumber}:N${target._rowNumber}`
   await googleRequest(`/values/${encodeURIComponent(range)}?valueInputOption=RAW`, {
     method: 'PUT',
     body: JSON.stringify({ values: [toRowValues(deleted)] })
