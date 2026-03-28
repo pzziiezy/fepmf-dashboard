@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FEPMF MISQA Watchlist</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/app.css" />
+</head>
+<body>
+  <div class="page">
+    <section class="header">
+      <div class="header-top">
+        <div>
+          <h1 class="title">FEPMF MISQA Watchlist</h1>
+          <div class="subtitle">ติดตาม FEPMF ที่ยังไม่มี MISQA และ FEPMF ที่กำลังรอ MISQA ปิดงานให้ครบ</div>
+        </div>
+        <nav class="nav">
+          <a href="/" target="_blank" rel="noopener noreferrer">List View</a>
+          <a href="/board.html" target="_blank" rel="noopener noreferrer">Board View</a>
+          <a class="active" href="/misqa-watch.html" target="_blank" rel="noopener noreferrer">MISQA Watchlist</a>
+          <a href="/calendar.html" target="_blank" rel="noopener noreferrer">Calendar Planner</a>
+          <a href="/shift-planner.html" target="_blank" rel="noopener noreferrer">Shift Planner</a>
+        </nav>
+      </div>
+      <div class="header-meta">
+        <span class="tag" id="misqaSyncTime">กำลังโหลดข้อมูล...</span>
+        <span class="tag">Data Source: Jira Cloud</span>
+      </div>
+    </section>
+
+    <div class="toolbar">
+      <input id="misqaSearch" class="search" placeholder="ค้นหา FEPMF / MISQA key / Summary / Assignee" />
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button id="misqaClearBtn" class="btn">ล้างค้นหา</button>
+        <button id="misqaRefreshBtn" class="btn primary">Refresh</button>
+      </div>
+    </div>
+
+    <section class="panel misqa-scope-panel">
+      <div class="misqa-panel-intro">
+        <div class="misqa-panel-title">Choose your view first</div>
+        <div class="misqa-panel-copy">เริ่มจากเลือกมุมมองหลัก แล้วค่อยใช้ Focus กับ Filters เฉพาะที่จำเป็น เพื่อให้ผลลัพธ์อ่านง่ายและไม่สับสน</div>
+      </div>
+      <div class="misqa-control-grid">
+        <div>
+          <div class="misqa-control-label">View</div>
+          <div id="misqaViewSwitch" class="misqa-scope-switch misqa-view-switch"></div>
+        </div>
+        <div>
+          <div class="misqa-control-label">Focus</div>
+          <div id="misqaScopeSwitch" class="misqa-scope-switch"></div>
+        </div>
+      </div>
+      <div id="misqaModeHint" class="misqa-scope-note"></div>
+    </section>
+
+    <section class="panel misqa-assignee-filter-panel">
+      <div class="misqa-filter-topbar">
+        <div class="misqa-control-label">MISQA Assignee Filter</div>
+        <div class="misqa-expand-actions">
+          <button id="misqaCollapseAllBtn" class="btn" type="button">Collapse All</button>
+          <button id="misqaExpandAllBtn" class="btn" type="button">Expand All</button>
+        </div>
+      </div>
+      <div class="misqa-single-filter-row">
+        <div id="misqaAssignedFilter" class="multi"></div>
+      </div>
+    </section>
+
+    <section class="kpis" id="misqaKpis"></section>
+    <section class="content" id="misqaContent"></section>
+  </div>
+  <script src="/misqa-watch.js"></script>
+</body>
+</html>

@@ -3,6 +3,8 @@
   query: '',
   rows: [],
   expanded: new Set(),
+  collapsedGroups: new Set(),
+  viewMode: 'fepmf',
   filters: {
     status: ['S4', 'S5', 'S6'],
     squad: [],
@@ -100,6 +102,133 @@ function renderKpis(summary, rows) {
     .join('')
 }
 
+function groupSortValue(value) {
+  const text = String(value || '')
+  const match = text.match(/\d+/)
+  return {
+    text,
+    num: match ? Number(match[0]) : Number.MAX_SAFE_INTEGER
+  }
+}
+
+function groupRowsForView(rows) {
+  if (state.viewMode === 'squad') {
+    const map = new Map()
+    for (const row of rows) {
+      const key = row.parent.squad || 'No Squad'
+      if (!map.has(key)) map.set(key, [])
+      map.get(key).push(row)
+    }
+    return [...map.entries()]
+      .sort((a, b) => String(a[0]).localeCompare(String(b[0])))
+      .map(([key, items]) => ({ key, title: key, subtitle: `${items.length} FEPMF`, rows: items }))
+  }
+
+  if (state.viewMode === 'estimateSprint') {
+    const map = new Map()
+    for (const row of rows) {
+      const key = row.parent.estimateSprint || row.parent.sprint || 'No Estimate Sprint'
+      if (!map.has(key)) map.set(key, [])
+      map.get(key).push(row)
+    }
+    return [...map.entries()]
+      .sort((a, b) => {
+        const av = groupSortValue(a[0])
+        const bv = groupSortValue(b[0])
+        if (av.num !== bv.num) return av.num - bv.num
+        return av.text.localeCompare(bv.text)
+      })
+      .map(([key, items]) => ({ key, title: key, subtitle: `${items.length} FEPMF`, rows: items }))
+  }
+
+  return [{
+    key: 'fepmf',
+    title: 'FEPMF',
+    subtitle: `${rows.length} FEPMF`,
+    rows
+  }]
+}
+
+function groupPreviewKeys(group) {
+  return (group?.rows || [])
+    .map((row) => row?.parent?.key)
+    .filter(Boolean)
+    .slice(0, 5)
+}
+
+function renderViewModeSwitch(rows) {
+  const items = [
+    { key: 'fepmf', title: 'View by FEPMF', meta: `${rows.length} FEPMF` },
+    { key: 'squad', title: 'View by Squad', meta: `${new Set(rows.map((row) => row.parent.squad || 'No Squad')).size} groups` },
+    { key: 'estimateSprint', title: 'View by Estimate Sprint', meta: `${new Set(rows.map((row) => row.parent.estimateSprint || row.parent.sprint || 'No Estimate Sprint')).size} groups` }
+  ]
+
+  document.getElementById('listViewModeSwitch').innerHTML = items.map((item) => `
+    <button type="button" class="list-view-mode-btn ${state.viewMode === item.key ? 'active' : ''}" data-view-mode="${esc(item.key)}">
+      <span class="list-view-mode-title">${esc(item.title)}</span>
+      <span class="list-view-mode-meta">${esc(item.meta)}</span>
+    </button>
+  `).join('')
+
+  document.querySelectorAll('[data-view-mode]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state.viewMode = btn.getAttribute('data-view-mode') || 'fepmf'
+      renderRows()
+    })
+  })
+}
+
+function renderParentCard(row) {
+  const isOpen = state.expanded.has(row.parent.key)
+  const childRows = (row.workItems || []).map((item) => {
+    const rowClass = workItemRowClass(item)
+    return `
+      <div class="item-row ${rowClass}">
+        <div class="item-top">
+          <div><a class="item-key" href="${esc(item.browseUrl)}" target="_blank">${esc(item.key)}</a> ${esc(item.summary || '')}</div>
+          <div class="${workItemStatusClass(item)}">${esc(item.status || '-')}</div>
+        </div>
+        <div class="item-meta">Assignee: ${esc(item.assignee || '-')}</div>
+      </div>
+    `
+  }).join('')
+
+  return `
+    <article class="panel parent-card">
+      <div class="parent-head">
+        <div class="parent-main">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <a class="parent-key" href="${esc(row.parent.browseUrl)}" target="_blank">${esc(row.parent.key)}</a>
+            <span class="${statusBadgeClass(row.parent.status)}">${esc(row.parent.status || '-')}</span>
+          </div>
+          <div>${esc(row.parent.summary || '-')}</div>
+          <div class="progress-line"><div style="width:${Math.max(0, Math.min(100, row.progressPercent || 0))}%"></div></div>
+          <div class="progress-meta">
+            <span><strong>${esc(row.progressPercent || 0)}%</strong></span>
+            <span>Based on child status formula</span>
+            <span>Children Done: ${esc(row.progress.doneLinked || 0)}/${esc(row.progress.totalLinked || 0)}</span>
+          </div>
+        </div>
+        <div class="badges">
+          <button class="expand-btn" data-parent="${esc(row.parent.key)}" type="button" aria-expanded="${isOpen ? 'true' : 'false'}">
+            <span class="expand-btn-icon">${isOpen ? '▾' : '▸'}</span>
+            <span>${isOpen ? 'Less' : 'More'}</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="meta-grid">
+        <div><strong>Squad:</strong> ${esc(row.parent.squad || '-')}</div>
+        <div><strong>Estimate Sprint:</strong> ${esc(row.parent.estimateSprint || row.parent.sprint || '-')}</div>
+        <div><strong>CAB Date:</strong> ${esc(formatDate(row.parent.cabDate))}</div>
+        <div><strong>Child Count:</strong> ${esc(row.linkedCount || 0)}</div>
+      </div>
+
+      ${isOpen ? `<div class="work-items">${childRows || '<div class="empty">ไม่มี Child/Linked Items</div>'}</div>` : ''}
+    </article>
+  `
+}
+
 function filterRows() {
   const q = state.query.trim().toLowerCase()
 
@@ -121,69 +250,60 @@ function toggleParent(key) {
   renderRows()
 }
 
+function groupStateKey(groupKey) {
+  return `${state.viewMode}:${groupKey}`
+}
+
+function toggleGroup(groupKey) {
+  const key = groupStateKey(groupKey)
+  if (state.collapsedGroups.has(key)) state.collapsedGroups.delete(key)
+  else state.collapsedGroups.add(key)
+  renderRows()
+}
+
 function renderRows() {
   const host = document.getElementById('content')
   const rows = state.rows || []
 
   renderKpis(state.data?.summary || {}, rows)
+  renderViewModeSwitch(rows)
 
   if (!rows.length) {
     host.innerHTML = '<div class="panel empty">ไม่พบข้อมูลตามเงื่อนไขที่เลือก</div>'
     return
   }
 
-  host.innerHTML = rows
-    .map((row) => {
-      const isOpen = state.expanded.has(row.parent.key)
-      const childRows = (row.workItems || []).map((item) => {
-        const rowClass = workItemRowClass(item)
-        return `
-          <div class="item-row ${rowClass}">
-            <div class="item-top">
-              <div><a class="item-key" href="${esc(item.browseUrl)}" target="_blank">${esc(item.key)}</a> ${esc(item.summary || '')}</div>
-              <div class="${workItemStatusClass(item)}">${esc(item.status || '-')}</div>
-            </div>
-            <div class="item-meta">Assignee: ${esc(item.assignee || '-')}</div>
-          </div>
-        `
-      }).join('')
+  const groups = groupRowsForView(rows)
 
-      return `
-        <article class="panel parent-card">
-          <div class="parent-head">
-            <div class="parent-main">
-              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                <a class="parent-key" href="${esc(row.parent.browseUrl)}" target="_blank">${esc(row.parent.key)}</a>
-                <span class="${statusBadgeClass(row.parent.status)}">${esc(row.parent.status || '-')}</span>
+  host.innerHTML = groups.map((group) => `
+    <section class="list-view-group">
+      ${state.viewMode === 'fepmf' ? '' : `
+        <button type="button" class="panel list-view-group-head ${state.collapsedGroups.has(groupStateKey(group.key)) ? 'collapsed' : 'expanded'}" data-group-toggle="${esc(group.key)}" aria-expanded="${state.collapsedGroups.has(groupStateKey(group.key)) ? 'false' : 'true'}">
+          <div class="list-view-group-head-main">
+            <div class="list-view-group-title">${esc(group.title)}</div>
+            <div class="list-view-group-meta">${esc(group.subtitle)}</div>
+            ${state.collapsedGroups.has(groupStateKey(group.key)) ? `
+              <div class="list-view-group-preview">
+                ${groupPreviewKeys(group).map((key) => `<span class="list-view-group-key">${esc(key)}</span>`).join('')}
+                ${(group.rows || []).length > 5 ? `<span class="list-view-group-more">+${esc((group.rows || []).length - 5)} more</span>` : ''}
               </div>
-              <div>${esc(row.parent.summary || '-')}</div>
-              <div class="progress-line"><div style="width:${Math.max(0, Math.min(100, row.progressPercent || 0))}%"></div></div>
-              <div class="progress-meta">
-                <span><strong>${esc(row.progressPercent || 0)}%</strong></span>
-                <span>Based on child status formula</span>
-                <span>Children Done: ${esc(row.progress.doneLinked || 0)}/${esc(row.progress.totalLinked || 0)}</span>
-              </div>
-            </div>
-            <div class="badges">
-              <button class="expand-btn" data-parent="${esc(row.parent.key)}" type="button" aria-expanded="${isOpen ? 'true' : 'false'}">
-                <span class="expand-btn-icon">${isOpen ? '▾' : '▸'}</span>
-                <span>${isOpen ? 'Less' : 'More'}</span>
-              </button>
-            </div>
+            ` : ''}
           </div>
-
-          <div class="meta-grid">
-            <div><strong>Squad:</strong> ${esc(row.parent.squad || '-')}</div>
-            <div><strong>Estimate Sprint:</strong> ${esc(row.parent.estimateSprint || row.parent.sprint || '-')}</div>
-            <div><strong>CAB Date:</strong> ${esc(formatDate(row.parent.cabDate))}</div>
-            <div><strong>Child Count:</strong> ${esc(row.linkedCount || 0)}</div>
+          <div class="list-view-group-action">
+            <span class="list-view-group-pill">${state.collapsedGroups.has(groupStateKey(group.key)) ? 'Expand' : 'Collapse'}</span>
+            <span class="list-view-group-chevron">${state.collapsedGroups.has(groupStateKey(group.key)) ? '▸' : '▾'}</span>
           </div>
+        </button>
+      `}
+      <div class="list-view-group-body" ${state.viewMode !== 'fepmf' && state.collapsedGroups.has(groupStateKey(group.key)) ? 'hidden' : ''}>
+        ${group.rows.map((row) => renderParentCard(row)).join('')}
+      </div>
+    </section>
+  `).join('')
 
-          ${isOpen ? `<div class="work-items">${childRows || '<div class="empty">ไม่มี Child/Linked Items</div>'}</div>` : ''}
-        </article>
-      `
-    })
-    .join('')
+  host.querySelectorAll('[data-group-toggle]').forEach((btn) => {
+    btn.addEventListener('click', () => toggleGroup(btn.getAttribute('data-group-toggle')))
+  })
 
   host.querySelectorAll('.expand-btn').forEach((btn) => {
     btn.addEventListener('click', () => toggleParent(btn.getAttribute('data-parent')))

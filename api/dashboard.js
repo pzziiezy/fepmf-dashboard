@@ -317,27 +317,57 @@
   }
 
   function extractRelations(issue, childFieldIds = [], linkedFieldIds = []) {
-    const records = []
+    const records = new Map()
+
+    function pushRecord(key, source) {
+      const normalizedKey = String(key || '').toUpperCase()
+      if (!normalizedKey) return
+      if (!records.has(normalizedKey)) {
+        records.set(normalizedKey, { key: normalizedKey, sources: [] })
+      }
+      const row = records.get(normalizedKey)
+      if (source && !row.sources.includes(source)) row.sources.push(source)
+    }
 
     for (const sub of issue?.fields?.subtasks || []) {
       if (!sub?.key) continue
-      records.push({ key: String(sub.key).toUpperCase() })
+      pushRecord(sub.key, 'subtask')
     }
 
     for (const link of issue?.fields?.issuelinks || []) {
-      if (link?.outwardIssue?.key) records.push({ key: String(link.outwardIssue.key).toUpperCase() })
-      if (link?.inwardIssue?.key) records.push({ key: String(link.inwardIssue.key).toUpperCase() })
+      if (link?.outwardIssue?.key) pushRecord(link.outwardIssue.key, 'issueLink')
+      if (link?.inwardIssue?.key) pushRecord(link.inwardIssue.key, 'issueLink')
     }
 
     for (const fieldId of childFieldIds) {
-      for (const key of parseIssueKeysFromValue(issue?.fields?.[fieldId])) records.push({ key })
+      for (const key of parseIssueKeysFromValue(issue?.fields?.[fieldId])) pushRecord(key, 'childField')
     }
 
     for (const fieldId of linkedFieldIds) {
-      for (const key of parseIssueKeysFromValue(issue?.fields?.[fieldId])) records.push({ key })
+      for (const key of parseIssueKeysFromValue(issue?.fields?.[fieldId])) pushRecord(key, 'linkedField')
     }
 
-    return uniq(records.map((x) => x.key)).map((key) => ({ key }))
+    return [...records.values()]
+  }
+
+  function mergeRelationRecords(existing = [], incoming = []) {
+    const map = new Map()
+    for (const item of existing) {
+      const key = String(item?.key || '').toUpperCase()
+      if (!key) continue
+      map.set(key, { key, sources: uniq(item?.sources || []) })
+    }
+    for (const item of incoming) {
+      const key = String(item?.key || '').toUpperCase()
+      if (!key) continue
+      if (!map.has(key)) {
+        map.set(key, { key, sources: uniq(item?.sources || []) })
+      } else {
+        const current = map.get(key)
+        current.sources = uniq([...(current.sources || []), ...(item?.sources || [])])
+      }
+    }
+    return [...map.values()]
   }
 
   function parseKeyParts(key) {
@@ -559,8 +589,7 @@
           if (!parentKey) continue
 
           const current = relationMap.get(parentKey) || []
-          current.push({ key: String(hit.key).toUpperCase() })
-          relationMap.set(parentKey, current)
+          relationMap.set(parentKey, mergeRelationRecords(current, [{ key: String(hit.key).toUpperCase(), sources: ['parentRef'] }]))
           relatedKeySet.add(String(hit.key).toUpperCase())
         }
       }
@@ -577,13 +606,13 @@
 
     const parents = parentsRaw.map((parentRaw) => {
       const parent = normalized.get(parentRaw.key)
-      const keys = uniq((relationMap.get(parent.key) || []).map((x) => x.key))
-
       const children = sortChildren(
-        keys
-          .map((key) => normalized.get(key))
+        (relationMap.get(parent.key) || [])
+          .map((rel) => {
+            const base = normalized.get(rel.key)
+            return base ? { ...base, relationSources: rel.sources || [] } : null
+          })
           .filter(Boolean)
-          .map((item) => ({ ...item }))
       )
 
       const doneCount = children.filter((item) => {

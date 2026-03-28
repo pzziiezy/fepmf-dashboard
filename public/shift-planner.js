@@ -32,6 +32,12 @@ function toIsoDate(value) {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
 }
 
+function toLocalIsoDate(value = new Date()) {
+  const d = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 function parseSprintNumber(v) {
   const m = String(v || '').match(/\d+/)
   return m ? Number(m[0]) : null
@@ -65,8 +71,8 @@ function getThreeMonthRange() {
     m = mm - 1
   } else {
     const now = new Date()
-    y = now.getUTCFullYear()
-    m = now.getUTCMonth()
+    y = now.getFullYear()
+    m = now.getMonth()
   }
 
   const start = new Date(Date.UTC(y, m, 1))
@@ -409,7 +415,7 @@ function renderTimeline() {
   const startDate = new Date(`${start}T00:00:00Z`)
   const endDate = new Date(`${end}T00:00:00Z`)
   const days = Math.floor((endDate - startDate) / 86400000) + 1
-  const todayIso = toIsoDate(new Date())
+  const todayIso = toLocalIsoDate(new Date())
   const todayDate = new Date(`${todayIso}T00:00:00Z`)
   const todayVisible = todayDate >= startDate && todayDate <= endDate
   const todayOffset = todayVisible ? Math.floor((todayDate - startDate) / 86400000) : -1

@@ -35,6 +35,12 @@ function toIsoDate(value) {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
 }
 
+function toLocalIsoDate(value = new Date()) {
+  const d = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 function getTwoMonthRange() {
   let y
   let m
@@ -44,8 +50,8 @@ function getTwoMonthRange() {
     m = mm - 1
   } else {
     const now = new Date()
-    y = now.getUTCFullYear()
-    m = now.getUTCMonth()
+    y = now.getFullYear()
+    m = now.getMonth()
   }
   const start = new Date(Date.UTC(y, m, 1))
   const end = new Date(Date.UTC(y, m + 2, 0))
@@ -242,12 +248,10 @@ function renderTimeline() {
   const allEvents = filteredEvents().sort((a, b) => (a.start || '').localeCompare(b.start || ''))
   const visibleCount = Math.min(state.timelineVisibleCount, allEvents.length)
   const events = allEvents.slice(0, visibleCount)
-  const todayIso = toIsoDate(new Date())
+  const todayIso = toLocalIsoDate(new Date())
   const todayDate = new Date(`${todayIso}T00:00:00Z`)
   const todayVisible = todayDate >= startDate && todayDate <= endDate
   const todayOffset = todayVisible ? Math.floor((todayDate - startDate) / 86400000) : -1
-  const todayLeft = todayVisible ? (todayOffset / days) * 100 : -1
-  const todayWidth = 100 / days
 
   const dayHeaders = Array.from({ length: days }, (_, i) => {
     const d = new Date(startDate.getTime())
@@ -265,8 +269,8 @@ function renderTimeline() {
     const clampedEnd = eventEnd > endDate ? endDate : eventEnd
     const startOffset = Math.floor((clampedStart - startDate) / 86400000)
     const endOffset = Math.floor((clampedEnd - startDate) / 86400000)
-    const left = (startOffset / days) * 100
-    const width = (Math.max(1, endOffset - startOffset + 1) / days) * 100
+    const startColumn = startOffset + 2
+    const endColumn = endOffset + 3
     const barClass = e.source === 'manual' ? 'bar-manual' : 'bar-parent'
     const manualStyle = e.source === 'manual' ? `background:${esc(e.color || DEFAULT_MANUAL_COLOR)};` : ''
     const rangeText = `${e.start} - ${e.end}`
@@ -284,12 +288,9 @@ function renderTimeline() {
           </div>
           <div class="calendar-item-summary">${esc(e.title || '-')}</div>
         </div>
-        <div class="row-track" style="grid-column:2 / -1;grid-row:1;">
-          ${todayVisible ? `<div class="today-bg" style="left:${todayLeft}%;width:${todayWidth}%"></div>` : ''}
-          <div class="event-bar ${barClass}" style="left:${left}%;width:${width};${manualStyle}" title="${esc(hoverText)}">${esc(e.key)}</div>
-          ${qaNames.length ? `<div class="event-bar bar-qa event-bar-secondary" style="left:${left}%;width:${width}%" title="${esc(qaHoverText)}">${esc(qaNames.join(', '))}</div>` : ''}
-        </div>
-        ${Array.from({ length: days }, () => '<div class="row-day"></div>').join('')}
+        ${Array.from({ length: days }, (_, i) => `<div class="row-day ${todayVisible && i === todayOffset ? 'today-day' : ''}"></div>`).join('')}
+        <div class="event-bar grid-bar ${barClass}" style="grid-column:${startColumn} / ${endColumn};grid-row:1;${manualStyle}" title="${esc(hoverText)}">${esc(e.key)}</div>
+        ${qaNames.length ? `<div class="event-bar grid-bar bar-qa event-bar-secondary" style="grid-column:${startColumn} / ${endColumn};grid-row:1;" title="${esc(qaHoverText)}">${esc(qaNames.join(', '))}</div>` : ''}
       </div>
     `
   }).join('')
