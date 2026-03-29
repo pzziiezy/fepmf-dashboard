@@ -38,6 +38,29 @@ function toLocalIsoDate(value = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+function getBangkokDateParts(value = new Date()) {
+  const d = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(d.getTime())) return null
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(d)
+  const get = (type) => parts.find((p) => p.type === type)?.value || ''
+  return {
+    year: Number(get('year')),
+    month: Number(get('month')),
+    day: Number(get('day'))
+  }
+}
+
+function toBangkokIsoDate(value = new Date()) {
+  const parts = getBangkokDateParts(value)
+  if (!parts) return ''
+  return `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`
+}
+
 function parseSprintNumber(v) {
   const m = String(v || '').match(/\d+/)
   return m ? Number(m[0]) : null
@@ -70,9 +93,9 @@ function getThreeMonthRange() {
     y = yy
     m = mm - 1
   } else {
-    const now = new Date()
-    y = now.getFullYear()
-    m = now.getMonth()
+    const now = getBangkokDateParts(new Date())
+    y = now?.year || new Date().getUTCFullYear()
+    m = (now?.month || (new Date().getUTCMonth() + 1)) - 1
   }
 
   const start = new Date(Date.UTC(y, m, 1))
@@ -415,19 +438,16 @@ function renderTimeline() {
   const startDate = new Date(`${start}T00:00:00Z`)
   const endDate = new Date(`${end}T00:00:00Z`)
   const days = Math.floor((endDate - startDate) / 86400000) + 1
-  const todayIso = toLocalIsoDate(new Date())
+  const todayIso = toBangkokIsoDate(new Date())
   const todayDate = new Date(`${todayIso}T00:00:00Z`)
   const todayVisible = todayDate >= startDate && todayDate <= endDate
   const todayOffset = todayVisible ? Math.floor((todayDate - startDate) / 86400000) : -1
-  const todayLeft = todayVisible ? (todayOffset / days) * 100 : -1
-  const todayWidth = 100 / days
-
   const visible = state.filtered.slice(0, state.visibleCount)
 
   const dayHeaders = Array.from({ length: days }, (_, i) => {
     const d = new Date(startDate.getTime())
     d.setUTCDate(d.getUTCDate() + i)
-    return `<div class="day-cell ${todayVisible && i === todayOffset ? 'today-cell' : ''}">${d.getUTCDate()}</div>`
+    return `<div class="day-cell ${todayVisible && i === todayOffset ? 'today-cell' : ''}" style="grid-column:${i + 2};grid-row:1;">${d.getUTCDate()}</div>`
   }).join('')
 
   const rowsHtml = visible.map((row) => {
@@ -444,10 +464,10 @@ function renderTimeline() {
       const clampedEnd = e > endDate ? endDate : e
       const offset = Math.floor((clampedStart - startDate) / 86400000)
       const endOffset = Math.floor((clampedEnd - startDate) / 86400000)
-      const left = (offset / days) * 100
-      const width = (Math.max(1, endOffset - offset + 1) / days) * 100
+      const startColumn = offset + 2
+      const endColumn = endOffset + 3
 
-      return `<div class="event-bar ${cssClass}" style="left:${left}%;width:${width}%;top:${rowTop}px" title="${esc(tooltipText)}">${esc(text)}</div>`
+      return `<div class="event-bar grid-bar ${cssClass}" style="grid-column:${startColumn} / ${endColumn};grid-row:1;top:${rowTop}px" title="${esc(tooltipText)}">${esc(text)}</div>`
     }
 
     const baseTip = `${row.parent.key} Baseline\n${row.parent.summary}\n${model.baselineStart} - ${model.baselineEnd}`
@@ -455,23 +475,20 @@ function renderTimeline() {
 
     return `
       <div class="timeline-row shift-row" style="grid-template-columns:180px repeat(${days}, minmax(14px, 1fr));">
-        <div class="row-label">
+        <div class="row-label" style="grid-column:1;grid-row:1;">
           <div><strong><a href="${esc(row.parent.browseUrl)}" target="_blank">${esc(row.parent.key)}</a></strong></div>
           <div style="font-size:11px;color:var(--muted)">${esc(row.parent.summary || '-')}</div>
         </div>
-        <div class="row-track shift-track" style="grid-column:2 / -1;grid-row:1;">
-          ${todayVisible ? `<div class="today-bg" style="left:${todayLeft}%;width:${todayWidth}%"></div>` : ''}
-          ${makeBar(model.baselineStart, model.baselineEnd, 'bar-baseline', 'Baseline', baseTip, 4)}
-          ${makeBar(model.plannedStart, model.plannedEnd, 'bar-plan', 'New', planTip, 22)}
-        </div>
-        ${Array.from({ length: days }, () => '<div class="row-day"></div>').join('')}
+        ${Array.from({ length: days }, (_, i) => `<div class="row-day ${todayVisible && i === todayOffset ? 'today-day' : ''}" style="grid-column:${i + 2};grid-row:1;"></div>`).join('')}
+        ${makeBar(model.baselineStart, model.baselineEnd, 'bar-baseline', 'Baseline', baseTip, 4)}
+        ${makeBar(model.plannedStart, model.plannedEnd, 'bar-plan', 'New', planTip, 22)}
       </div>
     `
   }).join('')
 
   host.innerHTML = `
     <div class="timeline-head" style="grid-template-columns:180px repeat(${days}, minmax(14px, 1fr));">
-      <div class="time-label"><strong>Timeline</strong><div style="font-size:11px;color:var(--muted)">${start} ถึง ${end}</div></div>
+      <div class="time-label" style="grid-column:1;grid-row:1;"><strong>Timeline</strong><div style="font-size:11px;color:var(--muted)">${start} ถึง ${end}</div></div>
       ${dayHeaders}
     </div>
     ${rowsHtml || '<div class="empty">ไม่พบรายการตามเงื่อนไข</div>'}
@@ -595,8 +612,8 @@ function renderTable() {
 
 function bindEvents() {
   const monthPicker = document.getElementById('shiftMonthPicker')
-  const now = new Date()
-  const currentMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`
+  const bangkokNow = getBangkokDateParts(new Date())
+  const currentMonth = `${bangkokNow?.year || new Date().getUTCFullYear()}-${String(bangkokNow?.month || (new Date().getUTCMonth() + 1)).padStart(2, '0')}`
   state.selectedMonth = currentMonth
   monthPicker.value = currentMonth
 

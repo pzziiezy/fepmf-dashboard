@@ -41,6 +41,29 @@ function toLocalIsoDate(value = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+function getBangkokDateParts(value = new Date()) {
+  const d = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(d.getTime())) return null
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(d)
+  const get = (type) => parts.find((p) => p.type === type)?.value || ''
+  return {
+    year: Number(get('year')),
+    month: Number(get('month')),
+    day: Number(get('day'))
+  }
+}
+
+function toBangkokIsoDate(value = new Date()) {
+  const parts = getBangkokDateParts(value)
+  if (!parts) return ''
+  return `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`
+}
+
 function getTwoMonthRange() {
   let y
   let m
@@ -49,9 +72,9 @@ function getTwoMonthRange() {
     y = yy
     m = mm - 1
   } else {
-    const now = new Date()
-    y = now.getFullYear()
-    m = now.getMonth()
+    const now = getBangkokDateParts(new Date())
+    y = now?.year || new Date().getUTCFullYear()
+    m = (now?.month || (new Date().getUTCMonth() + 1)) - 1
   }
   const start = new Date(Date.UTC(y, m, 1))
   const end = new Date(Date.UTC(y, m + 2, 0))
@@ -248,7 +271,7 @@ function renderTimeline() {
   const allEvents = filteredEvents().sort((a, b) => (a.start || '').localeCompare(b.start || ''))
   const visibleCount = Math.min(state.timelineVisibleCount, allEvents.length)
   const events = allEvents.slice(0, visibleCount)
-  const todayIso = toLocalIsoDate(new Date())
+  const todayIso = toBangkokIsoDate(new Date())
   const todayDate = new Date(`${todayIso}T00:00:00Z`)
   const todayVisible = todayDate >= startDate && todayDate <= endDate
   const todayOffset = todayVisible ? Math.floor((todayDate - startDate) / 86400000) : -1
@@ -256,7 +279,7 @@ function renderTimeline() {
   const dayHeaders = Array.from({ length: days }, (_, i) => {
     const d = new Date(startDate.getTime())
     d.setUTCDate(d.getUTCDate() + i)
-    return `<div class="day-cell ${todayVisible && i === todayOffset ? 'today-cell' : ''}">${d.getUTCDate()}</div>`
+    return `<div class="day-cell ${todayVisible && i === todayOffset ? 'today-cell' : ''}" style="grid-column:${i + 2};grid-row:1;">${d.getUTCDate()}</div>`
   }).join('')
 
   const qaByProject = getActiveQaByProjectKey()
@@ -281,14 +304,14 @@ function renderTimeline() {
 
     return `
       <div class="timeline-row calendar-row-compact ${qaNames.length ? 'has-qa' : ''}" style="grid-template-columns:240px repeat(${days}, minmax(14px, 1fr));">
-        <div class="row-label">
+        <div class="row-label" style="grid-column:1;grid-row:1;">
           <div style="display:flex;justify-content:space-between;gap:6px;align-items:center">
             <strong>${e.url ? `<a href="${esc(e.url)}" target="_blank" title="${esc(hoverText)}">${esc(itemLabel)}</a>` : `<span title="${esc(hoverText)}">${esc(itemLabel)}</span>`}</strong>
             <span class="${statusBadgeClass(e.status)}" style="padding:2px 8px">${esc(e.status)}</span>
           </div>
           <div class="calendar-item-summary">${esc(e.title || '-')}</div>
         </div>
-        ${Array.from({ length: days }, (_, i) => `<div class="row-day ${todayVisible && i === todayOffset ? 'today-day' : ''}"></div>`).join('')}
+        ${Array.from({ length: days }, (_, i) => `<div class="row-day ${todayVisible && i === todayOffset ? 'today-day' : ''}" style="grid-column:${i + 2};grid-row:1;"></div>`).join('')}
         <div class="event-bar grid-bar ${barClass}" style="grid-column:${startColumn} / ${endColumn};grid-row:1;${manualStyle}" title="${esc(hoverText)}">${esc(e.key)}</div>
         ${qaNames.length ? `<div class="event-bar grid-bar bar-qa event-bar-secondary" style="grid-column:${startColumn} / ${endColumn};grid-row:1;" title="${esc(qaHoverText)}">${esc(qaNames.join(', '))}</div>` : ''}
       </div>
@@ -297,7 +320,7 @@ function renderTimeline() {
 
   document.getElementById('timelineGrid').innerHTML = `
     <div class="timeline-head calendar-row-compact" style="grid-template-columns:240px repeat(${days}, minmax(14px, 1fr));position:relative;">
-      <div class="time-label"><strong>Item</strong><div style="font-size:10px;color:var(--muted)">${start} ถึง ${end}</div></div>
+      <div class="time-label" style="grid-column:1;grid-row:1;"><strong>Item</strong><div style="font-size:10px;color:var(--muted)">${start} ถึง ${end}</div></div>
       ${dayHeaders}
     </div>
     ${rows || '<div class="empty">ไม่พบข้อมูลตามเงื่อนไข</div>'}
