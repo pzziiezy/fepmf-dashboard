@@ -1535,6 +1535,11 @@ textarea {
   gap: 14px;
 }
 
+.planner-lab-main,
+.planner-lab-panel {
+  min-width: 0;
+}
+
 .planner-lab-side {
   align-self: start;
   position: sticky;
@@ -1596,6 +1601,8 @@ textarea {
 .planner-lab-dot.today { background: #f0b24a; }
 
 .planner-lab-timeline {
+  position: relative;
+  max-width: 100%;
   border: 1px solid #d6e3f1;
   border-radius: 16px;
   overflow: auto;
