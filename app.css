@@ -1688,12 +1688,13 @@ textarea {
 
 .planner-lab-today-column {
   position: absolute;
-  top: 0;
-  bottom: 0;
+  top: -1px;
+  bottom: -1px;
   background: #fff1d8;
-  box-shadow: inset 0 0 0 1px #efbf73;
+  border-left: 1px solid #efbf73;
+  border-right: 1px solid #efbf73;
   pointer-events: none;
-  z-index: 0;
+  z-index: 1;
 }
 
 .planner-lab-bar {
@@ -1922,25 +1923,6 @@ textarea {
   background: linear-gradient(180deg, #256fd1 0%, #1152b7 100%);
 }
 
-.planner-lab-row.has-qa .planner-lab-track {
-  min-height: 54px;
-}
-
-.planner-lab-row.has-qa .planner-lab-track-day {
-  min-height: 54px;
-}
-
-.planner-lab-bar-qa {
-  align-self: end;
-  height: 16px;
-  margin: 0 2px 5px 2px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #9358da, #6d3fc0);
-  box-shadow: 0 8px 18px rgba(109, 63, 192, 0.22);
-  font-size: 10px;
-  line-height: 16px;
-  padding: 0 10px;
-}
 
 .planner-lab-note-stack {
   display: grid;

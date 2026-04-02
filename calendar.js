@@ -1,44 +1,33 @@
+const LAB_DEFAULT_COLOR = '#b66a00'
+
 const state = {
-  dashboard: null,
   plans: [],
-  qaAssignments: [],
-  source: '',
-  editingId: '',
-  timelineVisibleCount: 30,
+  dashboard: null,
+  dashboardLoaded: false,
+  loadingProjects: false,
+  includeProjects: false,
   selectedMonth: '',
-  activeTab: 'manual',
+  search: '',
+  selectedEventId: '',
+  inspectorEditingId: '',
+  editingId: '',
   filters: {
-    q: '',
     status: ['Manual']
   },
-  statusOptions: [],
-  statusSearch: '',
-  qa: {
-    q: '',
-    status: ['S3', 'S4', 'S5', 'S6'],
-    statusOptions: ['S3', 'S4', 'S5', 'S6'],
-    statusSearch: '',
-    selectedKeys: new Set()
-  }
+  statusOptions: ['Manual'],
+  statusSearch: ''
 }
 
-const DEFAULT_MANUAL_COLOR = '#b66a00'
-
-function esc(v) {
-  return String(v ?? '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]))
+function esc(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]))
 }
 
-function toIsoDate(value) {
-  if (!value) return ''
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return ''
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
-}
-
-function toLocalIsoDate(value = new Date()) {
-  const d = value instanceof Date ? value : new Date(value)
-  if (Number.isNaN(d.getTime())) return ''
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+function setNotice(el, message, type = 'info') {
+  if (!el) return
+  el.textContent = message || ''
+  el.classList.remove('notice-success', 'notice-error')
+  if (type === 'success') el.classList.add('notice-success')
+  if (type === 'error') el.classList.add('notice-error')
 }
 
 function getBangkokDateParts(value = new Date()) {
@@ -50,12 +39,15 @@ function getBangkokDateParts(value = new Date()) {
     month: '2-digit',
     day: '2-digit'
   }).formatToParts(d)
-  const get = (type) => parts.find((p) => p.type === type)?.value || ''
-  return {
-    year: Number(get('year')),
-    month: Number(get('month')),
-    day: Number(get('day'))
-  }
+  const read = (type) => parts.find((p) => p.type === type)?.value || ''
+  return { year: Number(read('year')), month: Number(read('month')), day: Number(read('day')) }
+}
+
+function toIsoDate(value) {
+  if (!value) return ''
+  const d = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
 }
 
 function toBangkokIsoDate(value = new Date()) {
@@ -64,20 +56,27 @@ function toBangkokIsoDate(value = new Date()) {
   return `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`
 }
 
+function formatThaiDate(value) {
+  if (!value) return '-'
+  const d = new Date(`${value}T00:00:00Z`)
+  if (Number.isNaN(d.getTime())) return value
+  return d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
+}
+
 function getTwoMonthRange() {
-  let y
-  let m
+  let year
+  let month
   if (state.selectedMonth && /^\d{4}-\d{2}$/.test(state.selectedMonth)) {
     const [yy, mm] = state.selectedMonth.split('-').map(Number)
-    y = yy
-    m = mm - 1
+    year = yy
+    month = mm - 1
   } else {
-    const now = getBangkokDateParts(new Date())
-    y = now?.year || new Date().getUTCFullYear()
-    m = (now?.month || (new Date().getUTCMonth() + 1)) - 1
+    const today = getBangkokDateParts(new Date())
+    year = today?.year || new Date().getUTCFullYear()
+    month = (today?.month || (new Date().getUTCMonth() + 1)) - 1
   }
-  const start = new Date(Date.UTC(y, m, 1))
-  const end = new Date(Date.UTC(y, m + 2, 0))
+  const start = new Date(Date.UTC(year, month, 1))
+  const end = new Date(Date.UTC(year, month + 2, 0))
   return { start: toIsoDate(start), end: toIsoDate(end) }
 }
 
@@ -85,10 +84,59 @@ function overlaps(aStart, aEnd, bStart, bEnd) {
   return aStart <= bEnd && bStart <= aEnd
 }
 
+function durationDays(start, end) {
+  if (!start || !end) return 0
+  const a = new Date(`${start}T00:00:00Z`)
+  const b = new Date(`${end}T00:00:00Z`)
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime()) || b < a) return 0
+  return Math.floor((b - a) / 86400000) + 1
+}
+
+function normalizeHexColor(value, fallback = LAB_DEFAULT_COLOR) {
+  const raw = String(value || '').trim()
+  return /^#[0-9a-fA-F]{6}$/.test(raw) ? raw : fallback
+}
+
+function hexToRgba(hex, alpha) {
+  const normalized = normalizeHexColor(hex)
+  const base = normalized.slice(1)
+  const r = Number.parseInt(base.slice(0, 2), 16)
+  const g = Number.parseInt(base.slice(2, 4), 16)
+  const b = Number.parseInt(base.slice(4, 6), 16)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
+function inspectorThemeForStatus(selected) {
+  if (selected.source === 'manual') {
+    const manualColor = normalizeHexColor(selected.color, LAB_DEFAULT_COLOR)
+    return {
+      accent: manualColor,
+      accentSoft: hexToRgba(manualColor, 0.3),
+      accentSurface: hexToRgba(manualColor, 0.16),
+      accentBorder: hexToRgba(manualColor, 0.42)
+    }
+  }
+
+  const palettes = {
+    S3: { accent: '#c56b1f', accentSoft: 'rgba(197, 107, 31, 0.3)', accentSurface: 'rgba(255, 233, 205, 0.96)', accentBorder: 'rgba(197, 107, 31, 0.42)' },
+    S4: { accent: '#d89418', accentSoft: 'rgba(216, 148, 24, 0.32)', accentSurface: 'rgba(255, 244, 201, 0.96)', accentBorder: 'rgba(216, 148, 24, 0.44)' },
+    S5: { accent: '#00a7c4', accentSoft: 'rgba(0, 167, 196, 0.34)', accentSurface: 'rgba(220, 250, 255, 0.98)', accentBorder: 'rgba(0, 167, 196, 0.48)' },
+    S6: { accent: '#4667c8', accentSoft: 'rgba(70, 103, 200, 0.3)', accentSurface: 'rgba(226, 233, 255, 0.97)', accentBorder: 'rgba(70, 103, 200, 0.42)' },
+    S7: { accent: '#2b9a43', accentSoft: 'rgba(43, 154, 67, 0.34)', accentSurface: 'rgba(224, 250, 228, 0.97)', accentBorder: 'rgba(43, 154, 67, 0.46)' },
+    Cancelled: { accent: '#bc4a5f', accentSoft: 'rgba(188, 74, 95, 0.3)', accentSurface: 'rgba(255, 225, 232, 0.96)', accentBorder: 'rgba(188, 74, 95, 0.42)' }
+  }
+
+  return palettes[selected.status] || {
+    accent: '#4677c8',
+    accentSoft: 'rgba(70, 119, 200, 0.3)',
+    accentSurface: 'rgba(226, 238, 255, 0.97)',
+    accentBorder: 'rgba(70, 119, 200, 0.42)'
+  }
+}
+
 function statusBadgeClass(status) {
   const s = String(status || '')
   if (s === 'Manual') return 'badge status-manual'
-  if (s === 'QA Plan') return 'badge status-s3'
   if (s === 'S7') return 'badge status-s7'
   if (s === 'S6') return 'badge status-s6'
   if (s === 'S5') return 'badge status-s5'
@@ -98,50 +146,15 @@ function statusBadgeClass(status) {
   return 'badge status-default'
 }
 
-function setNotice(el, message, type = 'info') {
-  if (!el) return
-  el.textContent = message || ''
-  el.classList.remove('notice-success', 'notice-error')
-  if (type === 'success') el.classList.add('notice-success')
-  if (type === 'error') el.classList.add('notice-error')
-}
-
-function parseQaNamesInput(rawValue) {
-  const raw = String(rawValue || '').trim()
-  if (!raw) return []
-  return [...new Set(raw.split(/[,\n]+/).map((x) => x.trim()).filter(Boolean))]
-}
-
-function getActiveQaByProjectKey() {
-  const map = new Map()
-  for (const item of state.qaAssignments || []) {
-    const projectKey = String(item.projectKey || '').trim()
-    const qaName = String(item.qaName || '').trim()
-    if (!projectKey || !qaName) continue
-    if (!map.has(projectKey)) map.set(projectKey, [])
-    map.get(projectKey).push(item)
-  }
-  return map
-}
-
-function syncManualColorUi(colorValue) {
-  const normalized = /^#[0-9a-fA-F]{6}$/.test(String(colorValue || '').trim()) ? String(colorValue || '').trim().toLowerCase() : DEFAULT_MANUAL_COLOR
-  const input = document.getElementById('manualColorInput')
-  if (input && input.value.toLowerCase() !== normalized) input.value = normalized
-  document.querySelectorAll('.manual-color-chip').forEach((chip) => {
-    chip.classList.toggle('active', String(chip.getAttribute('data-color') || '').toLowerCase() === normalized)
-  })
-}
-
 function buildMultiFilter(hostId, selected, options, searchText, placeholder, onChange, onSearch) {
   const host = document.getElementById(hostId)
-  const filtered = (options || []).filter((v) => String(v).toLowerCase().includes(searchText.toLowerCase()))
+  const filtered = (options || []).filter((value) => String(value).toLowerCase().includes(searchText.toLowerCase()))
   const label = selected.length ? `${selected[0]}${selected.length > 1 ? ` +${selected.length - 1}` : ''}` : placeholder
 
   host.innerHTML = `
-    <button class="multi-trigger" type="button"><span class="value">${esc(label)}</span><span class="muted">▾</span></button>
+    <button class="multi-trigger" type="button"><span class="value">${esc(label)}</span><span class="muted">▼</span></button>
     <div class="multi-panel">
-      <div class="multi-search"><input data-role="search" value="${esc(searchText)}" placeholder="ค้นหา" /></div>
+      <div class="multi-search"><input data-role="search" value="${esc(searchText)}" placeholder="ค้นหา status" /></div>
       <div class="multi-options">
         ${filtered.map((value) => `
           <label class="multi-option"><input type="checkbox" value="${esc(value)}" ${selected.includes(value) ? 'checked' : ''} /><span>${esc(value)}</span></label>
@@ -154,12 +167,12 @@ function buildMultiFilter(hostId, selected, options, searchText, placeholder, on
     </div>
   `
 
-  host.querySelector('.multi-trigger').addEventListener('click', (e) => {
-    e.stopPropagation()
+  host.querySelector('.multi-trigger').addEventListener('click', (event) => {
+    event.stopPropagation()
     host.classList.toggle('open')
   })
-  host.querySelector('[data-role="search"]').addEventListener('input', (e) => {
-    onSearch(e.target.value || '')
+  host.querySelector('[data-role="search"]').addEventListener('input', (event) => {
+    onSearch(event.target.value || '')
     host.classList.add('open')
   })
   host.querySelectorAll('input[type="checkbox"]').forEach((el) => {
@@ -179,16 +192,15 @@ function buildMultiFilter(hostId, selected, options, searchText, placeholder, on
 
 function buildStatusFilter() {
   buildMultiFilter(
-    'calendarStatusFilter',
+    'labStatusFilter',
     state.filters.status,
     state.statusOptions,
     state.statusSearch,
     'เลือก Status',
     (next) => {
       state.filters.status = next
-      state.timelineVisibleCount = 30
+      renderAll()
       buildStatusFilter()
-      renderTimeline()
     },
     (nextSearch) => {
       state.statusSearch = nextSearch
@@ -197,228 +209,358 @@ function buildStatusFilter() {
   )
 }
 
-function buildQaStatusFilter() {
-  buildMultiFilter(
-    'qaStatusFilter',
-    state.qa.status,
-    state.qa.statusOptions,
-    state.qa.statusSearch,
-    'เลือก Status (S3-S6)',
-    (next) => {
-      state.qa.status = next
-      buildQaStatusFilter()
-      renderQaProjectList()
-      renderQaCounter()
-    },
-    (nextSearch) => {
-      state.qa.statusSearch = nextSearch
-      buildQaStatusFilter()
-    }
-  )
+function buildManualEvents() {
+  return (state.plans || []).map((item) => ({
+    id: item.id,
+    key: item.key || '-',
+    title: item.title,
+    status: 'Manual',
+    owner: item.owner || '-',
+    squad: item.owner || '-',
+    start: item.start,
+    end: item.end,
+    note: item.note || '',
+    sprint: item.sprint || '',
+    color: item.color || LAB_DEFAULT_COLOR,
+    source: 'manual'
+  }))
 }
 
-function enumerateEvents() {
-  const jiraParents = (state.dashboard?.parents || []).map((row) => {
-    const timeline = (state.dashboard.timelineItems || []).find((x) => x.key === row.parent.key)
+function buildProjectEvents() {
+  if (!state.dashboard) return []
+  const timelineByKey = new Map((state.dashboard.timelineItems || []).map((item) => [item.key, item]))
+  return (state.dashboard.parents || []).map((row) => {
+    const timeline = timelineByKey.get(row.parent.key)
     if (!timeline) return null
     return {
       id: row.parent.key,
       key: row.parent.key,
-      title: row.parent.summary,
-      status: row.parent.status,
-      squad: row.parent.squad,
+      title: row.parent.summary || '',
+      status: row.parent.status || '',
+      owner: row.parent.assignee || '-',
+      squad: row.parent.squad || '-',
       start: timeline.start,
       end: timeline.end,
-      source: 'parent',
-      url: row.parent.browseUrl
+      note: row.parent.summary || '',
+      sprint: row.parent.estimateSprint || row.parent.sprint || '',
+      source: 'project',
+      url: row.parent.browseUrl || ''
     }
   }).filter(Boolean)
-
-  const manual = (state.plans || []).map((x) => ({
-    id: x.id,
-    key: x.key || '-',
-    title: x.title,
-    status: 'Manual',
-    squad: x.owner || '-',
-    start: x.start,
-    end: x.end,
-    color: x.color || '#b66a00',
-    source: 'manual',
-    url: ''
-  }))
-  return [...jiraParents, ...manual]
 }
 
-function filteredEvents() {
+function getVisibleEvents() {
   const { start, end } = getTwoMonthRange()
-  const q = state.filters.q.toLowerCase().trim()
-  return enumerateEvents().filter((e) => {
-    if (!overlaps(e.start, e.end, start, end)) return false
-    if (state.filters.status.length && !state.filters.status.includes(e.status)) return false
-    if (q) {
-      const blob = `${e.key} ${e.title} ${e.status} ${e.squad}`.toLowerCase()
-      if (!blob.includes(q)) return false
-    }
-    return true
+  const q = state.search.trim().toLowerCase()
+  const pool = [...buildManualEvents(), ...(state.includeProjects ? buildProjectEvents() : [])]
+  return pool.filter((item) => overlaps(item.start, item.end, start, end)).filter((item) => {
+    if (state.filters.status.length && !state.filters.status.includes(item.status)) return false
+    if (!q) return true
+    const haystack = `${item.key} ${item.title} ${item.owner} ${item.note} ${item.squad} ${item.status}`.toLowerCase()
+    return haystack.includes(q)
+  }).sort((a, b) => {
+    if (a.start !== b.start) return String(a.start || '').localeCompare(String(b.start || ''))
+    if (a.source !== b.source) return a.source === 'manual' ? -1 : 1
+    return String(a.title || '').localeCompare(String(b.title || ''))
   })
 }
 
-function renderTimeline() {
+function getSelectedEvent(events) {
+  const selected = events.find((item) => item.id === state.selectedEventId)
+  if (selected) return selected
+  const fallback = events[0] || null
+  state.selectedEventId = fallback?.id || ''
+  return fallback
+}
+
+async function saveManualPlan(payload, editingId = '') {
+  const body = editingId ? { ...payload, id: editingId } : payload
+  const response = await fetch('/api/planner', {
+    method: editingId ? 'PUT' : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  })
+  const data = await response.json()
+  if (data.error) throw new Error(data.error)
+  return data
+}
+
+function renderSummary(events) {
+  const { start, end } = getTwoMonthRange()
+  const message = `${events.length} items | ${start} ถึง ${end} | ${state.includeProjects ? (state.dashboardLoaded ? 'projects loaded' : 'loading projects...') : 'manual fast path'}`
+  document.getElementById('labSummary').textContent = message
+  document.getElementById('labModeTag').textContent = `Mode: ${state.includeProjects ? 'Manual + Projects' : 'Manual only'}`
+}
+
+function renderTimeline(events) {
+  const host = document.getElementById('labTimeline')
+  if (!events.length) {
+    host.innerHTML = '<div class="empty">ไม่พบรายการในช่วงเวลาหรือคำค้นที่เลือก</div>'
+    return
+  }
+
   const { start, end } = getTwoMonthRange()
   const startDate = new Date(`${start}T00:00:00Z`)
   const endDate = new Date(`${end}T00:00:00Z`)
   const days = Math.floor((endDate - startDate) / 86400000) + 1
-  const allEvents = filteredEvents().sort((a, b) => (a.start || '').localeCompare(b.start || ''))
-  const visibleCount = Math.min(state.timelineVisibleCount, allEvents.length)
-  const events = allEvents.slice(0, visibleCount)
   const todayIso = toBangkokIsoDate(new Date())
   const todayDate = new Date(`${todayIso}T00:00:00Z`)
-  const todayVisible = todayDate >= startDate && todayDate <= endDate
-  const todayOffset = todayVisible ? Math.floor((todayDate - startDate) / 86400000) : -1
+  const todayOffset = todayDate >= startDate && todayDate <= endDate ? Math.floor((todayDate - startDate) / 86400000) : -1
 
-  const dayHeaders = Array.from({ length: days }, (_, i) => {
+  const weekCells = []
+  let cursor = 0
+  while (cursor < days) {
     const d = new Date(startDate.getTime())
-    d.setUTCDate(d.getUTCDate() + i)
-    return `<div class="day-cell ${todayVisible && i === todayOffset ? 'today-cell' : ''}" style="grid-column:${i + 2};grid-row:1;">${d.getUTCDate()}</div>`
+    d.setUTCDate(d.getUTCDate() + cursor)
+    const weekday = (d.getUTCDay() + 6) % 7
+    const span = Math.min(7 - weekday, days - cursor)
+    const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
+    weekCells.push(`<div class="planner-lab-week" style="grid-column:${cursor + 1} / span ${span}">Week of ${esc(label)}</div>`)
+    cursor += span
+  }
+
+  const dayHeaders = Array.from({ length: days }, (_, index) => {
+    const d = new Date(startDate.getTime())
+    d.setUTCDate(d.getUTCDate() + index)
+    const weekend = d.getUTCDay() === 0 || d.getUTCDay() === 6
+    const weekdayLabel = d.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' }).slice(0, 2)
+    return `
+      <div class="planner-lab-day ${weekend ? 'is-weekend' : ''} ${todayOffset === index ? 'is-today' : ''}" style="grid-column:${index + 1}">
+        <span>${weekdayLabel}</span>
+        <strong>${d.getUTCDate()}</strong>
+      </div>
+    `
   }).join('')
 
-  const qaByProject = getActiveQaByProjectKey()
-  const rows = events.map((e) => {
-    const qaRows = e.source === 'parent' ? (qaByProject.get(e.key) || []) : []
-    const qaNames = [...new Set(qaRows.map((x) => String(x.qaName || '').trim()).filter(Boolean))]
-    const eventStart = new Date(`${e.start}T00:00:00Z`)
-    const eventEnd = new Date(`${e.end}T00:00:00Z`)
+  const rows = events.map((item) => {
+    const eventStart = new Date(`${item.start}T00:00:00Z`)
+    const eventEnd = new Date(`${item.end}T00:00:00Z`)
     const clampedStart = eventStart < startDate ? startDate : eventStart
     const clampedEnd = eventEnd > endDate ? endDate : eventEnd
     const startOffset = Math.floor((clampedStart - startDate) / 86400000)
     const endOffset = Math.floor((clampedEnd - startDate) / 86400000)
-    const startColumn = startOffset + 2
-    const endColumn = endOffset + 3
-    const barClass = e.source === 'manual' ? 'bar-manual' : 'bar-parent'
-    const manualStyle = e.source === 'manual' ? `background:${esc(e.color || DEFAULT_MANUAL_COLOR)};` : ''
-    const rangeText = `${e.start} - ${e.end}`
-    const hoverText = `${e.title}\n${rangeText}`
-    const isProjectLike = e.source === 'parent'
-    const itemLabel = isProjectLike ? `${e.key}${e.squad ? ` (${e.squad})` : ''}` : e.title
-    const qaHoverText = qaNames.length ? `QA Plan: ${qaNames.join(', ')}\n${rangeText}` : ''
+    const startColumn = startOffset + 1
+    const span = Math.max(1, endOffset - startOffset + 1)
+    const isSelected = item.id === state.selectedEventId
+    const barStyle = item.source === 'manual'
+      ? `style="grid-column:${startColumn} / span ${span};--lab-bar:${esc(item.color || LAB_DEFAULT_COLOR)}"`
+      : `style="grid-column:${startColumn} / span ${span}"`
+    const barLabel = item.key && item.key !== '-' ? `${item.key} : ${item.title}` : item.title
 
     return `
-      <div class="timeline-row calendar-row-compact ${qaNames.length ? 'has-qa' : ''}" style="grid-template-columns:240px repeat(${days}, minmax(14px, 1fr));">
-        <div class="row-label" style="grid-column:1;grid-row:1;">
-          <div style="display:flex;justify-content:space-between;gap:6px;align-items:center">
-            <strong>${e.url ? `<a href="${esc(e.url)}" target="_blank" title="${esc(hoverText)}">${esc(itemLabel)}</a>` : `<span title="${esc(hoverText)}">${esc(itemLabel)}</span>`}</strong>
-            <span class="${statusBadgeClass(e.status)}" style="padding:2px 8px">${esc(e.status)}</span>
-          </div>
-          <div class="calendar-item-summary">${esc(e.title || '-')}</div>
+      <div class="planner-lab-row ${isSelected ? 'selected' : ''}">
+        <div class="planner-lab-track" style="grid-template-columns:repeat(${days}, minmax(22px, 1fr))">
+          ${Array.from({ length: days }, (_, dayIndex) => {
+            const date = new Date(startDate.getTime())
+            date.setUTCDate(date.getUTCDate() + dayIndex)
+            const weekend = date.getUTCDay() === 0 || date.getUTCDay() === 6
+            return `<div class="planner-lab-track-day ${weekend ? 'is-weekend' : ''}"></div>`
+          }).join('')}
+          ${todayOffset >= 0 ? `<div class="planner-lab-today-column" style="left:calc((100% / ${days}) * ${todayOffset});width:calc(100% / ${days});"></div>` : ''}
+          <button class="planner-lab-bar ${item.source === 'manual' ? 'manual' : 'project'} ${isSelected ? 'selected' : ''}" type="button" data-event-id="${esc(item.id)}" ${barStyle}><span>${esc(barLabel)}</span></button>
         </div>
-        ${Array.from({ length: days }, (_, i) => `<div class="row-day ${todayVisible && i === todayOffset ? 'today-day' : ''}" style="grid-column:${i + 2};grid-row:1;"></div>`).join('')}
-        <div class="event-bar grid-bar ${barClass}" style="grid-column:${startColumn} / ${endColumn};grid-row:1;${manualStyle}" title="${esc(hoverText)}">${esc(e.key)}</div>
-        ${qaNames.length ? `<div class="event-bar grid-bar bar-qa event-bar-secondary" style="grid-column:${startColumn} / ${endColumn};grid-row:1;" title="${esc(qaHoverText)}">${esc(qaNames.join(', '))}</div>` : ''}
       </div>
     `
   }).join('')
 
-  document.getElementById('timelineGrid').innerHTML = `
-    <div class="timeline-head calendar-row-compact" style="grid-template-columns:240px repeat(${days}, minmax(14px, 1fr));position:relative;">
-      <div class="time-label" style="grid-column:1;grid-row:1;"><strong>Item</strong><div style="font-size:10px;color:var(--muted)">${start} ถึง ${end}</div></div>
-      ${dayHeaders}
+  host.innerHTML = `
+    <div class="planner-lab-timeline-shell">
+      <div class="planner-lab-head" style="grid-template-columns:repeat(${days}, minmax(22px, 1fr))">
+        ${weekCells.join('')}
+        ${dayHeaders}
+      </div>
+      <div class="planner-lab-body">${rows}</div>
     </div>
-    ${rows || '<div class="empty">ไม่พบข้อมูลตามเงื่อนไข</div>'}
   `
 
-  document.getElementById('calendarSummary').textContent = `แสดง ${events.length}/${allEvents.length} รายการ | ช่วงวันที่ ${start} ถึง ${end} | Source: ${state.source || '-'}`
+  host.querySelectorAll('[data-event-id]').forEach((node) => {
+    node.addEventListener('click', () => {
+      state.selectedEventId = node.getAttribute('data-event-id') || ''
+      renderAll()
+    })
+  })
+}
 
-  const controls = document.getElementById('timelineControls')
-  if (!controls) return
-  if (visibleCount < allEvents.length) {
-    controls.innerHTML = `<button id="loadMoreTimelineBtn" class="btn" type="button">Load more (${allEvents.length - visibleCount} remaining)</button>`
-    document.getElementById('loadMoreTimelineBtn').addEventListener('click', () => {
-      state.timelineVisibleCount += 30
-      renderTimeline()
+function renderInspector(selected) {
+  const host = document.getElementById('labInspector')
+  if (!selected) {
+    host.innerHTML = '<div class="empty">เลือกรายการจาก timeline เพื่อดูรายละเอียด</div>'
+    return
+  }
+
+  const isEditingInline = selected.source === 'manual' && state.inspectorEditingId === selected.id
+  const theme = inspectorThemeForStatus(selected)
+  const themeStyle = `style="--inspector-accent:${esc(theme.accent)};--inspector-accent-soft:${esc(theme.accentSoft)};--inspector-surface:${esc(theme.accentSurface)};--inspector-border:${esc(theme.accentBorder)}"`
+  if (isEditingInline) {
+    host.innerHTML = `
+      <div class="planner-lab-inspector-card manual" ${themeStyle}>
+        <div class="planner-lab-inspector-top">
+          <div>
+            <div class="planner-lab-inspector-key">${esc(selected.key || '-')}</div>
+            <div class="planner-lab-inspector-title">Edit Manual Plan</div>
+          </div>
+          <span class="${statusBadgeClass(selected.status)}">${esc(selected.status)}</span>
+        </div>
+        <form id="labInspectorForm" class="planner-lab-inspector-form">
+          <label class="field"><span>Project Title *</span><input name="title" value="${esc(selected.title || '')}" required /></label>
+          <label class="field"><span>Key</span><input name="key" value="${esc(selected.key === '-' ? '' : (selected.key || ''))}" /></label>
+          <label class="field"><span>Owner</span><input name="owner" value="${esc(selected.owner || '')}" /></label>
+          <label class="field"><span>Sprint</span><input name="sprint" value="${esc(selected.sprint || '')}" /></label>
+          <label class="field"><span>Start Date *</span><input type="date" name="start" value="${esc(selected.start || '')}" required /></label>
+          <label class="field"><span>End Date *</span><input type="date" name="end" value="${esc(selected.end || '')}" required /></label>
+          <label class="field full"><span>Color</span><input type="color" name="color" value="${esc(selected.color || LAB_DEFAULT_COLOR)}" /></label>
+          <label class="field full"><span>Note</span><textarea name="note">${esc(selected.note || '')}</textarea></label>
+          <div class="planner-lab-inspector-actions">
+            <button class="btn primary" type="submit">บันทึก</button>
+            <button class="btn" type="button" id="labInspectorCancelBtn">ยกเลิก</button>
+            <span id="labInspectorStatus" class="notice"></span>
+          </div>
+        </form>
+      </div>
+    `
+
+    document.getElementById('labInspectorCancelBtn')?.addEventListener('click', () => {
+      state.inspectorEditingId = ''
+      renderAll()
     })
-  } else if (allEvents.length > 30) {
-    controls.innerHTML = `<button id="showLessTimelineBtn" class="btn" type="button">Show less</button>`
-    document.getElementById('showLessTimelineBtn').addEventListener('click', () => {
-      state.timelineVisibleCount = 30
-      renderTimeline()
+
+    document.getElementById('labInspectorForm')?.addEventListener('submit', async (event) => {
+      event.preventDefault()
+      const status = document.getElementById('labInspectorStatus')
+      setNotice(status, 'กำลังบันทึก...')
+      try {
+        const payload = Object.fromEntries(new FormData(event.currentTarget).entries())
+        await saveManualPlan(payload, selected.id)
+        state.inspectorEditingId = ''
+        await loadManualPlans()
+        renderAll()
+      } catch (error) {
+        setNotice(status, `ไม่สำเร็จ: ${error.message || error}`, 'error')
+      }
     })
-  } else {
-    controls.innerHTML = ''
+    return
+  }
+
+  host.innerHTML = `
+    <div class="planner-lab-inspector-card ${selected.source}" ${themeStyle}>
+      <div class="planner-lab-inspector-top">
+        <div>
+          <div class="planner-lab-inspector-key">${esc(selected.key || '-')}</div>
+          <div class="planner-lab-inspector-title">${esc(selected.title)}</div>
+        </div>
+        <span class="${statusBadgeClass(selected.status)}">${esc(selected.status)}</span>
+      </div>
+      <div class="planner-lab-inspector-note planner-lab-inspector-note-compact">${esc(formatThaiDate(selected.start))} - ${esc(formatThaiDate(selected.end))} | ${esc(String(durationDays(selected.start, selected.end)))} วัน | ${esc(selected.source === 'manual' ? (selected.owner || '-') : (selected.squad || '-'))}</div>
+      <div class="planner-lab-inspector-grid">
+        <div><span>Source</span><strong>${esc(selected.source)}</strong></div>
+        <div><span>Duration</span><strong>${esc(String(durationDays(selected.start, selected.end)))} วัน</strong></div>
+        <div><span>Start</span><strong>${esc(formatThaiDate(selected.start))}</strong></div>
+        <div><span>End</span><strong>${esc(formatThaiDate(selected.end))}</strong></div>
+        <div><span>Owner / Squad</span><strong>${esc(selected.source === 'manual' ? (selected.owner || '-') : (selected.squad || '-'))}</strong></div>
+        <div><span>Sprint</span><strong>${esc(selected.sprint || '-')}</strong></div>
+      </div>
+      <div class="planner-lab-inspector-note">${esc(selected.note || 'ไม่มี note เพิ่มเติม')}</div>
+      <div class="planner-lab-inspector-actions">
+        ${selected.source === 'manual' ? `<button class="btn" type="button" id="labInspectorEditBtn">แก้ไขแผนงาน</button>` : ''}
+        ${selected.url ? `<a class="btn primary" href="${esc(selected.url)}" target="_blank" rel="noopener noreferrer">Open Jira</a>` : ''}
+      </div>
+    </div>
+  `
+
+  if (selected.source === 'manual') {
+    const editBtn = document.getElementById('labInspectorEditBtn')
+    editBtn?.addEventListener('click', () => {
+      state.inspectorEditingId = selected.id
+      renderAll()
+    })
   }
 }
 
 function setEditMode(item) {
-  const form = document.getElementById('planForm')
-  const saveBtn = document.getElementById('savePlanBtn')
-  const cancelBtn = document.getElementById('cancelEditBtn')
-  const modeLabel = document.getElementById('editModeLabel')
+  const form = document.getElementById('labPlanForm')
+  const cancelBtn = document.getElementById('labCancelBtn')
+  const saveBtn = document.getElementById('labSaveBtn')
+
   if (!item) {
     state.editingId = ''
     form.reset()
-    form.elements.color.value = DEFAULT_MANUAL_COLOR
-    syncManualColorUi(DEFAULT_MANUAL_COLOR)
-    saveBtn.textContent = 'บันทึกแผนงาน'
+    form.elements.color.value = LAB_DEFAULT_COLOR
     cancelBtn.style.display = 'none'
-    modeLabel.style.display = 'none'
+    saveBtn.textContent = 'บันทึกแผนงาน'
     return
   }
+
   state.editingId = item.id
   form.elements.title.value = item.title || ''
   form.elements.key.value = item.key || ''
-  form.elements.sprint.value = item.sprint || ''
+  form.elements.owner.value = item.owner || ''
   form.elements.start.value = item.start || ''
   form.elements.end.value = item.end || ''
-  form.elements.owner.value = item.owner || ''
-  form.elements.color.value = item.color || DEFAULT_MANUAL_COLOR
-  syncManualColorUi(item.color || DEFAULT_MANUAL_COLOR)
+  form.elements.color.value = item.color || LAB_DEFAULT_COLOR
+  form.elements.sprint.value = item.sprint || ''
   form.elements.note.value = item.note || ''
-  saveBtn.textContent = 'อัปเดตแผนงาน'
   cancelBtn.style.display = ''
-  modeLabel.style.display = ''
+  saveBtn.textContent = 'อัปเดตแผนงาน'
 }
 
 function renderManualList() {
-  const list = document.getElementById('manualList')
+  const host = document.getElementById('labManualList')
   if (!state.plans.length) {
-    list.innerHTML = '<div class="empty">ยังไม่มีรายการ Manual</div>'
+    host.innerHTML = '<div class="empty">ยังไม่มี Manual plan ในช่วงเวลาที่เลือก</div>'
     return
   }
-  list.innerHTML = state.plans.map((item) => `
-    <div class="item-row">
-      <div class="item-top"><div><strong>${esc(item.key || '-')}</strong> ${esc(item.title)}</div><div class="badge status-default">${esc(item.start)} - ${esc(item.end)}</div></div>
-      <div class="item-meta">Owner: ${esc(item.owner || '-')} | Sprint: ${esc(item.sprint || '-')} | <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:999px;background:${esc(item.color || DEFAULT_MANUAL_COLOR)};display:inline-block;border:1px solid rgba(0,0,0,0.12)"></span>Timeline Color</span></div>
+
+  host.innerHTML = state.plans.map((item) => `
+    <div class="item-row planner-lab-manual-card">
+      <div class="item-top">
+        <div><strong>${esc(item.key || '-')}</strong> ${esc(item.title)}</div>
+        <span class="badge status-default">${esc(item.start)} - ${esc(item.end)}</span>
+      </div>
+      <div class="item-meta">Owner: ${esc(item.owner || '-')} | Sprint: ${esc(item.sprint || '-')} | ${esc(durationDays(item.start, item.end))} วัน</div>
       <div class="item-meta">${esc(item.note || '')}</div>
-      <div style="display:flex;gap:8px;margin-top:6px">
-        <button class="btn" data-action="edit" data-id="${esc(item.id)}">แก้ไข</button>
-        <button class="btn" data-action="delete" data-id="${esc(item.id)}">ลบ</button>
+      <div class="planner-lab-manual-foot">
+        <span class="planner-lab-color-chip" style="background:${esc(item.color || LAB_DEFAULT_COLOR)}"></span>
+        <div class="planner-lab-manual-actions">
+          <button class="btn" type="button" data-action="select" data-id="${esc(item.id)}">ดูบน timeline</button>
+          <button class="btn" type="button" data-action="edit" data-id="${esc(item.id)}">แก้ไข</button>
+          <button class="btn" type="button" data-action="delete" data-id="${esc(item.id)}">ลบ</button>
+        </div>
       </div>
     </div>
   `).join('')
 
-  list.querySelectorAll('button[data-action="edit"]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const id = btn.getAttribute('data-id')
-      const item = state.plans.find((x) => x.id === id)
+  host.querySelectorAll('button[data-action="select"]').forEach((button) => {
+    button.addEventListener('click', () => {
+      state.selectedEventId = button.getAttribute('data-id') || ''
+      renderAll()
+    })
+  })
+
+  host.querySelectorAll('button[data-action="edit"]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const id = button.getAttribute('data-id')
+      const item = state.plans.find((plan) => plan.id === id)
       if (item) setEditMode(item)
     })
   })
 
-  list.querySelectorAll('button[data-action="delete"]').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const id = btn.getAttribute('data-id')
+  host.querySelectorAll('button[data-action="delete"]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const id = button.getAttribute('data-id')
       if (!id || !confirm('ยืนยันลบรายการนี้?')) return
-      const status = document.getElementById('planStatus')
+      const status = document.getElementById('labFormStatus')
       setNotice(status, 'กำลังลบ...')
       try {
-        const res = await fetch('/api/planner', {
+        const response = await fetch('/api/planner', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id })
         })
-        const data = await res.json()
+        const data = await response.json()
         if (data.error) throw new Error(data.error)
         setNotice(status, 'ลบเรียบร้อย', 'success')
-        await loadAll()
+        await loadManualPlans()
+        renderAll()
       } catch (error) {
         setNotice(status, `ลบไม่สำเร็จ: ${error.message || error}`, 'error')
       }
@@ -426,275 +568,126 @@ function renderManualList() {
   })
 }
 
-function getQaCandidates() {
-  const q = state.qa.q.toLowerCase().trim()
-  return (state.dashboard?.parents || []).filter((row) => {
-    const status = row.parent.status
-    if (!['S3', 'S4', 'S5', 'S6'].includes(status)) return false
-    if (state.qa.status.length && !state.qa.status.includes(status)) return false
-    if (!q) return true
-    return `${row.parent.key} ${row.parent.summary} ${row.parent.squad}`.toLowerCase().includes(q)
-  })
+async function loadManualPlans() {
+  const { start, end } = getTwoMonthRange()
+  const response = await fetch(`/api/planner?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}&entityType=manual`)
+  const data = await response.json()
+  if (data.error) throw new Error(data.error)
+  state.plans = Array.isArray(data.items) ? data.items : []
+  document.getElementById('labSync').textContent = `Manual synced ${new Date().toLocaleString('th-TH')}`
 }
 
-function renderQaProjectList() {
-  const host = document.getElementById('qaProjectList')
-  const rows = getQaCandidates()
-  if (!rows.length) {
-    host.innerHTML = '<div class="empty">ไม่พบโปรเจ็คตามเงื่อนไข</div>'
-    return
-  }
-  host.innerHTML = rows.map((row) => {
-    const checked = state.qa.selectedKeys.has(row.parent.key) ? 'checked' : ''
-    return `
-      <label class="item-row" style="display:flex;gap:8px;align-items:flex-start">
-        <input type="checkbox" data-role="qa-pick" data-key="${esc(row.parent.key)}" ${checked} />
-        <div>
-          <div><strong>${esc(row.parent.key)}</strong> ${esc(row.parent.summary || '')}</div>
-          <div class="item-meta">Status: ${esc(row.parent.status || '-')} | Squad: ${esc(row.parent.squad || '-')}</div>
-        </div>
-      </label>
-    `
-  }).join('')
-}
-
-function renderQaAssignmentList() {
-  const host = document.getElementById('qaAssignmentList')
-  if (!state.qaAssignments.length) {
-    host.innerHTML = '<div class="empty">ยังไม่มี QA Assignment</div>'
-    return
-  }
-  host.innerHTML = state.qaAssignments.map((item) => `
-    <div class="item-row">
-      <div class="item-top">
-        <div><strong>${esc(item.projectKey)}</strong> ${esc(item.projectTitle || '')}</div>
-        <div class="badge b-status">${esc(item.qaName || '-')}</div>
-      </div>
-      <div class="item-meta">Status: ${esc(item.status || '-')} | Assigned: ${esc(item.assignedAt || '-')}</div>
-      <div style="display:flex;gap:8px;margin-top:6px">
-        <input data-role="qa-reassign-input" data-id="${esc(item.id)}" class="search" style="max-width:220px;padding:6px 10px" placeholder="ชื่อ QA คนใหม่" />
-        <button class="btn" data-action="qa-reassign" data-id="${esc(item.id)}">Re-assign</button>
-        <button class="btn" data-action="qa-delete" data-id="${esc(item.id)}">ลบ Assign</button>
-      </div>
-    </div>
-  `).join('')
-
-  host.querySelectorAll('button[data-action="qa-reassign"]').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const id = btn.getAttribute('data-id')
-      const row = btn.closest('.item-row')
-      const input = row ? row.querySelector('input[data-role="qa-reassign-input"]') : null
-      const qaName = String(input?.value || '').trim()
-      if (!id || !qaName) return
-      await updateQaAssignment(id, qaName)
-    })
-  })
-
-  host.querySelectorAll('button[data-action="qa-delete"]').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const id = btn.getAttribute('data-id')
-      if (!id || !confirm('ยืนยันลบการ assign นี้?')) return
-      const status = document.getElementById('qaAssignStatus')
-      setNotice(status, 'กำลังลบ assignment...')
-      try {
-        const res = await fetch('/api/qa-plan', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id })
-        })
-        const data = await res.json()
-        if (data.error) throw new Error(data.error)
-        setNotice(status, 'ลบ assignment แล้ว', 'success')
-        await loadAll()
-      } catch (error) {
-        setNotice(status, `ลบไม่สำเร็จ: ${error.message || error}`, 'error')
-      }
-    })
-  })
-}
-
-function renderQaCounter() {
-  const active = (state.qaAssignments || []).filter((x) => ['S3', 'S4', 'S5', 'S6'].includes(String(x.status || '').toUpperCase()))
-  const uniqueQa = [...new Set(active.map((x) => String(x.qaName || '').trim()).filter(Boolean))]
-  document.getElementById('qaCounter').textContent = `QA Assigned (S3-S6): ${uniqueQa.length} คน | รายการ: ${active.length}`
-}
-
-async function updateQaAssignment(id, qaName) {
-  const status = document.getElementById('qaAssignStatus')
-  setNotice(status, 'กำลัง re-assign...')
+async function ensureDashboardLoaded() {
+  if (state.dashboardLoaded || state.loadingProjects) return
+  state.loadingProjects = true
+  document.getElementById('labModeTag').textContent = 'Mode: Loading projects...'
   try {
-    const res = await fetch('/api/qa-plan', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, qaName })
-    })
-    const data = await res.json()
+    const response = await fetch('/api/dashboard')
+    const data = await response.json()
     if (data.error) throw new Error(data.error)
-    setNotice(status, 'Re-assign สำเร็จ', 'success')
-    await loadAll()
-  } catch (error) {
-    setNotice(status, `Re-assign ไม่สำเร็จ: ${error.message || error}`, 'error')
+    state.dashboard = data
+    state.dashboardLoaded = true
+    const jiraStatuses = data.meta?.available?.statuses || []
+    state.statusOptions = ['Manual', ...jiraStatuses.filter((status) => status !== 'Manual')]
+    if (state.filters.status.length === 1 && state.filters.status[0] === 'Manual' && state.includeProjects) {
+      state.filters.status = ['Manual']
+    }
+    buildStatusFilter()
+  } finally {
+    state.loadingProjects = false
   }
 }
 
-function switchTab(tab) {
-  state.activeTab = tab
-  document.getElementById('tabManual').style.display = tab === 'manual' ? '' : 'none'
-  document.getElementById('tabQa').style.display = tab === 'qa' ? '' : 'none'
-  document.getElementById('tabManualBtn').classList.toggle('active', tab === 'manual')
-  document.getElementById('tabQaBtn').classList.toggle('active', tab === 'qa')
+function renderAll() {
+  const events = getVisibleEvents()
+  const selected = getSelectedEvent(events)
+  renderSummary(events)
+  renderTimeline(events)
+  renderInspector(selected)
+  renderManualList()
+  document.getElementById('labManualOnlyBtn').classList.toggle('primary', !state.includeProjects)
+  document.getElementById('labBlendBtn').classList.toggle('primary', state.includeProjects)
 }
 
-async function loadAll() {
-  const [dashboardRes, plannerRes, qaRes] = await Promise.all([fetch('/api/dashboard'), fetch('/api/planner'), fetch('/api/qa-plan')])
-  const dashboard = await dashboardRes.json()
-  const planner = await plannerRes.json()
-  const qa = await qaRes.json()
-  if (dashboard.error) throw new Error(dashboard.error)
-  if (planner.error) throw new Error(planner.error)
-  if (qa.error) throw new Error(qa.error)
-
-  state.dashboard = dashboard
-  state.plans = Array.isArray(planner.items) ? planner.items : []
-  state.qaAssignments = Array.isArray(qa.items) ? qa.items : []
-  state.source = planner.source || qa.source || ''
-
-  state.statusOptions = dashboard.meta?.available?.statuses || []
-  if (!state.statusOptions.includes('Manual')) state.statusOptions.push('Manual')
-  state.filters.status = ['Manual'].filter((s) => state.statusOptions.includes(s))
-  state.timelineVisibleCount = 30
-
-  buildStatusFilter()
-  buildQaStatusFilter()
-  renderManualList()
-  renderQaProjectList()
-  renderQaAssignmentList()
-  renderQaCounter()
-  renderTimeline()
-  document.getElementById('calendarSync').textContent = `อัปเดตล่าสุด: ${new Date(dashboard.generatedAt || Date.now()).toLocaleString('th-TH')}`
+async function reloadPageData() {
+  await loadManualPlans()
+  if (state.includeProjects) await ensureDashboardLoaded()
+  renderAll()
 }
 
 function bindEvents() {
-  const monthPicker = document.getElementById('calendarMonthPicker')
-  if (monthPicker) {
-    const now = new Date()
-    const currentMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`
-    state.selectedMonth = currentMonth
-    monthPicker.value = currentMonth
-    monthPicker.addEventListener('change', (e) => {
-      state.selectedMonth = e.target.value || currentMonth
-      state.timelineVisibleCount = 30
-      renderTimeline()
-    })
-  }
+  const picker = document.getElementById('labMonthPicker')
+  const today = getBangkokDateParts(new Date())
+  const currentMonth = `${today.year}-${String(today.month).padStart(2, '0')}`
+  state.selectedMonth = currentMonth
+  picker.value = currentMonth
+  buildStatusFilter()
 
-  document.getElementById('calendarSearch').addEventListener('input', (e) => {
-    state.filters.q = e.target.value || ''
-    state.timelineVisibleCount = 30
-    renderTimeline()
+  picker.addEventListener('change', async (event) => {
+    state.selectedMonth = event.target.value || currentMonth
+    await reloadPageData()
   })
 
-  document.getElementById('cancelEditBtn').addEventListener('click', () => setEditMode(null))
+  document.getElementById('labSearch').addEventListener('input', (event) => {
+    state.search = event.target.value || ''
+    renderAll()
+  })
 
-  document.getElementById('planForm').addEventListener('submit', async (e) => {
-    e.preventDefault()
-    const payload = Object.fromEntries(new FormData(e.currentTarget).entries())
-    if (state.editingId) payload.id = state.editingId
-    const status = document.getElementById('planStatus')
-    setNotice(status, state.editingId ? 'กำลังอัปเดต...' : 'กำลังบันทึก...')
+  document.getElementById('labManualOnlyBtn').addEventListener('click', () => {
+    state.includeProjects = false
+    state.statusOptions = ['Manual']
+    state.filters.status = state.filters.status.filter((status) => status === 'Manual')
+    if (!state.filters.status.length) state.filters.status = ['Manual']
+    buildStatusFilter()
+    renderAll()
+  })
+
+  document.getElementById('labBlendBtn').addEventListener('click', async () => {
+    state.includeProjects = true
+    renderAll()
     try {
-      const res = await fetch('/api/planner', {
-        method: state.editingId ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      })
-      const data = await res.json()
-      if (data.error) throw new Error(data.error)
+      await ensureDashboardLoaded()
+      renderAll()
+    } catch (error) {
+      state.includeProjects = false
+      setNotice(document.getElementById('labSummary'), `โหลด project timeline ไม่สำเร็จ: ${error.message || error}`, 'error')
+      renderAll()
+    }
+  })
+
+  document.getElementById('labCancelBtn').addEventListener('click', () => {
+    setEditMode(null)
+    setNotice(document.getElementById('labFormStatus'), '')
+  })
+
+  document.getElementById('labPlanForm').addEventListener('submit', async (event) => {
+    event.preventDefault()
+    const payload = Object.fromEntries(new FormData(event.currentTarget).entries())
+    const status = document.getElementById('labFormStatus')
+    setNotice(status, state.editingId ? 'กำลังอัปเดต...' : 'กำลังบันทึก...')
+
+    try {
+      const data = await saveManualPlan(payload, state.editingId)
       setNotice(status, state.editingId ? 'อัปเดตเรียบร้อย' : 'บันทึกเรียบร้อย', 'success')
       setEditMode(null)
-      await loadAll()
+      await loadManualPlans()
+      if (!state.selectedEventId) state.selectedEventId = data.item?.id || ''
+      renderAll()
     } catch (error) {
       setNotice(status, `ไม่สำเร็จ: ${error.message || error}`, 'error')
     }
   })
 
-  document.getElementById('tabManualBtn').addEventListener('click', () => switchTab('manual'))
-  document.getElementById('tabQaBtn').addEventListener('click', () => switchTab('qa'))
-
-  document.getElementById('manualColorPresets').addEventListener('click', (e) => {
-    const chip = e.target.closest('.manual-color-chip')
-    if (!chip) return
-    syncManualColorUi(chip.getAttribute('data-color') || DEFAULT_MANUAL_COLOR)
-  })
-
-  document.getElementById('manualColorInput').addEventListener('input', (e) => {
-    const nextColor = String(e.target.value || '').trim().toLowerCase()
-    if (!/^#[0-9a-fA-F]{6}$/.test(nextColor)) return
-    syncManualColorUi(nextColor)
-  })
-
-  document.getElementById('qaSearch').addEventListener('input', (e) => {
-    state.qa.q = e.target.value || ''
-    renderQaProjectList()
-  })
-
-  document.getElementById('qaProjectList').addEventListener('change', (e) => {
-    if (e.target.getAttribute('data-role') !== 'qa-pick') return
-    const key = e.target.getAttribute('data-key')
-    if (!key) return
-    if (e.target.checked) state.qa.selectedKeys.add(key)
-    else state.qa.selectedKeys.delete(key)
-  })
-
-  document.getElementById('qaAssignBtn').addEventListener('click', async () => {
-    const qaInput = document.getElementById('qaNameInput')
-    const qaNames = parseQaNamesInput(qaInput.value)
-    const selectedKeys = [...state.qa.selectedKeys]
-    const status = document.getElementById('qaAssignStatus')
-    if (!qaNames.length) {
-      setNotice(status, 'กรุณาระบุชื่อ QA', 'error')
-      return
-    }
-    if (!selectedKeys.length) {
-      setNotice(status, 'กรุณาเลือกโปรเจ็คอย่างน้อย 1 รายการ', 'error')
-      return
-    }
-
-    const candidatesByKey = new Map(getQaCandidates().map((x) => [x.parent.key, x.parent]))
-    const projects = selectedKeys.map((k) => candidatesByKey.get(k)).filter(Boolean).map((p) => ({
-      projectKey: p.key,
-      projectTitle: p.summary,
-      status: p.status
-    }))
-
-    setNotice(status, 'กำลัง assign QA...')
-    try {
-      const res = await fetch('/api/qa-plan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ qaNames, projects })
-      })
-      const data = await res.json()
-      if (data.error) throw new Error(data.error)
-      setNotice(status, 'Assign QA สำเร็จ', 'success')
-      state.qa.selectedKeys.clear()
-      qaInput.value = ''
-      await loadAll()
-    } catch (error) {
-      setNotice(status, `Assign ไม่สำเร็จ: ${error.message || error}`, 'error')
-    }
-  })
-
-  document.addEventListener('click', (e) => {
-    if (!e.target.closest('.multi')) {
+  document.addEventListener('click', (event) => {
+    if (!event.target.closest('.multi')) {
       document.querySelectorAll('.multi.open').forEach((el) => el.classList.remove('open'))
     }
   })
 }
 
 bindEvents()
-syncManualColorUi(DEFAULT_MANUAL_COLOR)
-loadAll().catch((error) => {
-  document.getElementById('timelineGrid').innerHTML = `<div class="empty">โหลดข้อมูลไม่สำเร็จ: ${esc(error.message || error)}</div>`
-  document.getElementById('calendarSync').textContent = 'โหลดข้อมูลล้มเหลว'
+setEditMode(null)
+reloadPageData().catch((error) => {
+  document.getElementById('labTimeline').innerHTML = `<div class="empty">โหลดข้อมูลไม่สำเร็จ: ${esc(error.message || error)}</div>`
+  document.getElementById('labSync').textContent = 'โหลดข้อมูลล้มเหลว'
 })
