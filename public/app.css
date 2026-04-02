@@ -1663,14 +1663,14 @@ textarea {
 
 .planner-lab-body {
   display: grid;
-  gap: 6px;
-  padding: 6px 0;
+  gap: 2px;
+  padding: 2px 0;
 }
 
 .planner-lab-row {
   display: block;
-  border-radius: 10px;
-  overflow: hidden;
+  border-radius: 0;
+  overflow: visible;
 }
 
 .planner-lab-row.selected {
@@ -1698,8 +1698,8 @@ textarea {
 
 .planner-lab-today-column {
   position: absolute;
-  top: -1px;
-  bottom: -1px;
+  top: -2px;
+  bottom: -2px;
   background: #fff1d8;
   border-left: 1px solid #efbf73;
   border-right: 1px solid #efbf73;
