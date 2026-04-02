@@ -395,6 +395,14 @@ function renderTimeline(events) {
     `
   }).join('')
 
+  const weekendColumns = Array.from({ length: days }, (_, index) => {
+    const d = new Date(startDate.getTime())
+    d.setUTCDate(d.getUTCDate() + index)
+    return (d.getUTCDay() === 0 || d.getUTCDay() === 6)
+      ? `<div class="planner-lab-weekend-column" style="left:calc(var(--lab-col-width) * ${index});width:var(--lab-col-width);"></div>`
+      : ''
+  }).join('')
+
   const rows = events.map((item) => {
     const eventStart = new Date(`${item.start}T00:00:00Z`)
     const eventEnd = new Date(`${item.end}T00:00:00Z`)
@@ -414,11 +422,9 @@ function renderTimeline(events) {
       <div class="planner-lab-row ${isSelected ? 'selected' : ''}">
         <div class="planner-lab-track">
           ${Array.from({ length: days }, (_, dayIndex) => {
-            const date = new Date(startDate.getTime())
-            date.setUTCDate(date.getUTCDate() + dayIndex)
-            const weekend = date.getUTCDay() === 0 || date.getUTCDay() === 6
-            return `<div class="planner-lab-track-day ${weekend ? 'is-weekend' : ''}"></div>`
+            return `<div class="planner-lab-track-day"></div>`
           }).join('')}
+          ${weekendColumns}
           ${todayOffset >= 0 ? `<div class="planner-lab-today-column" style="left:calc(var(--lab-col-width) * ${todayOffset});width:var(--lab-col-width);"></div>` : ''}
           <button class="planner-lab-bar ${item.source === 'manual' ? 'manual' : 'project'} ${isSelected ? 'selected' : ''}" type="button" data-event-id="${esc(item.id)}" ${barStyle}><span>${esc(barLabel)}</span></button>
         </div>

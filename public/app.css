@@ -1650,8 +1650,7 @@ textarea {
   line-height: 1;
 }
 
-.planner-lab-day.is-weekend,
-.planner-lab-track-day.is-weekend {
+.planner-lab-day.is-weekend {
   background: rgba(242, 246, 252, 0.9);
 }
 
@@ -1694,6 +1693,15 @@ textarea {
   min-height: 30px;
   position: relative;
   z-index: 1;
+}
+
+.planner-lab-weekend-column {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(242, 246, 252, 0.9);
+  pointer-events: none;
+  z-index: 0;
 }
 
 .planner-lab-today-column {
