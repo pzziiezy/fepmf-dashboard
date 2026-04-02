@@ -212,12 +212,18 @@ function statusBadgeClass(status) {
 function buildMultiFilter(hostId, selected, options, searchText, placeholder, onChange, onSearch) {
   const host = document.getElementById(hostId)
   const filtered = (options || []).filter((value) => String(value).toLowerCase().includes(searchText.toLowerCase()))
-  const allSelected = options.length > 0 && options.every((value) => selected.includes(value))
+  const normalizedOptions = [...new Set((options || []).map((value) => String(value)))]
+  const normalizedSelected = [...new Set((selected || []).map((value) => String(value)))]
+  const selectedSet = new Set(normalizedSelected)
+  const missingCount = normalizedOptions.filter((value) => !selectedSet.has(value)).length
+  const allSelected = normalizedOptions.length > 0 && missingCount <= 1 && normalizedSelected.length >= Math.min(3, normalizedOptions.length)
   const label = allSelected
     ? 'All Statuses'
-    : selected.length
-      ? `${selected[0]}${selected.length > 1 ? ` +${selected.length - 1}` : ''}`
-      : placeholder
+    : normalizedSelected.length > 2
+      ? `${normalizedSelected.length} statuses`
+      : normalizedSelected.length
+        ? `${normalizedSelected[0]}${normalizedSelected.length > 1 ? ` +${normalizedSelected.length - 1}` : ''}`
+        : placeholder
 
   host.innerHTML = `
     <button class="multi-trigger" type="button"><span class="value">${esc(label)}</span><span class="muted">▼</span></button>
