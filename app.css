@@ -1698,6 +1698,7 @@ textarea {
 }
 
 .planner-lab-bar {
+  grid-row: 1;
   position: relative;
   z-index: 2;
   align-self: center;
