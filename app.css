@@ -1604,11 +1604,14 @@ textarea {
 }
 
 .planner-lab-timeline-shell {
-  min-width: 980px;
+  --lab-col-width: 24px;
+  width: max-content;
+  min-width: calc(var(--lab-days, 61) * var(--lab-col-width));
 }
 
 .planner-lab-head {
   display: grid;
+  grid-template-columns: repeat(var(--lab-days, 61), var(--lab-col-width));
   position: sticky;
   top: 0;
   z-index: 3;
@@ -1660,11 +1663,14 @@ textarea {
 
 .planner-lab-body {
   display: grid;
+  gap: 6px;
+  padding: 6px 0;
 }
 
 .planner-lab-row {
   display: block;
-  border-bottom: 1px solid #e6eef8;
+  border-radius: 10px;
+  overflow: hidden;
 }
 
 .planner-lab-row.selected {
@@ -1674,6 +1680,7 @@ textarea {
 
 .planner-lab-track {
   display: grid;
+  grid-template-columns: repeat(var(--lab-days, 61), var(--lab-col-width));
   position: relative;
   grid-template-rows: 30px;
   grid-auto-rows: 30px;

@@ -412,14 +412,14 @@ function renderTimeline(events) {
 
     return `
       <div class="planner-lab-row ${isSelected ? 'selected' : ''}">
-        <div class="planner-lab-track" style="grid-template-columns:repeat(${days}, minmax(22px, 1fr))">
+        <div class="planner-lab-track">
           ${Array.from({ length: days }, (_, dayIndex) => {
             const date = new Date(startDate.getTime())
             date.setUTCDate(date.getUTCDate() + dayIndex)
             const weekend = date.getUTCDay() === 0 || date.getUTCDay() === 6
             return `<div class="planner-lab-track-day ${weekend ? 'is-weekend' : ''}"></div>`
           }).join('')}
-          ${todayOffset >= 0 ? `<div class="planner-lab-today-column" style="left:calc((100% / ${days}) * ${todayOffset});width:calc(100% / ${days});"></div>` : ''}
+          ${todayOffset >= 0 ? `<div class="planner-lab-today-column" style="left:calc(var(--lab-col-width) * ${todayOffset});width:var(--lab-col-width);"></div>` : ''}
           <button class="planner-lab-bar ${item.source === 'manual' ? 'manual' : 'project'} ${isSelected ? 'selected' : ''}" type="button" data-event-id="${esc(item.id)}" ${barStyle}><span>${esc(barLabel)}</span></button>
         </div>
       </div>
@@ -427,8 +427,8 @@ function renderTimeline(events) {
   }).join('')
 
   host.innerHTML = `
-    <div class="planner-lab-timeline-shell">
-      <div class="planner-lab-head" style="grid-template-columns:repeat(${days}, minmax(22px, 1fr))">
+    <div class="planner-lab-timeline-shell" style="--lab-days:${days}">
+      <div class="planner-lab-head">
         ${weekCells.join('')}
         ${dayHeaders}
       </div>
