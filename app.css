@@ -1612,7 +1612,7 @@ textarea {
 
 .planner-lab-timeline-shell {
   --lab-col-width: 24px;
-  width: max(100%, calc(var(--lab-days, 61) * var(--lab-col-width)));
+  width: max-content;
   min-width: calc(var(--lab-days, 61) * var(--lab-col-width));
 }
 

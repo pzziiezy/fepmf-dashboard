@@ -212,7 +212,7 @@ function statusBadgeClass(status) {
 function buildMultiFilter(hostId, selected, options, searchText, placeholder, onChange, onSearch) {
   const host = document.getElementById(hostId)
   const filtered = (options || []).filter((value) => String(value).toLowerCase().includes(searchText.toLowerCase()))
-  const allSelected = options.length > 0 && selected.length === options.length
+  const allSelected = options.length > 0 && options.every((value) => selected.includes(value))
   const label = allSelected
     ? 'All Statuses'
     : selected.length
