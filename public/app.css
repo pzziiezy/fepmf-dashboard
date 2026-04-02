@@ -1675,13 +1675,13 @@ textarea {
 .planner-lab-track {
   display: grid;
   position: relative;
-  min-height: 36px;
+  min-height: 32px;
   min-width: 0;
 }
 
 .planner-lab-track-day {
   border-right: 1px solid #edf2f8;
-  min-height: 36px;
+  min-height: 32px;
   position: relative;
   z-index: 1;
 }
