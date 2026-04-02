@@ -1,9 +1,17 @@
-﻿export default async function handler(req, res) {
+import { dashboardCache } from './dashboard-cache.js'
+
+export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 
   if (req.method === 'OPTIONS') return res.status(200).end()
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
+
+  const refresh = String(req.query?.refresh || '').toLowerCase() === 'true'
+  if (!refresh && dashboardCache.payload && dashboardCache.expiresAt > Date.now()) {
+    return res.status(200).json(dashboardCache.payload)
+  }
 
   const EMAIL = process.env.JIRA_EMAIL
   const TOKEN = process.env.JIRA_API_TOKEN
@@ -681,7 +689,7 @@
       workingDaysRemaining: workingDaysLeft
     }
 
-    return res.status(200).json({
+    const payload = {
       generatedAt: new Date().toISOString(),
       summary,
       sprintCalendar,
@@ -695,7 +703,12 @@
         }
       },
       parents
-    })
+    }
+
+    dashboardCache.payload = payload
+    dashboardCache.expiresAt = Date.now() + (5 * 60 * 1000)
+
+    return res.status(200).json(payload)
   } catch (error) {
     return res.status(500).json({ error: error.message || 'Unknown error' })
   }

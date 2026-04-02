@@ -5,6 +5,11 @@ const tokenCache = {
   accessToken: '',
   expiresAt: 0
 }
+const listCache = {
+  key: '',
+  items: null,
+  expiresAt: 0
+}
 
 const SHEET_COLUMNS = ['id', 'key', 'title', 'sprint', 'start', 'end', 'owner', 'note', 'color', 'createdAt', 'updatedAt', 'isDeleted', 'deletedAt', 'entityType']
 const DEFAULT_GOOGLE_SHEETS_URL = 'https://docs.google.com/spreadsheets/d/1FzgaU35q3dvDVAf3vAqirRcUFemd_OThXr1o7NdJrGI/edit?usp=sharing'
@@ -20,6 +25,16 @@ function firstEnv(...names) {
 
 function nowIso() {
   return new Date().toISOString()
+}
+
+function cloneItems(items = []) {
+  return items.map((item) => ({ ...item }))
+}
+
+function invalidateListCache() {
+  listCache.key = ''
+  listCache.items = null
+  listCache.expiresAt = 0
 }
 
 function normalizeItem(raw = {}, forUpdate = false) {
@@ -237,12 +252,23 @@ function rowToItem(row = [], rowNumber = 0) {
 }
 
 async function listGoogleSheetItems(sheetName, includeDeleted = false) {
+  const cacheKey = `${sheetName}:${includeDeleted ? 'all' : 'active'}`
+  if (listCache.key === cacheKey && listCache.items && listCache.expiresAt > Date.now()) {
+    return cloneItems(listCache.items)
+  }
+
   await ensureSheetHeader(sheetName)
   const range = `${sheetName}!A2:N`
   const result = await googleRequest(`/values/${encodeURIComponent(range)}`)
   const rows = result.values || []
   const all = rows.map((row, idx) => rowToItem(row, idx + 2)).filter((item) => item.id && item.title)
-  return includeDeleted ? all : all.filter((x) => !x.isDeleted)
+  const items = includeDeleted ? all : all.filter((x) => !x.isDeleted)
+
+  listCache.key = cacheKey
+  listCache.items = cloneItems(items)
+  listCache.expiresAt = Date.now() + 30_000
+
+  return items
 }
 
 async function appendGoogleSheetItem(sheetName, item) {
@@ -251,6 +277,7 @@ async function appendGoogleSheetItem(sheetName, item) {
     method: 'POST',
     body: JSON.stringify({ values: [toRowValues(item)] })
   })
+  invalidateListCache()
   return item
 }
 
@@ -267,6 +294,7 @@ async function updateGoogleSheetItem(sheetName, id, patch) {
     method: 'PUT',
     body: JSON.stringify({ values: [toRowValues(merged)] })
   })
+  invalidateListCache()
   return merged
 }
 
@@ -281,7 +309,57 @@ async function softDeleteGoogleSheetItem(sheetName, id) {
     method: 'PUT',
     body: JSON.stringify({ values: [toRowValues(deleted)] })
   })
+  invalidateListCache()
   return { ok: true, id, softDeleted: true }
+}
+
+function itemMatchesQuery(item, queryText) {
+  const q = String(queryText || '').trim().toLowerCase()
+  if (!q) return true
+  const blob = [
+    item.id,
+    item.key,
+    item.title,
+    item.sprint,
+    item.owner,
+    item.note,
+    item.entityType
+  ].join(' ').toLowerCase()
+  return blob.includes(q)
+}
+
+function itemOverlapsRange(item, start, end) {
+  const itemStart = String(item.start || '').trim()
+  const itemEnd = String(item.end || '').trim() || itemStart
+  if (!start && !end) return true
+  if (!itemStart && !itemEnd) return true
+  if (start && itemEnd < start) return false
+  if (end && itemStart > end) return false
+  return true
+}
+
+function filterItemsByQuery(items, query = {}) {
+  const start = String(query.start || '').trim()
+  const end = String(query.end || '').trim()
+  const q = String(query.q || '').trim()
+  const entityType = String(query.entityType || '').trim().toLowerCase()
+  const limit = Number(query.limit || 0)
+
+  let filtered = items.filter((item) => itemMatchesQuery(item, q) && itemOverlapsRange(item, start, end))
+
+  if (entityType) {
+    filtered = filtered.filter((item) => String(item.entityType || 'manual').trim().toLowerCase() === entityType)
+  }
+
+  filtered = filtered.sort((a, b) => {
+    const aStart = String(a.start || '')
+    const bStart = String(b.start || '')
+    if (aStart !== bStart) return aStart.localeCompare(bStart)
+    return String(a.title || '').localeCompare(String(b.title || ''))
+  })
+
+  if (limit > 0) filtered = filtered.slice(0, limit)
+  return filtered
 }
 
 function parseBody(req) {
@@ -308,7 +386,8 @@ export default async function handler(req, res) {
     if (isGoogleSheetsConfigured()) {
       if (req.method === 'GET') {
         const includeDeleted = String(req.query?.includeDeleted || '').toLowerCase() === 'true'
-        const items = await listGoogleSheetItems(sheetName, includeDeleted)
+        const rawItems = await listGoogleSheetItems(sheetName, includeDeleted)
+        const items = filterItemsByQuery(rawItems, req.query || {})
         return res.status(200).json({ items, source: 'google_sheets' })
       }
 
@@ -339,7 +418,8 @@ export default async function handler(req, res) {
 
     if (req.method === 'GET') {
       const includeDeleted = String(req.query?.includeDeleted || '').toLowerCase() === 'true'
-      const items = includeDeleted ? memoryStore : memoryStore.filter((x) => String(x.isDeleted || 'false') !== 'true')
+      const rawItems = includeDeleted ? memoryStore : memoryStore.filter((x) => String(x.isDeleted || 'false') !== 'true')
+      const items = filterItemsByQuery(rawItems, req.query || {})
       return res.status(200).json({ items, source: 'memory', warning: 'Google Sheets not configured' })
     }
 
