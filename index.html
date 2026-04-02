@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="th">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FEPMF Dashboard</title>
+  <title>FEPMF Calendar Planner</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -11,55 +11,98 @@
 </head>
 <body>
   <div class="page">
-    <section class="header">
+    <section class="header planner-lab-header">
       <div class="header-top">
         <div>
-          <h1 class="title">FEPMF Portfolio Control Center</h1>
-          <div class="subtitle">Overview ระดับ FEPMF + Child พร้อม CAB Date และ %Progress ที่ตรง Jira มากขึ้น</div>
+          <h1 class="title">Calendar Planner</h1>
+          <div class="subtitle">ปฏิทินสำหรับวางแผน FEPMF แบบอ่านง่ายขึ้น โดยเริ่มจาก Manual-first และค่อยเปิด project timeline เมื่อต้องการ</div>
         </div>
         <nav class="nav">
-          <a class="active" href="/index.html" target="_blank" rel="noopener noreferrer">List View</a>
+          <a href="/list.html" target="_blank" rel="noopener noreferrer">List View</a>
           <a href="/board.html" target="_blank" rel="noopener noreferrer">Board View</a>
           <a href="/misqa-watch.html" target="_blank" rel="noopener noreferrer">MISQA Watchlist</a>
-          <a href="/calendar.html" target="_blank" rel="noopener noreferrer">Calendar Planner</a>
+          <a class="active" href="/" target="_blank" rel="noopener noreferrer">Calendar Planner</a>
           <a href="/shift-planner.html" target="_blank" rel="noopener noreferrer">Shift Planner</a>
         </nav>
       </div>
-      <div class="header-meta">
-        <span class="tag" id="syncTime">กำลังโหลดข้อมูล...</span>
-        <span class="tag">Data Source: Jira Cloud</span>
+      <div class="header-meta planner-lab-meta">
+        <span class="tag" id="labSync">กำลังโหลด Manual plans...</span>
+        <span class="tag" id="labModeTag">Mode: Manual only</span>
       </div>
     </section>
 
-    <div class="toolbar">
-      <input id="search" class="search" placeholder="ค้นหา FEPMF / Child key / Summary" />
-      <div style="display:flex;gap:8px;justify-content:flex-end">
-        <button id="clearBtn" class="btn">ล้างค้นหา</button>
-        <button id="refreshBtn" class="btn primary">Refresh</button>
+    <section class="panel planner-lab-toolbar">
+      <div class="planner-lab-toolbar-grid">
+        <input id="labSearch" class="search" placeholder="ค้นหา key, title, owner หรือ note" />
+        <div id="labStatusFilter" class="multi"></div>
+        <input id="labMonthPicker" class="search" type="month" />
       </div>
-    </div>
-
-    <section class="panel" style="margin-top:12px;padding:12px">
-      <div class="list-filter-grid">
-        <div id="statusFilter" class="multi"></div>
-        <div id="squadFilter" class="multi"></div>
-        <div id="estimateSprintFilter" class="multi"></div>
-        <div id="cabDateFilter" class="multi"></div>
-      </div>
-    </section>
-
-    <section class="kpis" id="kpis"></section>
-    <section class="panel list-view-mode-panel">
-      <div class="list-view-mode-head">
-        <div>
-          <div class="section-label">View Mode</div>
-          <div class="section-copy">เลือกว่าจะดูรายการแบบ FEPMF ตรง ๆ หรือจัดกลุ่มตาม Squad / Estimate Sprint</div>
+      <div class="planner-lab-toolbar-foot">
+        <div id="labSummary" class="notice">กำลังเตรียม timeline...</div>
+        <div class="planner-lab-toggle-group">
+          <button id="labManualOnlyBtn" class="btn primary" type="button">Manual only</button>
+          <button id="labBlendBtn" class="btn" type="button">Manual + Projects</button>
         </div>
       </div>
-      <div class="list-view-mode-switch" id="listViewModeSwitch"></div>
     </section>
-    <section class="content" id="content"></section>
+
+    <section class="planner-lab-layout">
+      <div class="planner-lab-main">
+        <section class="panel planner-lab-panel">
+          <div class="planner-lab-panel-head">
+            <div>
+              <div class="section-label">Timeline</div>
+              <h2 class="planner-lab-panel-title">Readable roadmap</h2>
+            </div>
+            <div class="planner-lab-legend">
+              <span><i class="planner-lab-dot manual"></i>Manual</span>
+              <span><i class="planner-lab-dot project"></i>Project</span>
+              <span><i class="planner-lab-dot today"></i>Today</span>
+            </div>
+          </div>
+          <div id="labTimeline" class="planner-lab-timeline"></div>
+        </section>
+
+        <section class="panel planner-lab-panel">
+          <div class="planner-lab-panel-head">
+            <div>
+              <div class="section-label">Workspace</div>
+              <h2 class="planner-lab-panel-title">Manual plan editor</h2>
+            </div>
+          </div>
+          <div class="notice">หน้านี้ยังคงแก้ไข Manual plan ได้ แต่จะยังไม่โหลด project timeline จนกว่าจะกดเปิดโหมดผสม</div>
+          <form id="labPlanForm" class="form-grid" style="margin-top:12px">
+            <label class="field"><span>Project Title *</span><input name="title" required /></label>
+            <label class="field"><span>Key</span><input name="key" /></label>
+            <label class="field"><span>Owner</span><input name="owner" /></label>
+            <label class="field"><span>Start Date *</span><input type="date" name="start" required /></label>
+            <label class="field"><span>End Date *</span><input type="date" name="end" required /></label>
+            <label class="field"><span>Color</span><input type="color" name="color" value="#b66a00" /></label>
+            <label class="field"><span>Sprint</span><input name="sprint" /></label>
+            <label class="field full"><span>Note</span><textarea name="note"></textarea></label>
+            <div class="full planner-lab-form-actions">
+              <button id="labSaveBtn" class="btn primary" type="submit">บันทึกแผนงาน</button>
+              <button id="labCancelBtn" class="btn" type="button" style="display:none">ยกเลิกแก้ไข</button>
+              <span id="labFormStatus" class="notice"></span>
+            </div>
+          </form>
+          <div id="labManualList" class="list"></div>
+        </section>
+      </div>
+
+      <aside class="planner-lab-side">
+        <section class="panel planner-lab-panel planner-lab-sticky">
+          <div class="planner-lab-panel-head">
+            <div>
+              <div class="section-label">Inspector</div>
+              <h2 class="planner-lab-panel-title">Selected item</h2>
+            </div>
+          </div>
+          <div id="labInspector" class="planner-lab-inspector"></div>
+        </section>
+      </aside>
+    </section>
   </div>
-  <script src="/overview.js"></script>
+  <script src="/calendar.js"></script>
 </body>
 </html>

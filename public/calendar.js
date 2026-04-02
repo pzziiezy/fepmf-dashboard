@@ -126,7 +126,7 @@ function scheduleBackgroundWarmup() {
   const run = () => {
     prefetchDashboardData()
     ;[
-      ['/index.html', 'document'],
+      ['/list.html', 'document'],
       ['/board.html', 'document'],
       ['/misqa-watch.html', 'document'],
       ['/shift-planner.html', 'document'],
