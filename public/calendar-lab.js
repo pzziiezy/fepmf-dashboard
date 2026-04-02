@@ -372,8 +372,9 @@ function renderTimeline(events) {
             const date = new Date(startDate.getTime())
             date.setUTCDate(date.getUTCDate() + dayIndex)
             const weekend = date.getUTCDay() === 0 || date.getUTCDay() === 6
-            return `<div class="planner-lab-track-day ${weekend ? 'is-weekend' : ''} ${todayOffset === dayIndex ? 'is-today' : ''}"></div>`
+            return `<div class="planner-lab-track-day ${weekend ? 'is-weekend' : ''}"></div>`
           }).join('')}
+          ${todayOffset >= 0 ? `<div class="planner-lab-today-column" style="left:calc((100% / ${days}) * ${todayOffset});width:calc(100% / ${days});"></div>` : ''}
           <button class="planner-lab-bar ${item.source === 'manual' ? 'manual' : 'project'} ${isSelected ? 'selected' : ''}" type="button" data-event-id="${esc(item.id)}" ${barStyle}><span>${esc(barLabel)}</span></button>
           ${hasQa ? `<button class="planner-lab-bar planner-lab-bar-qa ${isSelected ? 'selected' : ''}" type="button" data-event-id="${esc(item.id)}" style="grid-column:${startColumn} / span ${span}"><span>${esc(qaLabel)}</span></button>` : ''}
         </div>

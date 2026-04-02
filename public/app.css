@@ -1676,6 +1676,7 @@ textarea {
   display: grid;
   position: relative;
   min-height: 42px;
+  min-width: 0;
 }
 
 .planner-lab-track-day {
@@ -1683,6 +1684,16 @@ textarea {
   min-height: 42px;
   position: relative;
   z-index: 1;
+}
+
+.planner-lab-today-column {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: #fff1d8;
+  box-shadow: inset 0 0 0 1px #efbf73;
+  pointer-events: none;
+  z-index: 0;
 }
 
 .planner-lab-bar {
@@ -1851,11 +1862,13 @@ textarea {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+  min-width: 0;
 }
 
 .planner-lab-inspector-form .field {
   display: grid;
   gap: 4px;
+  min-width: 0;
 }
 
 .planner-lab-inspector-form .field span {
@@ -1868,6 +1881,21 @@ textarea {
 
 .planner-lab-inspector-form .full {
   grid-column: 1 / -1;
+}
+
+.planner-lab-inspector-form input,
+.planner-lab-inspector-form textarea {
+  width: 100%;
+  min-width: 0;
+}
+
+.planner-lab-inspector-form input[type="color"] {
+  width: 56px;
+  height: 40px;
+  padding: 4px;
+  border-radius: 12px;
+  background: #fff;
+  cursor: pointer;
 }
 
 .planner-lab-inspector-form textarea {
