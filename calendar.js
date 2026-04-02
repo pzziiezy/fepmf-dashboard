@@ -4,6 +4,9 @@ const state = {
   plans: [],
   dashboard: null,
   dashboardLoaded: false,
+  prefetchedDashboard: null,
+  dashboardPrefetchStarted: false,
+  backgroundWarmupScheduled: false,
   loadingProjects: false,
   includeProjects: false,
   selectedMonth: '',
@@ -78,6 +81,66 @@ function getTwoMonthRange() {
   const start = new Date(Date.UTC(year, month, 1))
   const end = new Date(Date.UTC(year, month + 2, 0))
   return { start: toIsoDate(start), end: toIsoDate(end) }
+}
+
+function prefetchAsset(href, as) {
+  if (!href || typeof document === 'undefined') return
+  if (document.head.querySelector(`link[rel="prefetch"][href="${href}"]`)) return
+  const link = document.createElement('link')
+  link.rel = 'prefetch'
+  if (as) link.as = as
+  link.href = href
+  document.head.appendChild(link)
+}
+
+function applyDashboardData(data) {
+  state.dashboard = data
+  state.dashboardLoaded = true
+  state.prefetchedDashboard = null
+  const jiraStatuses = data.meta?.available?.statuses || []
+  state.statusOptions = ['Manual', ...jiraStatuses.filter((status) => status !== 'Manual')]
+  if (state.filters.status.length === 1 && state.filters.status[0] === 'Manual' && state.includeProjects) {
+    state.filters.status = ['Manual']
+  }
+  buildStatusFilter()
+}
+
+async function prefetchDashboardData() {
+  if (state.dashboardLoaded || state.prefetchedDashboard || state.dashboardPrefetchStarted) return
+  state.dashboardPrefetchStarted = true
+  try {
+    const response = await fetch('/api/dashboard')
+    const data = await response.json()
+    if (data?.error) throw new Error(data.error)
+    state.prefetchedDashboard = data
+  } catch (_error) {
+  } finally {
+    state.dashboardPrefetchStarted = false
+  }
+}
+
+function scheduleBackgroundWarmup() {
+  if (state.backgroundWarmupScheduled) return
+  if (navigator.connection?.saveData) return
+  state.backgroundWarmupScheduled = true
+  const run = () => {
+    prefetchDashboardData()
+    ;[
+      ['/index.html', 'document'],
+      ['/board.html', 'document'],
+      ['/misqa-watch.html', 'document'],
+      ['/shift-planner.html', 'document'],
+      ['/overview.js', 'script'],
+      ['/board.js', 'script'],
+      ['/misqa-watch.js', 'script'],
+      ['/shift-planner.js', 'script']
+    ].forEach(([href, as]) => prefetchAsset(href, as))
+  }
+  if ('requestIdleCallback' in window) {
+    window.requestIdleCallback(run, { timeout: 1600 })
+  } else {
+    window.setTimeout(run, 900)
+  }
 }
 
 function overlaps(aStart, aEnd, bStart, bEnd) {
@@ -579,20 +642,17 @@ async function loadManualPlans() {
 
 async function ensureDashboardLoaded() {
   if (state.dashboardLoaded || state.loadingProjects) return
+  if (state.prefetchedDashboard) {
+    applyDashboardData(state.prefetchedDashboard)
+    return
+  }
   state.loadingProjects = true
   document.getElementById('labModeTag').textContent = 'Mode: Loading projects...'
   try {
     const response = await fetch('/api/dashboard')
     const data = await response.json()
     if (data.error) throw new Error(data.error)
-    state.dashboard = data
-    state.dashboardLoaded = true
-    const jiraStatuses = data.meta?.available?.statuses || []
-    state.statusOptions = ['Manual', ...jiraStatuses.filter((status) => status !== 'Manual')]
-    if (state.filters.status.length === 1 && state.filters.status[0] === 'Manual' && state.includeProjects) {
-      state.filters.status = ['Manual']
-    }
-    buildStatusFilter()
+    applyDashboardData(data)
   } finally {
     state.loadingProjects = false
   }
@@ -613,6 +673,7 @@ async function reloadPageData() {
   await loadManualPlans()
   if (state.includeProjects) await ensureDashboardLoaded()
   renderAll()
+  scheduleBackgroundWarmup()
 }
 
 function bindEvents() {
