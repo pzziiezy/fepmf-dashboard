@@ -209,21 +209,16 @@ function statusBadgeClass(status) {
   return 'badge status-default'
 }
 
-function buildMultiFilter(hostId, selected, options, searchText, placeholder, onChange, onSearch) {
+function buildMultiFilter(hostId, selected, options, searchText, placeholder, onChange, onSearch, getLabel) {
   const host = document.getElementById(hostId)
   const filtered = (options || []).filter((value) => String(value).toLowerCase().includes(searchText.toLowerCase()))
   const normalizedOptions = [...new Set((options || []).map((value) => String(value)))]
   const normalizedSelected = [...new Set((selected || []).map((value) => String(value)))]
-  const selectedSet = new Set(normalizedSelected)
-  const missingCount = normalizedOptions.filter((value) => !selectedSet.has(value)).length
-  const allSelected = normalizedOptions.length > 0 && missingCount <= 1 && normalizedSelected.length >= Math.min(3, normalizedOptions.length)
-  const label = allSelected
-    ? 'All Statuses'
-    : normalizedSelected.length > 2
-      ? `${normalizedSelected.length} statuses`
-      : normalizedSelected.length
-        ? `${normalizedSelected[0]}${normalizedSelected.length > 1 ? ` +${normalizedSelected.length - 1}` : ''}`
-        : placeholder
+  const label = typeof getLabel === 'function'
+    ? getLabel(normalizedSelected, normalizedOptions, placeholder)
+    : normalizedSelected.length
+      ? `${normalizedSelected[0]}${normalizedSelected.length > 1 ? ` +${normalizedSelected.length - 1}` : ''}`
+      : placeholder
 
   host.innerHTML = `
     <button class="multi-trigger" type="button"><span class="value">${esc(label)}</span><span class="muted">▼</span></button>
@@ -279,6 +274,17 @@ function buildStatusFilter() {
     (nextSearch) => {
       state.statusSearch = nextSearch
       buildStatusFilter()
+    },
+    (selected, options, placeholder) => {
+      const optionSet = new Set(options)
+      const knownSelected = selected.filter((value) => optionSet.has(value))
+      const ratio = options.length ? knownSelected.length / options.length : 0
+      if (options.length > 0 && (knownSelected.length >= options.length - 1 || ratio >= 0.85)) {
+        return 'All Statuses'
+      }
+      if (knownSelected.length > 2) return `${knownSelected.length} statuses`
+      if (knownSelected.length > 0) return `${knownSelected[0]}${knownSelected.length > 1 ? ` +${knownSelected.length - 1}` : ''}`
+      return placeholder
     }
   )
 }
