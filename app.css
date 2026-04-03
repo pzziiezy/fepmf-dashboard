@@ -2414,9 +2414,9 @@ textarea {
 }
 
 .todo-card.todo-card-checklist .todo-title-row .tag {
-  background: color-mix(in srgb, var(--todo-accent, #2b6b9b) 24%, #ffffff 76%);
-  border-color: color-mix(in srgb, var(--todo-accent, #2b6b9b) 50%, #c7d8ea 50%);
-  color: #13365a;
+  background: color-mix(in srgb, var(--todo-accent, #2b6b9b) 12%, #ffffff 88%);
+  border-color: color-mix(in srgb, var(--todo-accent, #2b6b9b) 58%, #c7d8ea 42%);
+  color: #12365d;
 }
 
 .todo-card.todo-card-checklist .todo-log-summary {
@@ -2424,9 +2424,11 @@ textarea {
 }
 
 .badge-checklist {
-  background: color-mix(in srgb, var(--todo-accent, #295f90) 34%, #ffffff 66%);
-  border-color: color-mix(in srgb, var(--todo-accent, #295f90) 58%, #c5d7ea 42%);
-  color: color-mix(in srgb, var(--todo-accent, #295f90) 84%, #17365f 16%);
+  background: color-mix(in srgb, var(--todo-accent, #295f90) 88%, #0f2f52 12%);
+  border-color: color-mix(in srgb, var(--todo-accent, #295f90) 94%, #08203a 6%);
+  color: #ffffff;
+  font-weight: 800;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--todo-accent, #295f90) 30%, rgba(9, 28, 52, 0.2) 70%);
 }
 
 .todo-log-panel {
