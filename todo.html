@@ -87,6 +87,21 @@
               <h2 class="todo-panel-title">To Do List</h2>
               <div class="section-copy">ใช้ `View logs` เพื่อเปิด timeline การติดตามงานและบันทึก update ล่าสุดของแต่ละ task</div>
             </div>
+            <div class="todo-sort-group">
+              <label class="todo-sort-label" for="todoSortField">Sort by</label>
+              <select id="todoSortField" class="todo-sort-select">
+                <option value="title">Task title</option>
+                <option value="owner">Owner</option>
+                <option value="updatedAt">Updated date</option>
+                <option value="updatedBy">Updated by</option>
+                <option value="start">Start date</option>
+                <option value="end">End date</option>
+              </select>
+              <select id="todoSortDir" class="todo-sort-select">
+                <option value="desc">มาก - น้อย</option>
+                <option value="asc">น้อย - มาก</option>
+              </select>
+            </div>
           </div>
           <div id="todoList" class="todo-list"></div>
         </section>
@@ -115,6 +130,6 @@
       </form>
     </section>
   </div>
-  <script src="/todo.js?v=20260403e"></script>
+  <script src="/todo.js?v=20260403f"></script>
 </body>
 </html>

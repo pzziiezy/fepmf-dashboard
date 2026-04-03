@@ -7,6 +7,8 @@ const state = {
   search: '',
   statusFilter: 'open',
   sourceFilter: 'all',
+  sortField: 'updatedAt',
+  sortDir: 'desc',
   editingTaskId: '',
   editingActorEmail: '',
   expandedLogUid: '',
@@ -161,6 +163,36 @@ function getTaskMapByPlannerRef() {
   )
 }
 
+function toTimeValue(value) {
+  const text = String(value || '').trim()
+  if (!text) return null
+  const n = Date.parse(text)
+  return Number.isNaN(n) ? null : n
+}
+
+function compareNullable(a, b, dir = 'asc', type = 'string') {
+  const asc = dir === 'asc'
+  const aMissing = a == null || String(a).trim() === ''
+  const bMissing = b == null || String(b).trim() === ''
+  if (aMissing && bMissing) return 0
+  if (aMissing) return 1
+  if (bMissing) return -1
+
+  let result = 0
+  if (type === 'date') {
+    const at = toTimeValue(a)
+    const bt = toTimeValue(b)
+    if (at == null && bt == null) result = 0
+    else if (at == null) result = 1
+    else if (bt == null) result = -1
+    else result = at === bt ? 0 : (at > bt ? 1 : -1)
+  } else {
+    result = String(a).localeCompare(String(b), 'th', { sensitivity: 'base' })
+  }
+
+  return asc ? result : -result
+}
+
 function getCombinedItems() {
   const plannerTaskMap = getTaskMapByPlannerRef()
 
@@ -227,10 +259,23 @@ function getCombinedItems() {
   return items.sort((a, b) => {
     if (a.isDone !== b.isDone) return a.isDone ? 1 : -1
     if (a.origin !== b.origin) return a.origin === 'todo' ? -1 : 1
-    const aUpdated = String(a.updatedAt || a.createdAt || '')
-    const bUpdated = String(b.updatedAt || b.createdAt || '')
-    if (aUpdated !== bUpdated) return bUpdated.localeCompare(aUpdated)
-    return String(a.title || '').localeCompare(String(b.title || ''))
+
+    const field = state.sortField || 'updatedAt'
+    const dir = state.sortDir || 'desc'
+
+    let cmp = 0
+    if (field === 'title') cmp = compareNullable(a.title, b.title, dir, 'string')
+    else if (field === 'owner') cmp = compareNullable(a.owner, b.owner, dir, 'string')
+    else if (field === 'updatedAt') cmp = compareNullable(a.updatedAt || a.createdAt, b.updatedAt || b.createdAt, dir, 'date')
+    else if (field === 'updatedBy') cmp = compareNullable(a.updatedByEmail || a.createdByEmail, b.updatedByEmail || b.createdByEmail, dir, 'string')
+    else if (field === 'start') cmp = compareNullable(a.start, b.start, dir, 'date')
+    else if (field === 'end') cmp = compareNullable(a.end, b.end, dir, 'date')
+
+    if (cmp !== 0) return cmp
+
+    const fallback = compareNullable(a.updatedAt || a.createdAt, b.updatedAt || b.createdAt, 'desc', 'date')
+    if (fallback !== 0) return fallback
+    return compareNullable(a.title, b.title, 'asc', 'string')
   })
 }
 
@@ -310,8 +355,8 @@ function renderList() {
             <div class="todo-title-row">
               <span class="badge ${item.origin === 'planner' ? 'status-manual' : 'badge-checklist'}">${esc(item.origin === 'planner' ? 'Planner manual' : 'Checklist')}</span>
               <strong>${esc(item.title)}</strong>
+              ${item.key ? `<span class="todo-context-inlinebar"><span class="todo-context-bartext">${esc(item.key)}</span></span>` : ''}
             </div>
-            ${item.key ? `<div class="todo-context-barline"><span class="todo-context-bartext">${esc(item.key)}</span></div>` : ''}
             <div class="todo-meta-line">${esc(timelineText)}</div>
             <div class="todo-meta-line">Updated ${esc(updatedText)}${actorText ? ` | By ${esc(actorText)}` : ''}</div>
             ${ownerText ? `<div class="todo-owner-line"><span class="todo-owner-icon" aria-hidden="true"></span><span>Owner ${esc(ownerText)}</span></div>` : ''}
@@ -680,6 +725,23 @@ function bindEvents() {
     state.search = event.target.value || ''
     renderList()
   })
+
+  const sortFieldEl = byId('todoSortField')
+  const sortDirEl = byId('todoSortDir')
+  if (sortFieldEl) {
+    sortFieldEl.value = state.sortField
+    sortFieldEl.addEventListener('change', (event) => {
+      state.sortField = event.target.value || 'updatedAt'
+      renderList()
+    })
+  }
+  if (sortDirEl) {
+    sortDirEl.value = state.sortDir
+    sortDirEl.addEventListener('change', (event) => {
+      state.sortDir = event.target.value || 'desc'
+      renderList()
+    })
+  }
 
   byId('todoForm').addEventListener('submit', async (event) => {
     event.preventDefault()

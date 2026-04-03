@@ -2082,6 +2082,32 @@ textarea {
   margin-bottom: 14px;
 }
 
+.todo-sort-group {
+  margin-left: auto;
+  display: grid;
+  gap: 6px;
+  min-width: 210px;
+}
+
+.todo-sort-label {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #5f7692;
+}
+
+.todo-sort-select {
+  width: 100%;
+  min-height: 38px;
+  border-radius: 12px;
+  border: 1px solid #c8d8ea;
+  background: #ffffff;
+  color: #173f70;
+  font: inherit;
+  padding: 0 11px;
+}
+
 .todo-panel-title {
   margin: 4px 0 0;
   font-size: 28px;
@@ -2386,13 +2412,13 @@ textarea {
   font-size: 13px;
 }
 
-.todo-context-barline {
-  display: flex;
+.todo-context-inlinebar {
+  display: inline-flex;
   align-items: center;
   min-width: 0;
 }
 
-.todo-context-barline::before {
+.todo-context-inlinebar::before {
   content: "";
   width: 4px;
   height: 18px;
@@ -2480,7 +2506,7 @@ textarea {
   color: #183d63;
 }
 
-.todo-card.todo-card-checklist .todo-context-barline::before {
+.todo-card.todo-card-checklist .todo-context-inlinebar::before {
   background: color-mix(in srgb, var(--todo-accent, #2b6b9b) 78%, #6f9fd0 22%);
 }
 
@@ -2676,6 +2702,17 @@ textarea {
 @media (max-width: 980px) {
   .todo-layout {
     grid-template-columns: 1fr;
+  }
+
+  .todo-panel-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .todo-sort-group {
+    margin-left: 0;
+    width: 100%;
+    max-width: 360px;
   }
 
   .todo-side {
