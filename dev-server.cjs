@@ -149,6 +149,12 @@ const server = http.createServer((req, res) => {
   const ext = path.extname(filePath).toLowerCase()
   res.statusCode = 200
   res.setHeader('Content-Type', mime[ext] || 'application/octet-stream')
+  if (ext === '.html' || ext === '.js' || ext === '.css') {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+    res.setHeader('Pragma', 'no-cache')
+    res.setHeader('Expires', '0')
+    res.setHeader('Surrogate-Control', 'no-store')
+  }
   fs.createReadStream(filePath).pipe(res)
 })
 

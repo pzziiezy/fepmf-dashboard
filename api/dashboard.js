@@ -303,6 +303,9 @@ export default async function handler(req, res) {
   function normalizeIssue(issue, cfg) {
     const sprint = parseSprintFromIssue(issue, cfg.sprintFieldIds)
     const statusRaw = getStatus(issue)
+    const labels = uniq((issue?.fields?.labels || []).map((x) => String(x || '').trim()).filter(Boolean))
+    const components = uniq((issue?.fields?.components || []).map((x) => String(x?.name || '').trim()).filter(Boolean))
+    const keywords = uniq([...labels, ...components])
     return {
       id: issue?.id || '',
       key: issue?.key || '',
@@ -320,7 +323,10 @@ export default async function handler(req, res) {
       sprintStart: sprint.start,
       sprintEnd: sprint.end,
       squad: inferSquad(issue, cfg.squadFieldIds),
-      estimateSprint: getEstimateSprint(issue, cfg.estimateSprintFieldIds)
+      estimateSprint: getEstimateSprint(issue, cfg.estimateSprintFieldIds),
+      labels,
+      components,
+      keywords
     }
   }
 

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>FEPMF To Do Checklist</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/app.css?v=20260403c" />
+</head>
+<body>
+  <div class="page">
+    <section class="header">
+      <div class="header-top">
+        <div>
+          <h1 class="title">To Do Checklist</h1>
+          <div class="subtitle">ติดตามงาน manual และ checklist ใหม่ในหน้าเดียว พร้อมบันทึก update log ของแต่ละงานเป็น story ต่อเนื่องสำหรับการ follow-up</div>
+        </div>
+        <nav class="nav">
+          <a href="/list.html" target="_blank" rel="noopener noreferrer">List View</a>
+          <a href="/board.html" target="_blank" rel="noopener noreferrer">Board View</a>
+          <a href="/misqa-watch.html" target="_blank" rel="noopener noreferrer">MISQA Watchlist</a>
+          <a href="/calendar.html" target="_blank" rel="noopener noreferrer">Calendar Planner</a>
+          <a href="/shift-planner.html" target="_blank" rel="noopener noreferrer">Shift Planner</a>
+          <a class="active" href="/todo.html" target="_blank" rel="noopener noreferrer">To Do Checklist</a>
+        </nav>
+      </div>
+      <div class="header-meta">
+        <span class="tag" id="todoSync">Loading checklist...</span>
+        <span class="tag" id="todoSheetTag">Sheet: PlannerTasks</span>
+      </div>
+    </section>
+
+    <section class="todo-layout">
+      <aside class="panel todo-side">
+        <div class="todo-panel-head">
+          <div>
+            <div class="section-label">Workspace</div>
+            <h2 class="todo-panel-title">Add Checklist Item</h2>
+            <div class="section-copy">สร้าง task ใหม่แบบ lightweight แล้วค่อยอัปเดตสถานะหรือบันทึก story ของงานภายหลังได้</div>
+          </div>
+        </div>
+        <form id="todoForm" class="form-grid todo-form">
+          <label class="field full"><span>Task title *</span><input name="title" required /></label>
+          <label class="field full"><span>Key</span><input name="key" /></label>
+          <label class="field"><span>Start Date (Optional)</span><input type="date" name="start" /></label>
+          <label class="field"><span>End Date (Optional)</span><input type="date" name="end" /></label>
+          <label class="field"><span>Owner</span><input name="owner" /></label>
+          <label class="field todo-color-field">
+            <span>Color</span>
+            <div class="todo-color-shell">
+              <input id="todoColorInput" class="todo-color-input" type="color" name="color" value="#2c6e91" />
+              <button id="todoColorPreview" class="todo-color-preview" type="button" aria-label="Choose color"></button>
+            </div>
+          </label>
+          <label class="field full"><span>Note</span><textarea name="note"></textarea></label>
+          <div class="full planner-lab-form-actions">
+            <button id="todoSaveBtn" class="btn primary" type="submit">Save task</button>
+            <button id="todoCancelBtn" class="btn" type="button" style="display:none">Cancel edit</button>
+            <span id="todoFormStatus" class="notice"></span>
+          </div>
+        </form>
+
+        <section class="todo-kpi-grid" id="todoKpis"></section>
+      </aside>
+
+      <main class="todo-main">
+        <section class="panel todo-toolbar">
+          <div class="todo-toolbar-grid">
+            <input id="todoSearch" class="search" placeholder="ค้นหา title, key, owner หรือ note" />
+            <div id="todoStatusSwitch" class="list-view-mode-switch todo-switch"></div>
+            <div id="todoSourceSwitch" class="list-view-mode-switch todo-switch"></div>
+          </div>
+          <div class="todo-toolbar-foot">
+            <div id="todoSummary" class="notice">Preparing checklist...</div>
+          </div>
+        </section>
+
+        <section class="panel todo-list-panel">
+          <div class="todo-panel-head">
+            <div>
+              <div class="section-label">Checklist</div>
+              <h2 class="todo-panel-title">To Do List</h2>
+              <div class="section-copy">ใช้ `View logs` เพื่อเปิด timeline การติดตามงานและบันทึก update ล่าสุดของแต่ละ task</div>
+            </div>
+          </div>
+          <div id="todoList" class="todo-list"></div>
+        </section>
+      </main>
+    </section>
+  </div>
+  <script src="/todo.js?v=20260403c"></script>
+</body>
+</html>

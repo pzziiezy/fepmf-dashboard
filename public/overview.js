@@ -44,7 +44,18 @@ function textBlob(row) {
     row.parent.squad,
     row.parent.estimateSprint,
     row.parent.cabDate,
-    ...(row.workItems || []).flatMap((x) => [x.key, x.summary, x.status, x.assignee])
+    ...(row.parent.labels || []),
+    ...(row.parent.components || []),
+    ...(row.parent.keywords || []),
+    ...(row.workItems || []).flatMap((x) => [
+      x.key,
+      x.summary,
+      x.status,
+      x.assignee,
+      ...(x.labels || []),
+      ...(x.components || []),
+      ...(x.keywords || [])
+    ])
   ].join(' ').toLowerCase()
 }
 
@@ -231,9 +242,13 @@ function renderParentCard(row) {
 
 function filterRows() {
   const q = state.query.trim().toLowerCase()
+  const terms = q ? q.split(/\s+/).filter(Boolean) : []
 
   state.rows = (state.data?.parents || []).filter((row) => {
-    if (q && !textBlob(row).includes(q)) return false
+    if (terms.length) {
+      const blob = textBlob(row)
+      if (terms.some((term) => !blob.includes(term))) return false
+    }
 
     if (state.filters.status.length && !state.filters.status.includes(row.parent.status)) return false
     if (state.filters.squad.length && !state.filters.squad.includes(row.parent.squad)) return false
