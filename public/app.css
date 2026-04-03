@@ -2386,19 +2386,66 @@ textarea {
   font-size: 13px;
 }
 
-.todo-context {
+.todo-context-inline {
+  display: inline-flex;
+  align-items: center;
   font-size: 13px;
   font-weight: 600;
-  color: #113e72;
-  line-height: 1.45;
-  padding-left: 10px;
-  border-left: 3px solid rgba(64, 123, 178, 0.46);
+  line-height: 1.4;
+  color: #0f3f73;
+  border: 1px solid #74a8dc;
+  background: rgba(255, 255, 255, 0.58);
+  border-radius: 999px;
+  padding: 4px 10px;
 }
 
 .todo-meta-line {
   font-size: 13px;
   color: #355779;
   line-height: 1.5;
+}
+
+.todo-owner-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #355779;
+  line-height: 1.5;
+}
+
+.todo-owner-icon {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid #4f7198;
+  position: relative;
+  display: inline-block;
+}
+
+.todo-owner-icon::before {
+  content: "";
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #4f7198;
+  left: 50%;
+  top: 2px;
+  transform: translateX(-50%);
+}
+
+.todo-owner-icon::after {
+  content: "";
+  position: absolute;
+  width: 7px;
+  height: 3px;
+  border-radius: 999px 999px 0 0;
+  border: 1.5px solid #4f7198;
+  border-bottom: 0;
+  left: 50%;
+  bottom: 2px;
+  transform: translateX(-50%);
 }
 
 .todo-note {
@@ -2422,13 +2469,31 @@ textarea {
   color: #183d63;
 }
 
-.todo-card.todo-card-checklist .todo-context {
-  color: #0f3763;
-  border-left-color: color-mix(in srgb, var(--todo-accent, #2b6b9b) 70%, #7ba8d4 30%);
+.todo-card.todo-card-checklist .todo-context-inline {
+  color: #0c365f;
+  border-color: color-mix(in srgb, var(--todo-accent, #2b6b9b) 72%, #7da9d4 28%);
+  background: color-mix(in srgb, var(--todo-accent, #2b6b9b) 8%, #ffffff 92%);
 }
 
 .todo-card.todo-card-checklist .todo-meta-line {
   color: #20486f;
+}
+
+.todo-card.todo-card-checklist .todo-owner-line {
+  color: #20486f;
+}
+
+.todo-card.todo-card-checklist .todo-owner-icon {
+  border-color: #315d89;
+}
+
+.todo-card.todo-card-checklist .todo-owner-icon::before {
+  background: #315d89;
+}
+
+.todo-card.todo-card-checklist .todo-owner-icon::after {
+  border-color: #315d89;
+  border-bottom: 0;
 }
 
 .todo-card.todo-card-checklist .todo-log-summary {
