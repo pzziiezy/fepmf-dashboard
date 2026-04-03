@@ -310,15 +310,10 @@ function renderList() {
             <div class="todo-title-row">
               <span class="badge ${item.origin === 'planner' ? 'status-manual' : 'badge-checklist'}">${esc(item.origin === 'planner' ? 'Planner manual' : 'Checklist')}</span>
               <strong>${esc(item.title)}</strong>
-              ${item.key ? `<span class="tag">${esc(item.key)}</span>` : ''}
             </div>
-            <div class="todo-meta-row">
-              <span class="todo-meta-pill">${esc(timelineText)}</span>
-              ${ownerText ? `<span class="todo-meta-pill">Owner ${esc(ownerText)}</span>` : ''}
-            </div>
-            <div class="todo-meta-row">
-              <span class="todo-meta-pill">Updated ${esc(updatedText)}${actorText ? ` | By ${esc(actorText)}` : ''}</span>
-            </div>
+            ${item.key ? `<div class="todo-context">${esc(item.key)}</div>` : ''}
+            <div class="todo-meta-line">${esc(timelineText)}</div>
+            <div class="todo-meta-line">Updated ${esc(updatedText)}${actorText ? ` | By ${esc(actorText)}` : ''}${ownerText ? ` | Owner ${esc(ownerText)}` : ''}</div>
             <div class="todo-note">${esc(item.note || (item.origin === 'planner' ? 'No extra note' : 'No note'))}</div>
             ${item.isDone && item.doneAt ? `<div class="todo-done-at">Done ${esc(formatThaiDateTime(item.doneAt))}${item.doneByEmail ? ` - By ${esc(item.doneByEmail)}` : ''}</div>` : ''}
             <div class="todo-log-summary">${esc(String(logs.length))} update log${logs.length === 1 ? '' : 's'}</div>
