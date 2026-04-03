@@ -2386,17 +2386,28 @@ textarea {
   font-size: 13px;
 }
 
-.todo-context-inline {
-  display: inline-flex;
+.todo-context-barline {
+  display: flex;
   align-items: center;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.4;
-  color: #0f3f73;
-  border: 1px solid #74a8dc;
-  background: rgba(255, 255, 255, 0.58);
+  min-width: 0;
+}
+
+.todo-context-barline::before {
+  content: "";
+  width: 4px;
+  height: 18px;
   border-radius: 999px;
-  padding: 4px 10px;
+  background: #4f7fbc;
+  margin-right: 8px;
+  flex: 0 0 auto;
+}
+
+.todo-context-bartext {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #103c70;
+  word-break: break-word;
 }
 
 .todo-meta-line {
@@ -2469,10 +2480,12 @@ textarea {
   color: #183d63;
 }
 
-.todo-card.todo-card-checklist .todo-context-inline {
-  color: #0c365f;
-  border-color: color-mix(in srgb, var(--todo-accent, #2b6b9b) 72%, #7da9d4 28%);
-  background: color-mix(in srgb, var(--todo-accent, #2b6b9b) 8%, #ffffff 92%);
+.todo-card.todo-card-checklist .todo-context-barline::before {
+  background: color-mix(in srgb, var(--todo-accent, #2b6b9b) 78%, #6f9fd0 22%);
+}
+
+.todo-card.todo-card-checklist .todo-context-bartext {
+  color: #0f3763;
 }
 
 .todo-card.todo-card-checklist .todo-meta-line {

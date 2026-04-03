@@ -310,8 +310,8 @@ function renderList() {
             <div class="todo-title-row">
               <span class="badge ${item.origin === 'planner' ? 'status-manual' : 'badge-checklist'}">${esc(item.origin === 'planner' ? 'Planner manual' : 'Checklist')}</span>
               <strong>${esc(item.title)}</strong>
-              ${item.key ? `<span class="todo-context-inline">${esc(item.key)}</span>` : ''}
             </div>
+            ${item.key ? `<div class="todo-context-barline"><span class="todo-context-bartext">${esc(item.key)}</span></div>` : ''}
             <div class="todo-meta-line">${esc(timelineText)}</div>
             <div class="todo-meta-line">Updated ${esc(updatedText)}${actorText ? ` | By ${esc(actorText)}` : ''}</div>
             ${ownerText ? `<div class="todo-owner-line"><span class="todo-owner-icon" aria-hidden="true"></span><span>Owner ${esc(ownerText)}</span></div>` : ''}
