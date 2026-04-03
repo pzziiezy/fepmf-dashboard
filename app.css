@@ -2284,6 +2284,19 @@ textarea {
   box-shadow: 0 16px 30px rgba(10, 31, 66, 0.06);
 }
 
+.todo-card.todo-card-checklist {
+  border-color: color-mix(in srgb, var(--todo-accent, #2b6b9b) 38%, #c7d8ea 62%);
+  box-shadow:
+    0 16px 30px color-mix(in srgb, var(--todo-accent, #2b6b9b) 12%, rgba(10, 31, 66, 0.06) 88%),
+    inset 4px 0 0 color-mix(in srgb, var(--todo-accent, #2b6b9b) 70%, #ffffff 30%);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--todo-accent, #2b6b9b) 8%, #ffffff 92%),
+      color-mix(in srgb, var(--todo-accent, #2b6b9b) 5%, #f8fbff 95%)
+    );
+}
+
 .todo-card.is-done {
   opacity: 0.84;
   background: linear-gradient(180deg, rgba(247, 250, 252, 0.96), rgba(239, 245, 249, 0.96));
@@ -2324,6 +2337,15 @@ textarea {
 .todo-check input:checked + span {
   background: linear-gradient(135deg, #214b80, #17375f);
   border-color: #17375f;
+}
+
+.todo-card.todo-card-checklist .todo-check input:checked + span {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--todo-accent, #214b80) 86%, #ffffff 14%),
+    color-mix(in srgb, var(--todo-accent, #17375f) 76%, #0d1f37 24%)
+  );
+  border-color: color-mix(in srgb, var(--todo-accent, #17375f) 72%, #0f2848 28%);
 }
 
 .todo-check input:checked + span::after {
@@ -2379,6 +2401,16 @@ textarea {
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.02em;
+}
+
+.todo-card.todo-card-checklist .todo-log-summary {
+  color: color-mix(in srgb, var(--todo-accent, #1d5a98) 70%, #123760 30%);
+}
+
+.badge-checklist {
+  background: color-mix(in srgb, var(--todo-accent, #295f90) 18%, #ffffff 82%);
+  border-color: color-mix(in srgb, var(--todo-accent, #295f90) 42%, #d8e4f0 58%);
+  color: color-mix(in srgb, var(--todo-accent, #295f90) 72%, #17365f 28%);
 }
 
 .todo-log-panel {

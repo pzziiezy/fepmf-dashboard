@@ -204,6 +204,10 @@ function renderList() {
   }
 
   byId('todoList').innerHTML = items.map((item) => {
+    const isChecklist = item.origin === 'todo'
+    const accentColor = normalizeColor(item.color || TODO_DEFAULT_COLOR)
+    const cardClass = `todo-card ${item.isDone ? 'is-done' : ''} ${isChecklist ? 'todo-card-checklist' : ''}`.trim()
+    const cardStyle = isChecklist ? ` style="--todo-accent:${esc(accentColor)}"` : ''
     const rangeText = hasTimelineDates(item.start, item.end)
       ? `${formatThaiDate(item.start)} - ${formatThaiDate(item.end)}`
       : 'No timeline date'
@@ -213,7 +217,7 @@ function renderList() {
     const logs = Array.isArray(item.logs) ? item.logs : []
     const isExpanded = state.expandedLogUid === item.uid
     return `
-      <article class="todo-card ${item.isDone ? 'is-done' : ''}" data-uid="${esc(item.uid)}">
+      <article class="${esc(cardClass)}" data-uid="${esc(item.uid)}"${cardStyle}>
         <div class="todo-card-main">
           <label class="todo-check">
             <input type="checkbox" data-role="toggle" ${item.isDone ? 'checked' : ''} />
@@ -222,7 +226,7 @@ function renderList() {
           <div class="todo-copy">
             <div class="todo-title-row">
               <strong>${esc(item.title)}</strong>
-              <span class="badge ${item.origin === 'planner' ? 'status-manual' : 'status-s6'}">${esc(item.origin === 'planner' ? 'Planner manual' : 'Checklist')}</span>
+              <span class="badge ${item.origin === 'planner' ? 'status-manual' : 'badge-checklist'}">${esc(item.origin === 'planner' ? 'Planner manual' : 'Checklist')}</span>
               ${item.key ? `<span class="tag">${esc(item.key)}</span>` : ''}
             </div>
             <div class="todo-meta">${esc(meta)} | ${esc(item.owner || '-')}</div>
