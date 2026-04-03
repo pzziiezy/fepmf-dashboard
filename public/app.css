@@ -2284,15 +2284,15 @@ textarea {
 }
 
 .todo-card.todo-card-checklist {
-  border-color: color-mix(in srgb, var(--todo-accent, #2b6b9b) 38%, #c7d8ea 62%);
+  border-color: color-mix(in srgb, var(--todo-accent, #2b6b9b) 56%, #b5cce4 44%);
   box-shadow:
-    0 16px 30px color-mix(in srgb, var(--todo-accent, #2b6b9b) 12%, rgba(10, 31, 66, 0.06) 88%),
-    inset 4px 0 0 color-mix(in srgb, var(--todo-accent, #2b6b9b) 70%, #ffffff 30%);
+    0 16px 30px color-mix(in srgb, var(--todo-accent, #2b6b9b) 20%, rgba(10, 31, 66, 0.06) 80%),
+    inset 5px 0 0 color-mix(in srgb, var(--todo-accent, #2b6b9b) 82%, #ffffff 18%);
   background:
     linear-gradient(
       180deg,
-      color-mix(in srgb, var(--todo-accent, #2b6b9b) 8%, #ffffff 92%),
-      color-mix(in srgb, var(--todo-accent, #2b6b9b) 5%, #f8fbff 95%)
+      color-mix(in srgb, var(--todo-accent, #2b6b9b) 22%, #ffffff 78%),
+      color-mix(in srgb, var(--todo-accent, #2b6b9b) 16%, #f4f9ff 84%)
     );
 }
 
@@ -2407,9 +2407,9 @@ textarea {
 }
 
 .badge-checklist {
-  background: color-mix(in srgb, var(--todo-accent, #295f90) 18%, #ffffff 82%);
-  border-color: color-mix(in srgb, var(--todo-accent, #295f90) 42%, #d8e4f0 58%);
-  color: color-mix(in srgb, var(--todo-accent, #295f90) 72%, #17365f 28%);
+  background: color-mix(in srgb, var(--todo-accent, #295f90) 34%, #ffffff 66%);
+  border-color: color-mix(in srgb, var(--todo-accent, #295f90) 58%, #c5d7ea 42%);
+  color: color-mix(in srgb, var(--todo-accent, #295f90) 84%, #17365f 16%);
 }
 
 .todo-log-panel {
