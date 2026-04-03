@@ -179,6 +179,7 @@ function getCombinedItems() {
         color: task.color || TODO_DEFAULT_COLOR,
         isDone: Boolean(task.isDone),
         doneAt: task.doneAt || '',
+        doneByEmail: task.doneByEmail || '',
         createdAt: task.createdAt || '',
         updatedAt: task.updatedAt || '',
         createdByEmail: task.createdByEmail || '',
@@ -202,6 +203,7 @@ function getCombinedItems() {
         color: syncedTask?.color || planner.color || '#b66a00',
         isDone: Boolean(syncedTask?.isDone),
         doneAt: syncedTask?.doneAt || '',
+        doneByEmail: syncedTask?.doneByEmail || '',
         createdAt: syncedTask?.createdAt || planner.createdAt || '',
         updatedAt: syncedTask?.updatedAt || planner.updatedAt || '',
         createdByEmail: syncedTask?.createdByEmail || '',
@@ -289,13 +291,12 @@ function renderList() {
     const accentColor = normalizeColor(item.color || TODO_DEFAULT_COLOR)
     const cardClass = `todo-card ${item.isDone ? 'is-done' : ''} ${isChecklist ? 'todo-card-checklist' : ''}`.trim()
     const cardStyle = isChecklist ? ` style="--todo-accent:${esc(accentColor)}"` : ''
-    const rangeText = hasTimelineDates(item.start, item.end)
+    const timelineText = hasTimelineDates(item.start, item.end)
       ? `${formatThaiDate(item.start)} - ${formatThaiDate(item.end)}`
       : 'No timeline date'
+    const updatedText = formatThaiDateTime(item.updatedAt || item.createdAt)
     const actorText = String(item.updatedByEmail || item.createdByEmail || '').trim()
-    const meta = item.origin === 'planner'
-      ? `${rangeText}${actorText ? ` | By ${actorText}` : ''}`
-      : `${rangeText} | Updated ${formatThaiDateTime(item.updatedAt || item.createdAt)}${actorText ? ` | By ${actorText}` : ''}`
+    const ownerText = String(item.owner || '').trim()
     const logs = Array.isArray(item.logs) ? item.logs : []
     const isExpanded = state.expandedLogUid === item.uid
     return `
@@ -311,16 +312,22 @@ function renderList() {
               <strong>${esc(item.title)}</strong>
               ${item.key ? `<span class="tag">${esc(item.key)}</span>` : ''}
             </div>
-            <div class="todo-meta">${esc(meta)} | ${esc(item.owner || '-')}</div>
+            <div class="todo-meta-row">
+              <span class="todo-meta-pill">${esc(timelineText)}</span>
+              ${ownerText ? `<span class="todo-meta-pill">Owner ${esc(ownerText)}</span>` : ''}
+            </div>
+            <div class="todo-meta-row">
+              <span class="todo-meta-pill">Updated ${esc(updatedText)}${actorText ? ` | By ${esc(actorText)}` : ''}</span>
+            </div>
             <div class="todo-note">${esc(item.note || (item.origin === 'planner' ? 'No extra note' : 'No note'))}</div>
-            ${item.isDone && item.doneAt ? `<div class="todo-done-at">Done at ${esc(formatThaiDateTime(item.doneAt))}</div>` : ''}
+            ${item.isDone && item.doneAt ? `<div class="todo-done-at">Done ${esc(formatThaiDateTime(item.doneAt))}${item.doneByEmail ? ` - By ${esc(item.doneByEmail)}` : ''}</div>` : ''}
             <div class="todo-log-summary">${esc(String(logs.length))} update log${logs.length === 1 ? '' : 's'}</div>
             ${isExpanded ? `
               <section class="todo-log-panel">
                 <div class="todo-log-list">
                   ${logs.length ? logs.map((entry) => `
                     <article class="todo-log-entry">
-                      <div class="todo-log-time">${esc(formatThaiDateTime(entry.createdAt))}</div>
+                      <div class="todo-log-time">${esc(formatThaiDateTime(entry.createdAt))}${entry.actorEmail ? ` | Add by ${esc(entry.actorEmail)}` : ''}</div>
                       <div class="todo-log-message">${esc(entry.message)}</div>
                     </article>
                   `).join('') : '<div class="mini-empty">ยังไม่มี update log สำหรับงานนี้</div>'}
@@ -349,7 +356,8 @@ function renderList() {
     input.addEventListener('change', async (event) => {
       const card = event.target.closest('.todo-card')
       if (!card) return
-      await toggleDone(card.dataset.uid || '', event.target.checked)
+      const isOk = await toggleDone(card.dataset.uid || '', event.target.checked)
+      if (!isOk) event.target.checked = !event.target.checked
     })
   })
 
@@ -515,6 +523,10 @@ async function toggleDone(uid, nextChecked) {
     : null
 
   try {
+    const actor = await requestActorAuth('เปลี่ยนสถานะ done')
+    const actorEmail = String(actor?.email || '').trim().toLowerCase()
+    if (!actorEmail) throw new Error('Jira email is required')
+
     if (taskMatch) {
       await apiFetch('/api/todo', {
         method: 'PUT',
@@ -522,7 +534,9 @@ async function toggleDone(uid, nextChecked) {
         body: JSON.stringify({
           id: taskMatch.id,
           isDone: nextChecked,
-          doneAt: nextChecked ? new Date().toISOString() : ''
+          doneAt: nextChecked ? new Date().toISOString() : '',
+          doneByEmail: nextChecked ? actorEmail : '',
+          actorEmail
         })
       })
     } else if (plannerItem) {
@@ -540,13 +554,17 @@ async function toggleDone(uid, nextChecked) {
           start: plannerItem.start || '',
           end: plannerItem.end || '',
           isDone: nextChecked,
-          doneAt: nextChecked ? new Date().toISOString() : ''
+          doneAt: nextChecked ? new Date().toISOString() : '',
+          doneByEmail: nextChecked ? actorEmail : '',
+          actorEmail
         })
       })
     }
     await loadData()
+    return true
   } catch (error) {
     setNotice(byId('todoSync'), error.message || 'Unable to update task status', 'error')
+    return false
   }
 }
 
@@ -566,6 +584,11 @@ async function saveLog(uid, message) {
   }
 
   try {
+    const actor = await requestActorAuth('เพิ่ม update log')
+    const actorEmail = String(actor?.email || '').trim().toLowerCase()
+    if (!actorEmail) throw new Error('Jira email is required')
+    nextLog.actorEmail = actorEmail
+
     setNotice(byId('todoSync'), 'Saving update log...')
     if (taskMatch) {
       await apiFetch('/api/todo', {
@@ -573,7 +596,8 @@ async function saveLog(uid, message) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: taskMatch.id,
-          logs: [...(Array.isArray(taskMatch.logs) ? taskMatch.logs : []), nextLog]
+          logs: [...(Array.isArray(taskMatch.logs) ? taskMatch.logs : []), nextLog],
+          actorEmail
         })
       })
     } else if (plannerItem) {
@@ -591,7 +615,8 @@ async function saveLog(uid, message) {
           start: plannerItem.start || '',
           end: plannerItem.end || '',
           isDone: false,
-          logs: [nextLog]
+          logs: [nextLog],
+          actorEmail
         })
       })
     }

@@ -11,7 +11,7 @@ const listCache = {
   expiresAt: 0
 }
 
-const SHEET_COLUMNS = ['id', 'plannerRefId', 'sourceType', 'key', 'title', 'owner', 'note', 'color', 'isDone', 'doneAt', 'createdAt', 'updatedAt', 'isDeleted', 'deletedAt', 'start', 'end', 'logsJson', 'createdByEmail', 'updatedByEmail', 'deletedByEmail', 'auditJson']
+const SHEET_COLUMNS = ['id', 'plannerRefId', 'sourceType', 'key', 'title', 'owner', 'note', 'color', 'isDone', 'doneAt', 'createdAt', 'updatedAt', 'isDeleted', 'deletedAt', 'start', 'end', 'logsJson', 'createdByEmail', 'updatedByEmail', 'deletedByEmail', 'auditJson', 'doneByEmail']
 const DEFAULT_GOOGLE_SHEETS_URL = 'https://docs.google.com/spreadsheets/d/1FzgaU35q3dvDVAf3vAqirRcUFemd_OThXr1o7NdJrGI/edit?usp=sharing'
 const DEFAULT_TASK_COLOR = '#2c6e91'
 
@@ -72,7 +72,8 @@ function normalizeLogs(rawLogs = []) {
     .map((entry) => ({
       id: String(entry?.id || '').trim() || `log_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       message: String(entry?.message || '').trim(),
-      createdAt: String(entry?.createdAt || '').trim() || nowIso()
+      createdAt: String(entry?.createdAt || '').trim() || nowIso(),
+      actorEmail: normalizeEmail(entry?.actorEmail)
     }))
     .filter((entry) => entry.message)
     .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
@@ -129,6 +130,9 @@ function normalizeTodo(raw = {}, forUpdate = false) {
   const doneAt = isDone === 'true'
     ? String(raw.doneAt || '').trim() || nowIso()
     : ''
+  const doneByEmail = isDone === 'true'
+    ? normalizeEmail(raw.doneByEmail) || actorEmail
+    : ''
   const createdAt = String(raw.createdAt || '').trim() || nowIso()
   const updatedAt = nowIso()
   const isDeleted = String(raw.isDeleted || '').trim().toLowerCase() === 'true' ? 'true' : 'false'
@@ -160,6 +164,7 @@ function normalizeTodo(raw = {}, forUpdate = false) {
     color,
     isDone,
     doneAt,
+    doneByEmail,
     createdAt,
     updatedAt,
     isDeleted,
@@ -331,7 +336,8 @@ function toRowValues(item) {
     normalizeEmail(item.createdByEmail),
     normalizeEmail(item.updatedByEmail),
     normalizeEmail(item.deletedByEmail),
-    JSON.stringify(Array.isArray(item.auditTrail) ? item.auditTrail : [])
+    JSON.stringify(Array.isArray(item.auditTrail) ? item.auditTrail : []),
+    normalizeEmail(item.doneByEmail)
   ]
 }
 
@@ -359,6 +365,7 @@ function rowToItem(row = [], rowNumber = 0) {
     updatedByEmail: normalizeEmail(getCell(18)),
     deletedByEmail: normalizeEmail(getCell(19)),
     auditTrail: normalizeAuditTrail(getCell(20)),
+    doneByEmail: normalizeEmail(getCell(21)),
     _rowNumber: rowNumber
   }
 }
@@ -446,6 +453,7 @@ function itemMatchesQuery(item, queryText) {
     item.createdByEmail,
     item.updatedByEmail,
     item.deletedByEmail,
+    item.doneByEmail,
     item.start,
     item.end,
     ...(Array.isArray(item.logs) ? item.logs.map((entry) => `${entry.message} ${entry.createdAt}`) : [])
