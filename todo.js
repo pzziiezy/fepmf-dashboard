@@ -225,8 +225,8 @@ function renderList() {
           </label>
           <div class="todo-copy">
             <div class="todo-title-row">
-              <strong>${esc(item.title)}</strong>
               <span class="badge ${item.origin === 'planner' ? 'status-manual' : 'badge-checklist'}">${esc(item.origin === 'planner' ? 'Planner manual' : 'Checklist')}</span>
+              <strong>${esc(item.title)}</strong>
               ${item.key ? `<span class="tag">${esc(item.key)}</span>` : ''}
             </div>
             <div class="todo-meta">${esc(meta)} | ${esc(item.owner || '-')}</div>
