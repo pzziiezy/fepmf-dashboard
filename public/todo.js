@@ -1,4 +1,5 @@
 const TODO_DEFAULT_COLOR = '#2c6e91'
+const TODO_AUTH_SESSION_KEY = 'todo_actor_session_v1'
 
 const state = {
   tasks: [],
@@ -7,8 +8,10 @@ const state = {
   statusFilter: 'open',
   sourceFilter: 'all',
   editingTaskId: '',
+  editingActorEmail: '',
   expandedLogUid: '',
-  sheetName: 'PlannerTasks'
+  sheetName: 'PlannerTasks',
+  authPending: null
 }
 
 function esc(value) {
@@ -78,6 +81,78 @@ function apiFetch(url, options = {}) {
     })
 }
 
+function getStoredActor() {
+  try {
+    const raw = sessionStorage.getItem(TODO_AUTH_SESSION_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    const email = String(parsed?.email || '').trim().toLowerCase()
+    if (!email) return null
+    return {
+      email,
+      displayName: String(parsed?.displayName || '').trim(),
+      accountId: String(parsed?.accountId || '').trim()
+    }
+  } catch {
+    return null
+  }
+}
+
+function storeActor(actor) {
+  const email = String(actor?.email || '').trim().toLowerCase()
+  if (!email) return
+  sessionStorage.setItem(TODO_AUTH_SESSION_KEY, JSON.stringify({
+    email,
+    displayName: String(actor?.displayName || '').trim(),
+    accountId: String(actor?.accountId || '').trim()
+  }))
+}
+
+function clearStoredActor() {
+  sessionStorage.removeItem(TODO_AUTH_SESSION_KEY)
+}
+
+async function validateJiraEmail(email) {
+  return apiFetch(`/api/jira?action=validate_email&email=${encodeURIComponent(String(email || '').trim())}`)
+}
+
+function closeAuthModal() {
+  byId('todoAuthModal').hidden = true
+}
+
+function cancelAuthModal(message = 'ยกเลิกการยืนยันตัวตน') {
+  const pending = state.authPending
+  state.authPending = null
+  closeAuthModal()
+  if (pending?.reject) pending.reject(new Error(message))
+}
+
+function openAuthModal(actionLabel = 'ทำรายการ') {
+  const modal = byId('todoAuthModal')
+  const subtitle = byId('todoAuthSubtitle')
+  const emailInput = byId('todoAuthEmail')
+  const remember = byId('todoAuthRemember')
+  const status = byId('todoAuthStatus')
+  const saved = getStoredActor()
+
+  subtitle.textContent = `กรอกอีเมล Jira เพื่อยืนยันก่อน${actionLabel}`
+  emailInput.value = saved?.email || ''
+  remember.checked = Boolean(saved)
+  setNotice(status, '')
+  modal.hidden = false
+  setTimeout(() => emailInput.focus(), 0)
+}
+
+function requestActorAuth(actionLabel) {
+  const saved = getStoredActor()
+  if (saved) return Promise.resolve(saved)
+
+  return new Promise((resolve, reject) => {
+    state.authPending = { actionLabel, resolve, reject }
+    openAuthModal(actionLabel)
+  })
+}
+
 function getTaskMapByPlannerRef() {
   return new Map(
     state.tasks
@@ -106,6 +181,9 @@ function getCombinedItems() {
         doneAt: task.doneAt || '',
         createdAt: task.createdAt || '',
         updatedAt: task.updatedAt || '',
+        createdByEmail: task.createdByEmail || '',
+        updatedByEmail: task.updatedByEmail || '',
+        deletedByEmail: task.deletedByEmail || '',
         start: task.start || '',
         end: task.end || ''
       })),
@@ -126,6 +204,9 @@ function getCombinedItems() {
         doneAt: syncedTask?.doneAt || '',
         createdAt: syncedTask?.createdAt || planner.createdAt || '',
         updatedAt: syncedTask?.updatedAt || planner.updatedAt || '',
+        createdByEmail: syncedTask?.createdByEmail || '',
+        updatedByEmail: syncedTask?.updatedByEmail || '',
+        deletedByEmail: syncedTask?.deletedByEmail || '',
         start: planner.start || '',
         end: planner.end || ''
       }
@@ -211,9 +292,10 @@ function renderList() {
     const rangeText = hasTimelineDates(item.start, item.end)
       ? `${formatThaiDate(item.start)} - ${formatThaiDate(item.end)}`
       : 'No timeline date'
+    const actorText = String(item.updatedByEmail || item.createdByEmail || '').trim()
     const meta = item.origin === 'planner'
-      ? rangeText
-      : `${rangeText} | Updated ${formatThaiDateTime(item.updatedAt || item.createdAt)}`
+      ? `${rangeText}${actorText ? ` | By ${actorText}` : ''}`
+      : `${rangeText} | Updated ${formatThaiDateTime(item.updatedAt || item.createdAt)}${actorText ? ` | By ${actorText}` : ''}`
     const logs = Array.isArray(item.logs) ? item.logs : []
     const isExpanded = state.expandedLogUid === item.uid
     return `
@@ -272,14 +354,20 @@ function renderList() {
   })
 
   byId('todoList').querySelectorAll('[data-role="edit"]').forEach((button) => {
-    button.addEventListener('click', () => {
+    button.addEventListener('click', async () => {
       const uid = button.closest('.todo-card')?.dataset.uid || ''
       const taskId = uid.replace(/^todo:/, '')
       const task = state.tasks.find((item) => item.id === taskId && String(item.sourceType || 'todo') === 'todo')
       if (!task) return
-      state.editingTaskId = task.id
-      hydrateForm(task)
-      setNotice(byId('todoFormStatus'), 'Editing checklist item...')
+      try {
+        const actor = await requestActorAuth('เปิดโหมดแก้ไข')
+        state.editingTaskId = task.id
+        state.editingActorEmail = actor.email || ''
+        hydrateForm(task)
+        setNotice(byId('todoFormStatus'), `Editing checklist item as ${state.editingActorEmail || 'verified user'}...`)
+      } catch (error) {
+        setNotice(byId('todoFormStatus'), error.message || 'Auth cancelled', 'error')
+      }
     })
   })
 
@@ -289,7 +377,12 @@ function renderList() {
       const taskId = uid.replace(/^todo:/, '')
       if (!taskId) return
       try {
-        await apiFetch(`/api/todo?id=${encodeURIComponent(taskId)}`, { method: 'DELETE' })
+        const actor = await requestActorAuth('ลบรายการ')
+        await apiFetch('/api/todo', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: taskId, actorEmail: actor.email || '' })
+        })
         if (state.editingTaskId === taskId) resetForm()
         await loadData()
       } catch (error) {
@@ -320,6 +413,7 @@ function renderList() {
 
 function resetForm() {
   state.editingTaskId = ''
+  state.editingActorEmail = ''
   byId('todoForm').reset()
   byId('todoForm').color.value = TODO_DEFAULT_COLOR
   hydrateForm(null)
@@ -511,6 +605,50 @@ async function saveLog(uid, message) {
 }
 
 function bindEvents() {
+  byId('todoAuthCancel').addEventListener('click', () => cancelAuthModal())
+  byId('todoAuthBackdrop').addEventListener('click', () => cancelAuthModal())
+  byId('todoAuthForm').addEventListener('submit', async (event) => {
+    event.preventDefault()
+    const pending = state.authPending
+    if (!pending) return
+
+    const email = String(byId('todoAuthEmail').value || '').trim().toLowerCase()
+    const remember = Boolean(byId('todoAuthRemember').checked)
+    const status = byId('todoAuthStatus')
+    const confirmBtn = byId('todoAuthConfirm')
+
+    if (!email) {
+      setNotice(status, 'กรุณากรอกอีเมล Jira', 'error')
+      return
+    }
+
+    try {
+      confirmBtn.disabled = true
+      setNotice(status, 'กำลังตรวจสอบอีเมลกับ Jira...')
+      const result = await validateJiraEmail(email)
+      if (!result?.valid) {
+        throw new Error(result?.reason || 'ไม่พบอีเมลนี้ใน Jira')
+      }
+
+      const actor = {
+        email: String(result?.user?.email || email).trim().toLowerCase(),
+        displayName: String(result?.user?.displayName || '').trim(),
+        accountId: String(result?.user?.accountId || '').trim()
+      }
+
+      if (remember) storeActor(actor)
+      else clearStoredActor()
+
+      state.authPending = null
+      closeAuthModal()
+      pending.resolve(actor)
+    } catch (error) {
+      setNotice(status, error.message || 'ยืนยันตัวตนไม่สำเร็จ', 'error')
+    } finally {
+      confirmBtn.disabled = false
+    }
+  })
+
   byId('todoColorPreview').addEventListener('click', () => {
     byId('todoColorInput')?.click()
   })
@@ -550,6 +688,12 @@ function bindEvents() {
     }
 
     try {
+      const actor = state.editingTaskId && state.editingActorEmail
+        ? { email: state.editingActorEmail }
+        : await requestActorAuth(state.editingTaskId ? 'บันทึกการแก้ไข' : 'สร้างรายการใหม่')
+      const actorEmail = String(actor?.email || '').trim().toLowerCase()
+      if (!actorEmail) throw new Error('Jira email is required')
+
       setNotice(byId('todoFormStatus'), state.editingTaskId ? 'Updating task...' : 'Saving task...')
       const editingTask = state.editingTaskId
         ? state.tasks.find((task) => task.id === state.editingTaskId)
@@ -563,13 +707,13 @@ function bindEvents() {
         await apiFetch('/api/todo', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...syncedPayload, id: state.editingTaskId })
+          body: JSON.stringify({ ...syncedPayload, id: state.editingTaskId, actorEmail })
         })
       } else {
         await apiFetch('/api/todo', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(syncedPayload)
+          body: JSON.stringify({ ...syncedPayload, actorEmail })
         })
       }
       await loadData()

@@ -11,9 +11,22 @@ const listCache = {
   expiresAt: 0
 }
 
-const SHEET_COLUMNS = ['id', 'plannerRefId', 'sourceType', 'key', 'title', 'owner', 'note', 'color', 'isDone', 'doneAt', 'createdAt', 'updatedAt', 'isDeleted', 'deletedAt', 'start', 'end', 'logsJson']
+const SHEET_COLUMNS = ['id', 'plannerRefId', 'sourceType', 'key', 'title', 'owner', 'note', 'color', 'isDone', 'doneAt', 'createdAt', 'updatedAt', 'isDeleted', 'deletedAt', 'start', 'end', 'logsJson', 'createdByEmail', 'updatedByEmail', 'deletedByEmail', 'auditJson']
 const DEFAULT_GOOGLE_SHEETS_URL = 'https://docs.google.com/spreadsheets/d/1FzgaU35q3dvDVAf3vAqirRcUFemd_OThXr1o7NdJrGI/edit?usp=sharing'
 const DEFAULT_TASK_COLOR = '#2c6e91'
+
+function toSheetColumnLetter(index) {
+  let out = ''
+  let n = Number(index || 1)
+  while (n > 0) {
+    const mod = (n - 1) % 26
+    out = String.fromCharCode(65 + mod) + out
+    n = Math.floor((n - mod) / 26)
+  }
+  return out || 'A'
+}
+
+const SHEET_LAST_COLUMN = toSheetColumnLetter(SHEET_COLUMNS.length)
 
 function firstEnv(...names) {
   for (const name of names) {
@@ -25,6 +38,10 @@ function firstEnv(...names) {
 
 function nowIso() {
   return new Date().toISOString()
+}
+
+function normalizeEmail(value) {
+  return String(value || '').trim().toLowerCase()
 }
 
 function cloneItems(items = []) {
@@ -61,7 +78,42 @@ function normalizeLogs(rawLogs = []) {
     .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
 }
 
+function normalizeAuditTrail(rawAudit = []) {
+  const source = typeof rawAudit === 'string'
+    ? (() => {
+        try {
+          const parsed = JSON.parse(rawAudit)
+          return Array.isArray(parsed) ? parsed : []
+        } catch {
+          return []
+        }
+      })()
+    : Array.isArray(rawAudit)
+      ? rawAudit
+      : []
+
+  return source
+    .map((entry) => ({
+      id: String(entry?.id || '').trim() || `audit_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      action: String(entry?.action || '').trim().toLowerCase() || 'update',
+      actorEmail: normalizeEmail(entry?.actorEmail),
+      createdAt: String(entry?.createdAt || '').trim() || nowIso()
+    }))
+    .filter((entry) => entry.action)
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+}
+
+function makeAuditEntry(action, actorEmail) {
+  return {
+    id: `audit_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    action: String(action || 'update').trim().toLowerCase(),
+    actorEmail: normalizeEmail(actorEmail),
+    createdAt: nowIso()
+  }
+}
+
 function normalizeTodo(raw = {}, forUpdate = false) {
+  const actorEmail = normalizeEmail(raw.actorEmail)
   const id = String(raw.id || '').trim() || `todo_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
   const plannerRefId = String(raw.plannerRefId || '').trim()
   const sourceType = String(raw.sourceType || 'todo').trim().toLowerCase() || 'todo'
@@ -84,6 +136,10 @@ function normalizeTodo(raw = {}, forUpdate = false) {
   const start = String(raw.start || '').trim()
   const end = String(raw.end || '').trim()
   const logs = normalizeLogs(raw.logs || raw.logsJson)
+  const createdByEmail = normalizeEmail(raw.createdByEmail) || (!forUpdate ? actorEmail : '')
+  const updatedByEmail = normalizeEmail(raw.updatedByEmail) || actorEmail || createdByEmail
+  const deletedByEmail = normalizeEmail(raw.deletedByEmail) || (String(raw.isDeleted || '').trim().toLowerCase() === 'true' ? actorEmail : '')
+  const auditTrail = normalizeAuditTrail(raw.auditTrail || raw.auditJson)
 
   if (!forUpdate && !title) throw new Error('title is required')
   if (forUpdate && !id) throw new Error('id is required for update')
@@ -110,7 +166,11 @@ function normalizeTodo(raw = {}, forUpdate = false) {
     deletedAt,
     start,
     end,
-    logs
+    logs,
+    createdByEmail,
+    updatedByEmail,
+    deletedByEmail,
+    auditTrail
   }
 }
 
@@ -236,7 +296,7 @@ async function ensureSheetExists(sheetName) {
 
 async function ensureSheetHeader(sheetName) {
   await ensureSheetExists(sheetName)
-  const range = `${sheetName}!A1:Q1`
+  const range = `${sheetName}!A1:${SHEET_LAST_COLUMN}1`
   const result = await googleRequest(`/values/${encodeURIComponent(range)}`)
   const current = result.values?.[0] || []
   const expected = SHEET_COLUMNS
@@ -267,29 +327,38 @@ function toRowValues(item) {
     item.deletedAt || '',
     item.start || '',
     item.end || '',
-    JSON.stringify(Array.isArray(item.logs) ? item.logs : [])
+    JSON.stringify(Array.isArray(item.logs) ? item.logs : []),
+    normalizeEmail(item.createdByEmail),
+    normalizeEmail(item.updatedByEmail),
+    normalizeEmail(item.deletedByEmail),
+    JSON.stringify(Array.isArray(item.auditTrail) ? item.auditTrail : [])
   ]
 }
 
 function rowToItem(row = [], rowNumber = 0) {
+  const getCell = (index) => String(row?.[index] || '').trim()
   return {
-    id: String(row[0] || '').trim(),
-    plannerRefId: String(row[1] || '').trim(),
-    sourceType: String(row[2] || 'todo').trim().toLowerCase() || 'todo',
-    key: String(row[3] || '').trim(),
-    title: String(row[4] || '').trim(),
-    owner: String(row[5] || '').trim(),
-    note: String(row[6] || '').trim(),
-    color: String(row[7] || '').trim() || DEFAULT_TASK_COLOR,
-    isDone: String(row[8] || '').trim().toLowerCase() === 'true',
-    doneAt: String(row[9] || '').trim(),
-    createdAt: String(row[10] || '').trim(),
-    updatedAt: String(row[11] || '').trim(),
-    isDeleted: String(row[12] || '').trim().toLowerCase() === 'true',
-    deletedAt: String(row[13] || '').trim(),
-    start: String(row.length >= 17 ? row[14] || '' : '').trim(),
-    end: String(row.length >= 17 ? row[15] || '' : '').trim(),
-    logs: normalizeLogs(String(row.length >= 17 ? row[16] : row[14] || '').trim()),
+    id: getCell(0),
+    plannerRefId: getCell(1),
+    sourceType: getCell(2).toLowerCase() || 'todo',
+    key: getCell(3),
+    title: getCell(4),
+    owner: getCell(5),
+    note: getCell(6),
+    color: getCell(7) || DEFAULT_TASK_COLOR,
+    isDone: getCell(8).toLowerCase() === 'true',
+    doneAt: getCell(9),
+    createdAt: getCell(10),
+    updatedAt: getCell(11),
+    isDeleted: getCell(12).toLowerCase() === 'true',
+    deletedAt: getCell(13),
+    start: getCell(14),
+    end: getCell(15),
+    logs: normalizeLogs(getCell(16)),
+    createdByEmail: normalizeEmail(getCell(17)),
+    updatedByEmail: normalizeEmail(getCell(18)),
+    deletedByEmail: normalizeEmail(getCell(19)),
+    auditTrail: normalizeAuditTrail(getCell(20)),
     _rowNumber: rowNumber
   }
 }
@@ -301,7 +370,7 @@ async function listGoogleSheetItems(sheetName, includeDeleted = false) {
   }
 
   await ensureSheetHeader(sheetName)
-  const range = `${sheetName}!A2:Q`
+  const range = `${sheetName}!A2:${SHEET_LAST_COLUMN}`
   const result = await googleRequest(`/values/${encodeURIComponent(range)}`)
   const rows = result.values || []
   const all = rows.map((row, idx) => rowToItem(row, idx + 2)).filter((item) => item.id && item.title)
@@ -315,7 +384,7 @@ async function listGoogleSheetItems(sheetName, includeDeleted = false) {
 }
 
 async function appendGoogleSheetItem(sheetName, item) {
-  const range = `${sheetName}!A:Q`
+  const range = `${sheetName}!A:${SHEET_LAST_COLUMN}`
   await googleRequest(`/values/${encodeURIComponent(range)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {
     method: 'POST',
     body: JSON.stringify({ values: [toRowValues(item)] })
@@ -329,8 +398,17 @@ async function updateGoogleSheetItem(sheetName, id, patch) {
   const target = items.find((item) => item.id === id)
   if (!target) throw new Error('Item not found')
 
-  const merged = normalizeTodo({ ...target, ...patch, id, createdAt: target.createdAt || nowIso() }, true)
-  const range = `${sheetName}!A${target._rowNumber}:Q${target._rowNumber}`
+  const targetAudit = normalizeAuditTrail(target.auditTrail || target.auditJson)
+  const patchAudit = patch?._appendAudit
+    ? [...targetAudit, patch._appendAudit]
+    : (patch?.auditTrail || patch?.auditJson)
+      ? normalizeAuditTrail(patch.auditTrail || patch.auditJson)
+      : targetAudit
+  const patchClean = { ...(patch || {}) }
+  delete patchClean._appendAudit
+
+  const merged = normalizeTodo({ ...target, ...patchClean, auditTrail: patchAudit, id, createdAt: target.createdAt || nowIso() }, true)
+  const range = `${sheetName}!A${target._rowNumber}:${SHEET_LAST_COLUMN}${target._rowNumber}`
   await googleRequest(`/values/${encodeURIComponent(range)}?valueInputOption=RAW`, {
     method: 'PUT',
     body: JSON.stringify({ values: [toRowValues(merged)] })
@@ -345,7 +423,7 @@ async function softDeleteGoogleSheetItem(sheetName, id) {
   if (!target) throw new Error('Item not found')
 
   const deleted = normalizeTodo({ ...target, isDeleted: 'true', deletedAt: nowIso() }, true)
-  const range = `${sheetName}!A${target._rowNumber}:Q${target._rowNumber}`
+  const range = `${sheetName}!A${target._rowNumber}:${SHEET_LAST_COLUMN}${target._rowNumber}`
   await googleRequest(`/values/${encodeURIComponent(range)}?valueInputOption=RAW`, {
     method: 'PUT',
     body: JSON.stringify({ values: [toRowValues(deleted)] })
@@ -365,6 +443,9 @@ function itemMatchesQuery(item, queryText) {
     item.title,
     item.owner,
     item.note,
+    item.createdByEmail,
+    item.updatedByEmail,
+    item.deletedByEmail,
     item.start,
     item.end,
     ...(Array.isArray(item.logs) ? item.logs.map((entry) => `${entry.message} ${entry.createdAt}`) : [])
@@ -435,7 +516,14 @@ export default async function handler(req, res) {
       }
 
       if (req.method === 'POST') {
-        const item = normalizeTodo(parseBody(req))
+        const body = parseBody(req)
+        const actorEmail = normalizeEmail(body.actorEmail)
+        const item = normalizeTodo({
+          ...body,
+          createdByEmail: normalizeEmail(body.createdByEmail) || actorEmail,
+          updatedByEmail: normalizeEmail(body.updatedByEmail) || actorEmail,
+          auditTrail: [...normalizeAuditTrail(body.auditTrail || body.auditJson), makeAuditEntry('create', actorEmail)]
+        })
         const saved = await appendGoogleSheetItem(sheetName, item)
         return res.status(201).json({ ok: true, item: saved, source: 'google_sheets', sheetName })
       }
@@ -444,7 +532,12 @@ export default async function handler(req, res) {
         const body = parseBody(req)
         const id = String(body.id || '').trim()
         if (!id) return res.status(400).json({ error: 'id is required' })
-        const updated = await updateGoogleSheetItem(sheetName, id, body)
+        const actorEmail = normalizeEmail(body.actorEmail)
+        const updated = await updateGoogleSheetItem(sheetName, id, {
+          ...body,
+          updatedByEmail: actorEmail || normalizeEmail(body.updatedByEmail),
+          _appendAudit: makeAuditEntry('update', actorEmail)
+        })
         return res.status(200).json({ ok: true, item: updated, source: 'google_sheets', sheetName })
       }
 
@@ -452,8 +545,16 @@ export default async function handler(req, res) {
         const body = parseBody(req)
         const id = String(body.id || req.query?.id || '').trim()
         if (!id) return res.status(400).json({ error: 'id is required' })
-        const deleted = await softDeleteGoogleSheetItem(sheetName, id)
-        return res.status(200).json({ ...deleted, source: 'google_sheets', sheetName })
+        const actorEmail = normalizeEmail(body.actorEmail)
+        const deleted = await updateGoogleSheetItem(sheetName, id, {
+          isDeleted: 'true',
+          deletedAt: nowIso(),
+          deletedByEmail: actorEmail,
+          updatedByEmail: actorEmail,
+          _appendAudit: makeAuditEntry('delete', actorEmail)
+        })
+        invalidateListCache()
+        return res.status(200).json({ ok: true, id, softDeleted: true, item: deleted, source: 'google_sheets', sheetName })
       }
 
       return res.status(405).json({ error: 'Method not allowed' })
@@ -467,7 +568,14 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-      const item = normalizeTodo(parseBody(req))
+      const body = parseBody(req)
+      const actorEmail = normalizeEmail(body.actorEmail)
+      const item = normalizeTodo({
+        ...body,
+        createdByEmail: normalizeEmail(body.createdByEmail) || actorEmail,
+        updatedByEmail: normalizeEmail(body.updatedByEmail) || actorEmail,
+        auditTrail: [...normalizeAuditTrail(body.auditTrail || body.auditJson), makeAuditEntry('create', actorEmail)]
+      })
       memoryStore.unshift(item)
       return res.status(201).json({ ok: true, item, source: 'memory', warning: 'Google Sheets not configured', sheetName })
     }
@@ -479,7 +587,14 @@ export default async function handler(req, res) {
       const idx = memoryStore.findIndex((item) => item.id === id)
       if (idx < 0) return res.status(404).json({ error: 'Item not found' })
 
-      const merged = normalizeTodo({ ...memoryStore[idx], ...body, id }, true)
+      const actorEmail = normalizeEmail(body.actorEmail)
+      const merged = normalizeTodo({
+        ...memoryStore[idx],
+        ...body,
+        id,
+        updatedByEmail: actorEmail || normalizeEmail(body.updatedByEmail),
+        auditTrail: [...normalizeAuditTrail(memoryStore[idx]?.auditTrail || memoryStore[idx]?.auditJson), makeAuditEntry('update', actorEmail)]
+      }, true)
       memoryStore[idx] = merged
       return res.status(200).json({ ok: true, item: merged, source: 'memory', warning: 'Google Sheets not configured', sheetName })
     }
@@ -490,7 +605,16 @@ export default async function handler(req, res) {
       if (!id) return res.status(400).json({ error: 'id is required' })
       const idx = memoryStore.findIndex((item) => item.id === id)
       if (idx < 0) return res.status(404).json({ error: 'Item not found' })
-      memoryStore[idx] = normalizeTodo({ ...memoryStore[idx], isDeleted: 'true', deletedAt: nowIso(), id }, true)
+      const actorEmail = normalizeEmail(body.actorEmail)
+      memoryStore[idx] = normalizeTodo({
+        ...memoryStore[idx],
+        isDeleted: 'true',
+        deletedAt: nowIso(),
+        deletedByEmail: actorEmail,
+        updatedByEmail: actorEmail,
+        id,
+        auditTrail: [...normalizeAuditTrail(memoryStore[idx]?.auditTrail || memoryStore[idx]?.auditJson), makeAuditEntry('delete', actorEmail)]
+      }, true)
       return res.status(200).json({ ok: true, id, softDeleted: true, source: 'memory', warning: 'Google Sheets not configured', sheetName })
     }
 

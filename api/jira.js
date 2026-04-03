@@ -68,7 +68,7 @@ export default async function handler(req, res) {
 }
 
   try {
-    const { action = 'fepmf', keys = '', key = '' } = req.query
+    const { action = 'fepmf', keys = '', key = '', email = '' } = req.query
 
     // 1) ดึง FEPMF ทั้งหมด
     if (action === 'fepmf') {
@@ -165,6 +165,32 @@ export default async function handler(req, res) {
         hasEmail: !!EMAIL,
         hasToken: !!TOKEN,
         base: BASE
+      })
+    }
+
+    if (action === 'validate_email') {
+      const normalizedEmail = String(email || '').trim().toLowerCase()
+      if (!normalizedEmail) return res.status(400).json({ valid: false, error: 'email is required' })
+
+      const users = await fetchJira(`/user/search?query=${encodeURIComponent(normalizedEmail)}&maxResults=50`)
+      const list = Array.isArray(users) ? users : []
+      const exact = list.find((user) => String(user?.emailAddress || '').trim().toLowerCase() === normalizedEmail)
+
+      if (!exact) {
+        return res.status(200).json({
+          valid: false,
+          reason: 'Email not found in Jira (or hidden by Jira privacy policy)'
+        })
+      }
+
+      return res.status(200).json({
+        valid: true,
+        user: {
+          email: String(exact.emailAddress || '').trim(),
+          displayName: String(exact.displayName || '').trim(),
+          accountId: String(exact.accountId || '').trim(),
+          active: Boolean(exact.active)
+        }
       })
     }
 

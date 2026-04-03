@@ -93,6 +93,28 @@
       </main>
     </section>
   </div>
-  <script src="/todo.js?v=20260403c"></script>
+  <div id="todoAuthModal" class="todo-auth-modal" hidden>
+    <div id="todoAuthBackdrop" class="todo-auth-backdrop"></div>
+    <section class="todo-auth-dialog" role="dialog" aria-modal="true" aria-labelledby="todoAuthTitle">
+      <h3 id="todoAuthTitle">ยืนยันตัวตนก่อนทำรายการ</h3>
+      <p id="todoAuthSubtitle" class="todo-auth-subtitle">กรอกอีเมลที่ใช้งานใน Jira เพื่อลงชื่อผู้ทำรายการ</p>
+      <form id="todoAuthForm" class="todo-auth-form">
+        <label class="field full">
+          <span>Jira Email *</span>
+          <input id="todoAuthEmail" type="email" placeholder="name@company.com" required />
+        </label>
+        <label class="todo-auth-remember">
+          <input id="todoAuthRemember" type="checkbox" />
+          <span>จดจำฉันใน session นี้</span>
+        </label>
+        <div id="todoAuthStatus" class="notice"></div>
+        <div class="todo-auth-actions">
+          <button id="todoAuthCancel" class="btn" type="button">ยกเลิก</button>
+          <button id="todoAuthConfirm" class="btn primary" type="submit">ยืนยัน</button>
+        </div>
+      </form>
+    </section>
+  </div>
+  <script src="/todo.js?v=20260403e"></script>
 </body>
 </html>
