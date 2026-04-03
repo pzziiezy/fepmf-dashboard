@@ -531,8 +531,8 @@ function renderInspector(selected) {
     <div class="planner-lab-inspector-card ${selected.source}" ${themeStyle}>
       <div class="planner-lab-inspector-top">
         <div>
-          <div class="planner-lab-inspector-key">${esc(selected.key || '-')}</div>
           <div class="planner-lab-inspector-title">${esc(selected.title)}</div>
+          <div class="planner-lab-inspector-key">${esc(selected.key || '-')}</div>
         </div>
         <span class="${statusBadgeClass(selected.status)}">${esc(selected.status)}</span>
       </div>
