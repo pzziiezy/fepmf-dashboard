@@ -2403,8 +2403,24 @@ textarea {
   letter-spacing: 0.02em;
 }
 
+.todo-card.todo-card-checklist .todo-title-row strong {
+  color: #0b2a4a;
+}
+
+.todo-card.todo-card-checklist .todo-meta,
+.todo-card.todo-card-checklist .todo-note,
+.todo-card.todo-card-checklist .todo-done-at {
+  color: #183d63;
+}
+
+.todo-card.todo-card-checklist .todo-title-row .tag {
+  background: color-mix(in srgb, var(--todo-accent, #2b6b9b) 24%, #ffffff 76%);
+  border-color: color-mix(in srgb, var(--todo-accent, #2b6b9b) 50%, #c7d8ea 50%);
+  color: #13365a;
+}
+
 .todo-card.todo-card-checklist .todo-log-summary {
-  color: color-mix(in srgb, var(--todo-accent, #1d5a98) 70%, #123760 30%);
+  color: #0f4b84;
 }
 
 .badge-checklist {
