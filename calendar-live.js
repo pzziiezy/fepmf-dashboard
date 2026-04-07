@@ -622,7 +622,7 @@ function renderManualList() {
   host.innerHTML = state.plans.map((item) => `
     <div class="item-row planner-lab-manual-card">
       <div class="item-top">
-        <div><strong>${esc(item.key || '-')}</strong> ${esc(item.title)}</div>
+        <div><strong>${esc(item.title)}</strong> ${esc(item.key ? `(${item.key})` : '')}</div>
         <span class="badge status-default">${esc(item.start)} - ${esc(item.end)}</span>
       </div>
       <div class="item-meta">Owner: ${esc(item.owner || '-')} | Sprint: ${esc(item.sprint || '-')} | ${esc(durationDays(item.start, item.end))} วัน</div>
