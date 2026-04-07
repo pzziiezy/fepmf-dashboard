@@ -2407,8 +2407,8 @@ textarea {
 }
 
 .todo-table-col-note {
-  min-width: 220px;
-  max-width: 280px;
+  min-width: 150px;
+  max-width: 190px;
   color: #375776;
   white-space: normal;
   word-break: break-word;
@@ -2448,18 +2448,17 @@ textarea {
   font-weight: 800;
 }
 
-.todo-table-actions {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 6px;
-  align-items: center;
-  white-space: nowrap;
+.todo-table-actions-stack {
+  display: grid;
+  gap: 3px;
 }
 
-.todo-table-actions .btn {
-  min-height: 36px;
-  padding: 7px 12px;
-  border-radius: 11px;
+.todo-table-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
 }
 
 .todo-table-action-text {
@@ -2477,12 +2476,6 @@ textarea {
 .todo-table-action-text:hover {
   color: #0d63ce;
   text-decoration: underline;
-}
-
-.todo-table-action-text + .todo-table-action-text::before {
-  content: "|";
-  color: #9aaec5;
-  margin-right: 6px;
 }
 
 .todo-table-log-row td {

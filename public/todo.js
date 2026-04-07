@@ -957,11 +957,15 @@ function todoRenderTableRows(item) {
       <td>${esc(doneText)}</td>
       <td>${esc(String(logs.length))}</td>
       <td>
-        <div class="todo-table-actions">
-          ${item.origin === 'planner'
-            ? '<a class="todo-table-action-text" href="/calendar.html" target="_blank" rel="noopener noreferrer">Open planner</a>'
-            : '<button class="todo-table-action-text" type="button" data-role="edit">Edit</button><button class="todo-table-action-text" type="button" data-role="delete">Delete</button>'}
-          <button class="todo-table-action-text" type="button" data-role="toggle-log">${isExpanded ? 'Hide logs' : 'View logs'}</button>
+        <div class="todo-table-actions-stack">
+          <div class="todo-table-actions-row">
+            <button class="todo-table-action-text" type="button" data-role="toggle-log">${isExpanded ? 'Hide logs' : 'View logs'}</button>
+          </div>
+          <div class="todo-table-actions-row">
+            ${item.origin === 'planner'
+              ? '<a class="todo-table-action-text" href="/calendar.html" target="_blank" rel="noopener noreferrer">Open planner</a>'
+              : '<button class="todo-table-action-text" type="button" data-role="edit">Edit</button><button class="todo-table-action-text" type="button" data-role="delete">Delete</button>'}
+          </div>
         </div>
       </td>
     </tr>
