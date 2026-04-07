@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/app.css?v=20260403c" />
+  <link rel="stylesheet" href="/app.css?v=20260407a" />
 </head>
 <body>
   <div class="page">
@@ -87,20 +87,26 @@
               <h2 class="todo-panel-title">To Do List</h2>
               <div class="section-copy">ใช้ `View logs` เพื่อเปิด timeline การติดตามงานและบันทึก update ล่าสุดของแต่ละ task</div>
             </div>
-            <div class="todo-sort-group">
-              <label class="todo-sort-label" for="todoSortField">Sort by</label>
-              <select id="todoSortField" class="todo-sort-select">
-                <option value="title">Task title</option>
-                <option value="owner">Owner</option>
-                <option value="updatedAt">Updated date</option>
-                <option value="updatedBy">Updated by</option>
-                <option value="start">Start date</option>
-                <option value="end">End date</option>
-              </select>
-              <select id="todoSortDir" class="todo-sort-select">
-                <option value="desc">มาก - น้อย</option>
-                <option value="asc">น้อย - มาก</option>
-              </select>
+            <div class="todo-head-controls">
+              <div class="todo-view-group">
+                <label class="todo-sort-label">View</label>
+                <div id="todoViewSwitch" class="list-view-mode-switch todo-switch todo-view-switch"></div>
+              </div>
+              <div class="todo-sort-group">
+                <label class="todo-sort-label" for="todoSortField">Sort by</label>
+                <select id="todoSortField" class="todo-sort-select">
+                  <option value="title">Task title</option>
+                  <option value="owner">Owner</option>
+                  <option value="updatedAt">Updated date</option>
+                  <option value="updatedBy">Updated by</option>
+                  <option value="start">Start date</option>
+                  <option value="end">End date</option>
+                </select>
+                <select id="todoSortDir" class="todo-sort-select">
+                  <option value="desc">มาก - น้อย</option>
+                  <option value="asc">น้อย - มาก</option>
+                </select>
+              </div>
             </div>
           </div>
           <div id="todoList" class="todo-list"></div>
@@ -130,6 +136,6 @@
       </form>
     </section>
   </div>
-  <script src="/todo.js?v=20260403f"></script>
+  <script src="/todo.js?v=20260407a"></script>
 </body>
 </html>

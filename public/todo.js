@@ -7,6 +7,7 @@ const state = {
   search: '',
   statusFilter: 'open',
   sourceFilter: 'all',
+  viewMode: 'card',
   sortField: 'updatedAt',
   sortDir: 'desc',
   editingTaskId: '',
@@ -316,7 +317,7 @@ function hydrateForm(task) {
   byId('todoSaveBtn').textContent = task ? 'Update task' : 'Save task'
 }
 
-function renderList() {
+function renderListLegacy() {
   const items = getCombinedItems()
   renderKpis(items)
   byId('todoSummary').textContent = `${items.length} items shown | custom ${items.filter((item) => item.origin === 'todo').length} | planner ${items.filter((item) => item.origin === 'planner').length}`
@@ -470,6 +471,15 @@ function resetForm() {
 }
 
 function renderControls() {
+  renderSegmented('todoViewSwitch', [
+    { value: 'card', label: 'Card view' },
+    { value: 'table', label: 'Table view' }
+  ], state.viewMode, (value) => {
+    state.viewMode = value || 'card'
+    renderControls()
+    renderList()
+  })
+
   renderSegmented('todoStatusSwitch', [
     { value: 'all', label: 'All status' },
     { value: 'open', label: 'Open only' },
@@ -808,6 +818,243 @@ function bindEvents() {
   })
 
   byId('todoCancelBtn').addEventListener('click', resetForm)
+}
+
+function todoGetTimelineText(item) {
+  return hasTimelineDates(item.start, item.end)
+    ? `${formatThaiDate(item.start)} - ${formatThaiDate(item.end)}`
+    : 'No timeline date'
+}
+
+function todoGetUpdatedLineText(item) {
+  const updatedText = formatThaiDateTime(item.updatedAt || item.createdAt)
+  const actorText = String(item.updatedByEmail || item.createdByEmail || '').trim()
+  return `Updated ${updatedText}${actorText ? ` | By ${actorText}` : ''}`
+}
+
+function todoRenderLogPanel(item) {
+  const logs = Array.isArray(item.logs) ? item.logs : []
+  return `
+    <section class="todo-log-panel">
+      <div class="todo-log-list">
+        ${logs.length ? logs.map((entry) => `
+          <article class="todo-log-entry">
+            <div class="todo-log-time">${esc(formatThaiDateTime(entry.createdAt))}${entry.actorEmail ? ` | Add by ${esc(entry.actorEmail)}` : ''}</div>
+            <div class="todo-log-message">${esc(entry.message)}</div>
+          </article>
+        `).join('') : '<div class="mini-empty">ยังไม่มี update log สำหรับงานนี้</div>'}
+      </div>
+      <form class="todo-log-form" data-role="log-form">
+        <textarea name="message" placeholder="บันทึกอัปเดตล่าสุดของงานนี้"></textarea>
+        <div class="todo-log-actions">
+          <button class="btn primary" type="submit">Add update log</button>
+        </div>
+      </form>
+    </section>
+  `
+}
+
+function todoRenderCardItem(item) {
+  const isChecklist = item.origin === 'todo'
+  const accentColor = normalizeColor(item.color || TODO_DEFAULT_COLOR)
+  const cardClass = `todo-card ${item.isDone ? 'is-done' : ''} ${isChecklist ? 'todo-card-checklist' : ''}`.trim()
+  const cardStyle = isChecklist ? ` style="--todo-accent:${esc(accentColor)}"` : ''
+  const ownerText = String(item.owner || '').trim()
+  const logs = Array.isArray(item.logs) ? item.logs : []
+  const isExpanded = state.expandedLogUid === item.uid
+  return `
+    <article class="${esc(cardClass)}" data-uid="${esc(item.uid)}"${cardStyle}>
+      <div class="todo-card-main">
+        <label class="todo-check">
+          <input type="checkbox" data-role="toggle" ${item.isDone ? 'checked' : ''} />
+          <span></span>
+        </label>
+        <div class="todo-copy">
+          <div class="todo-title-row">
+            <span class="badge ${item.origin === 'planner' ? 'status-manual' : 'badge-checklist'}">${esc(item.origin === 'planner' ? 'Planner manual' : 'Checklist')}</span>
+            <strong>${esc(item.title)}</strong>
+            ${item.key ? `<span class="todo-context-inlinebar"><span class="todo-context-bartext">${esc(item.key)}</span></span>` : ''}
+          </div>
+          <div class="todo-meta-line">${esc(todoGetTimelineText(item))}</div>
+          <div class="todo-meta-line">${esc(todoGetUpdatedLineText(item))}</div>
+          ${ownerText ? `<div class="todo-owner-line"><span class="todo-owner-icon" aria-hidden="true"></span><span>Owner ${esc(ownerText)}</span></div>` : ''}
+          <div class="todo-note">${esc(item.note || (item.origin === 'planner' ? 'No extra note' : 'No note'))}</div>
+          ${item.isDone && item.doneAt ? `<div class="todo-done-at">Done ${esc(formatThaiDateTime(item.doneAt))}${item.doneByEmail ? ` - By ${esc(item.doneByEmail)}` : ''}</div>` : ''}
+          <div class="todo-log-summary">${esc(String(logs.length))} update log${logs.length === 1 ? '' : 's'}</div>
+          ${isExpanded ? todoRenderLogPanel(item) : ''}
+        </div>
+      </div>
+      <div class="todo-card-actions">
+        ${item.origin === 'planner'
+          ? '<a class="btn" href="/calendar.html" target="_blank" rel="noopener noreferrer">Open planner</a>'
+          : '<button class="btn" type="button" data-role="edit">Edit</button><button class="btn" type="button" data-role="delete">Delete</button>'}
+        <button class="btn" type="button" data-role="toggle-log">${isExpanded ? 'Hide logs' : 'View logs'}</button>
+      </div>
+    </article>
+  `
+}
+
+function todoRenderTableRows(item) {
+  const isChecklist = item.origin === 'todo'
+  const accentColor = normalizeColor(item.color || TODO_DEFAULT_COLOR)
+  const rowClass = `todo-table-row ${item.isDone ? 'is-done' : ''} ${isChecklist ? 'todo-table-row-checklist' : ''}`.trim()
+  const rowStyle = isChecklist ? ` style="--todo-accent:${esc(accentColor)}"` : ''
+  const logs = Array.isArray(item.logs) ? item.logs : []
+  const isExpanded = state.expandedLogUid === item.uid
+  const doneText = item.isDone && item.doneAt
+    ? `Done ${formatThaiDateTime(item.doneAt)}${item.doneByEmail ? ` - ${item.doneByEmail}` : ''}`
+    : '-'
+
+  return `
+    <tr class="${esc(rowClass)}" data-uid="${esc(item.uid)}"${rowStyle}>
+      <td class="todo-table-col-check">
+        <label class="todo-check todo-check-inline">
+          <input type="checkbox" data-role="toggle" ${item.isDone ? 'checked' : ''} />
+          <span></span>
+        </label>
+      </td>
+      <td class="todo-table-col-title">
+        <div class="todo-table-title-cell">
+          <span class="badge ${item.origin === 'planner' ? 'status-manual' : 'badge-checklist'}">${esc(item.origin === 'planner' ? 'Planner manual' : 'Checklist')}</span>
+          <strong>${esc(item.title)}</strong>
+        </div>
+      </td>
+      <td>${item.key ? `<span class="todo-context-inlinebar"><span class="todo-context-bartext">${esc(item.key)}</span></span>` : '-'}</td>
+      <td>${esc(String(item.owner || '-'))}</td>
+      <td>${esc(todoGetTimelineText(item))}</td>
+      <td>${esc(todoGetUpdatedLineText(item))}</td>
+      <td>${esc(doneText)}</td>
+      <td>${esc(String(logs.length))}</td>
+      <td>
+        <div class="todo-table-actions">
+          ${item.origin === 'planner'
+            ? '<a class="btn" href="/calendar.html" target="_blank" rel="noopener noreferrer">Open planner</a>'
+            : '<button class="btn" type="button" data-role="edit">Edit</button><button class="btn" type="button" data-role="delete">Delete</button>'}
+          <button class="btn" type="button" data-role="toggle-log">${isExpanded ? 'Hide logs' : 'View logs'}</button>
+        </div>
+      </td>
+    </tr>
+    ${isExpanded ? `
+      <tr class="todo-table-log-row" data-uid="${esc(item.uid)}"${rowStyle}>
+        <td colspan="9">
+          <div class="todo-table-log-shell">
+            ${item.note ? `<div class="todo-table-note">Note: ${esc(item.note)}</div>` : ''}
+            ${todoRenderLogPanel(item)}
+          </div>
+        </td>
+      </tr>
+    ` : ''}
+  `
+}
+
+function renderList() {
+  const items = getCombinedItems()
+  const listEl = byId('todoList')
+  renderKpis(items)
+  byId('todoSummary').textContent = `${items.length} items shown | custom ${items.filter((item) => item.origin === 'todo').length} | planner ${items.filter((item) => item.origin === 'planner').length}`
+
+  if (!items.length) {
+    listEl.innerHTML = `
+      <section class="todo-empty-state">
+        <strong>ยังไม่มีรายการ To Do</strong>
+        <p>เริ่มจากเพิ่มงานใหม่ทางฝั่งซ้าย หรือสลับตัวกรองเพื่อแสดงงานจาก Planner manual</p>
+      </section>
+    `
+    return
+  }
+
+  if (state.viewMode === 'table') {
+    listEl.innerHTML = `
+      <div class="todo-table-wrap">
+        <table class="todo-table">
+          <thead>
+            <tr>
+              <th>Done</th>
+              <th>Task</th>
+              <th>Context</th>
+              <th>Owner</th>
+              <th>Timeline</th>
+              <th>Updated</th>
+              <th>Done info</th>
+              <th>Logs</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${items.map((item) => todoRenderTableRows(item)).join('')}
+          </tbody>
+        </table>
+      </div>
+    `
+  } else {
+    listEl.innerHTML = items.map((item) => todoRenderCardItem(item)).join('')
+  }
+
+  listEl.querySelectorAll('[data-role="toggle"]').forEach((input) => {
+    input.addEventListener('change', async (event) => {
+      const holder = event.target.closest('[data-uid]')
+      if (!holder) return
+      const isOk = await toggleDone(holder.dataset.uid || '', event.target.checked)
+      if (!isOk) event.target.checked = !event.target.checked
+    })
+  })
+
+  listEl.querySelectorAll('[data-role="edit"]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const uid = button.closest('[data-uid]')?.dataset.uid || ''
+      const taskId = uid.replace(/^todo:/, '')
+      const task = state.tasks.find((item) => item.id === taskId && String(item.sourceType || 'todo') === 'todo')
+      if (!task) return
+      try {
+        const actor = await requestActorAuth('เปิดโหมดแก้ไข')
+        state.editingTaskId = task.id
+        state.editingActorEmail = actor.email || ''
+        hydrateForm(task)
+        setNotice(byId('todoFormStatus'), `Editing checklist item as ${state.editingActorEmail || 'verified user'}...`)
+      } catch (error) {
+        setNotice(byId('todoFormStatus'), error.message || 'Auth cancelled', 'error')
+      }
+    })
+  })
+
+  listEl.querySelectorAll('[data-role="delete"]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const uid = button.closest('[data-uid]')?.dataset.uid || ''
+      const taskId = uid.replace(/^todo:/, '')
+      if (!taskId) return
+      try {
+        const actor = await requestActorAuth('ลบรายการ')
+        await apiFetch('/api/todo', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: taskId, actorEmail: actor.email || '' })
+        })
+        if (state.editingTaskId === taskId) resetForm()
+        await loadData()
+      } catch (error) {
+        setNotice(byId('todoSync'), error.message || 'Unable to delete task', 'error')
+      }
+    })
+  })
+
+  listEl.querySelectorAll('[data-role="toggle-log"]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const uid = button.closest('[data-uid]')?.dataset.uid || ''
+      state.expandedLogUid = state.expandedLogUid === uid ? '' : uid
+      renderList()
+    })
+  })
+
+  listEl.querySelectorAll('[data-role="log-form"]').forEach((form) => {
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault()
+      const holder = form.closest('[data-uid]')
+      const uid = holder?.dataset.uid || ''
+      const message = String(form.message.value || '').trim()
+      if (!uid || !message) return
+      await saveLog(uid, message)
+    })
+  })
 }
 
 bindEvents()
