@@ -2338,6 +2338,24 @@ textarea {
   border-spacing: 0;
 }
 
+.todo-table th:nth-child(3),
+.todo-table td:nth-child(3) {
+  min-width: 300px;
+}
+
+.todo-table th:nth-child(6),
+.todo-table td:nth-child(6),
+.todo-table th:nth-child(7),
+.todo-table td:nth-child(7) {
+  min-width: 135px;
+}
+
+.todo-table th:nth-child(8),
+.todo-table td:nth-child(8) {
+  width: 170px;
+  max-width: 170px;
+}
+
 .todo-table thead th {
   position: sticky;
   top: 0;
@@ -2399,17 +2417,18 @@ textarea {
 .todo-table-updated-cell {
   display: grid;
   gap: 2px;
-  min-width: 240px;
+  min-width: 0;
 }
 
 .todo-table-updated-time {
   color: #173f70;
   font-weight: 600;
+  font-size: 12px;
 }
 
 .todo-table-updated-by {
   color: #355779;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .todo-check-inline {
