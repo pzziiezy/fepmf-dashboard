@@ -851,7 +851,7 @@ function todoGetUpdatedParts(item) {
   const actorText = String(item.updatedByEmail || item.createdByEmail || '').trim()
   return {
     datetime,
-    byLine: actorText ? `By ${actorText}` : 'By -'
+    byLine: actorText || '-'
   }
 }
 

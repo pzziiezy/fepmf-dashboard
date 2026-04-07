@@ -2444,8 +2444,13 @@ textarea {
 
 .todo-table-title-cell strong {
   color: #132b4d;
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 800;
+}
+
+.todo-table-title-cell .badge {
+  font-size: 10px;
+  padding: 4px 8px;
 }
 
 .todo-table-actions-stack {
