@@ -90,7 +90,7 @@ function formatThaiDate(value) {
 }
 
 function apiFetch(url, options = {}) {
-  return fetch(url, options)
+  return fetch(url, { cache: 'no-store', ...options })
     .then(async (response) => {
       const data = await response.json().catch(() => ({}))
       if (!response.ok || data?.error) throw new Error(data?.error || 'Request failed')
@@ -518,9 +518,10 @@ function renderControls() {
 async function loadData() {
   setNotice(byId('todoSync'), 'Loading checklist...')
   try {
+    const cacheBust = `_ts=${Date.now()}`
     const [taskData, plannerData] = await Promise.all([
-      apiFetch('/api/todo'),
-      apiFetch('/api/planner?entityType=manual')
+      apiFetch(`/api/todo?${cacheBust}`),
+      apiFetch(`/api/planner?entityType=manual&${cacheBust}`)
     ])
     state.tasks = Array.isArray(taskData.items) ? taskData.items : []
     state.plannerItems = Array.isArray(plannerData.items) ? plannerData.items : []
