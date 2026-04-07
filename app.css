@@ -2294,8 +2294,9 @@ textarea {
 }
 
 .todo-kpi {
-  min-height: 132px;
-  border-radius: 18px;
+  min-height: 108px;
+  border-radius: 16px;
+  padding: 12px;
   border: 1px solid #dde6f0;
   background: linear-gradient(180deg, #ffffff 0%, #f7faff 100%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
@@ -2303,7 +2304,7 @@ textarea {
 
 .todo-kpi-label {
   display: block;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -2312,8 +2313,8 @@ textarea {
 
 .todo-kpi-value {
   display: block;
-  margin-top: 10px;
-  font-size: 34px;
+  margin-top: 8px;
+  font-size: 26px;
   line-height: 1;
   color: #122947;
 }
@@ -2382,6 +2383,19 @@ textarea {
   width: 56px;
 }
 
+.todo-table-col-title {
+  width: 220px;
+  max-width: 220px;
+}
+
+.todo-table-col-note {
+  min-width: 220px;
+  max-width: 280px;
+  color: #375776;
+  white-space: normal;
+  word-break: break-word;
+}
+
 .todo-check-inline {
   margin-top: 0;
 }
@@ -2390,7 +2404,7 @@ textarea {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-width: 260px;
+  min-width: 0;
 }
 
 .todo-table-title-cell strong {
@@ -2401,14 +2415,39 @@ textarea {
 
 .todo-table-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  flex-wrap: nowrap;
+  gap: 6px;
+  align-items: center;
+  white-space: nowrap;
 }
 
 .todo-table-actions .btn {
   min-height: 36px;
   padding: 7px 12px;
   border-radius: 11px;
+}
+
+.todo-table-action-text {
+  border: 0;
+  background: transparent;
+  color: #184a82;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.todo-table-action-text:hover {
+  color: #0d63ce;
+  text-decoration: underline;
+}
+
+.todo-table-action-text + .todo-table-action-text::before {
+  content: "|";
+  color: #9aaec5;
+  margin-right: 6px;
 }
 
 .todo-table-log-row td {

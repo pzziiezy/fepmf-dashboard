@@ -921,6 +921,7 @@ function todoRenderTableRows(item) {
       </td>
       <td>${item.key ? `<span class="todo-context-inlinebar"><span class="todo-context-bartext">${esc(item.key)}</span></span>` : '-'}</td>
       <td>${esc(String(item.owner || '-'))}</td>
+      <td class="todo-table-col-note">${esc(String(item.note || '-'))}</td>
       <td>${esc(todoGetTimelineText(item))}</td>
       <td>${esc(todoGetUpdatedLineText(item))}</td>
       <td>${esc(doneText)}</td>
@@ -928,15 +929,15 @@ function todoRenderTableRows(item) {
       <td>
         <div class="todo-table-actions">
           ${item.origin === 'planner'
-            ? '<a class="btn" href="/calendar.html" target="_blank" rel="noopener noreferrer">Open planner</a>'
-            : '<button class="btn" type="button" data-role="edit">Edit</button><button class="btn" type="button" data-role="delete">Delete</button>'}
-          <button class="btn" type="button" data-role="toggle-log">${isExpanded ? 'Hide logs' : 'View logs'}</button>
+            ? '<a class="todo-table-action-text" href="/calendar.html" target="_blank" rel="noopener noreferrer">Open planner</a>'
+            : '<button class="todo-table-action-text" type="button" data-role="edit">Edit</button><button class="todo-table-action-text" type="button" data-role="delete">Delete</button>'}
+          <button class="todo-table-action-text" type="button" data-role="toggle-log">${isExpanded ? 'Hide logs' : 'View logs'}</button>
         </div>
       </td>
     </tr>
     ${isExpanded ? `
       <tr class="todo-table-log-row" data-uid="${esc(item.uid)}"${rowStyle}>
-        <td colspan="9">
+        <td colspan="10">
           <div class="todo-table-log-shell">
             ${item.note ? `<div class="todo-table-note">Note: ${esc(item.note)}</div>` : ''}
             ${todoRenderLogPanel(item)}
@@ -973,6 +974,7 @@ function renderList() {
               <th>Task</th>
               <th>Context</th>
               <th>Owner</th>
+              <th>Note</th>
               <th>Timeline</th>
               <th>Updated</th>
               <th>Done info</th>
