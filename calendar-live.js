@@ -365,6 +365,29 @@ async function saveManualPlan(payload, editingId = '') {
   return data
 }
 
+async function rebuildCalendarFromTodo() {
+  const syncTag = document.getElementById('labSync')
+  const btn = document.getElementById('labRebuildTodoBtn')
+  if (btn) btn.disabled = true
+  setNotice(syncTag, 'Rebuilding calendar from ToDo...')
+  try {
+    const response = await fetch('/api/planner?action=rebuild_todo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    })
+    const data = await response.json()
+    if (data.error) throw new Error(data.error)
+    await reloadPageData()
+    const summary = `Rebuild done | created ${Number(data.created || 0)} | updated ${Number(data.updated || 0)} | deleted ${Number(data.deleted || 0)}`
+    setNotice(syncTag, summary, 'success')
+  } catch (error) {
+    setNotice(syncTag, `Rebuild failed: ${error.message || error}`, 'error')
+  } finally {
+    if (btn) btn.disabled = false
+  }
+}
+
 function renderSummary(events) {
   const { start, end } = getTwoMonthRange()
   const message = `${events.length} items | ${start} ถึง ${end} | ${state.includeProjects ? (state.dashboardLoaded ? 'projects loaded' : 'loading projects...') : 'manual fast path'}`
@@ -715,6 +738,11 @@ function bindEvents() {
   document.getElementById('labSearch').addEventListener('input', (event) => {
     state.search = event.target.value || ''
     renderAll()
+  })
+
+  document.getElementById('labRebuildTodoBtn')?.addEventListener('click', async () => {
+    if (!confirm('Rebuild Calendar from ToDo now?')) return
+    await rebuildCalendarFromTodo()
   })
 
   document.getElementById('labManualOnlyBtn').addEventListener('click', () => {

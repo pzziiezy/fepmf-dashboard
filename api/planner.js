@@ -7,6 +7,8 @@ const tokenCache = {
 }
 
 const SHEET_COLUMNS = ['id', 'key', 'title', 'sprint', 'start', 'end', 'owner', 'note', 'color', 'createdAt', 'updatedAt', 'isDeleted', 'deletedAt', 'entityType']
+const TODO_SHEET_COLUMNS = ['id', 'plannerRefId', 'sourceType', 'key', 'title', 'owner', 'note', 'color', 'isDone', 'doneAt', 'createdAt', 'updatedAt', 'isDeleted', 'deletedAt', 'start', 'end', 'logsJson', 'createdByEmail', 'updatedByEmail', 'deletedByEmail', 'auditJson', 'doneByEmail']
+const TODO_SHEET_LAST_COLUMN = 'V'
 const DEFAULT_GOOGLE_SHEETS_URL = 'https://docs.google.com/spreadsheets/d/1FzgaU35q3dvDVAf3vAqirRcUFemd_OThXr1o7NdJrGI/edit?usp=sharing'
 const DEFAULT_MANUAL_COLOR = '#b66a00'
 
@@ -240,6 +242,36 @@ function rowToItem(row = [], rowNumber = 0) {
   }
 }
 
+function normalizeTodoRow(row = []) {
+  const cell = (index) => String(row[index] || '').trim()
+  return {
+    id: cell(0),
+    sourceType: cell(2).toLowerCase() || 'todo',
+    key: cell(3),
+    title: cell(4),
+    owner: cell(5),
+    note: cell(6),
+    color: cell(7) || '',
+    createdAt: cell(10),
+    updatedAt: cell(11),
+    isDeleted: cell(12).toLowerCase() === 'true',
+    start: cell(14),
+    end: cell(15)
+  }
+}
+
+function plannerItemMatchesTodoSync(existing, desired) {
+  return String(existing?.key || '') === String(desired?.key || '')
+    && String(existing?.title || '') === String(desired?.title || '')
+    && String(existing?.owner || '') === String(desired?.owner || '')
+    && String(existing?.note || '') === String(desired?.note || '')
+    && String(existing?.start || '') === String(desired?.start || '')
+    && String(existing?.end || '') === String(desired?.end || '')
+    && String(existing?.color || '') === String(desired?.color || '')
+    && String(existing?.entityType || 'manual') === 'manual'
+    && !existing?.isDeleted
+}
+
 async function listGoogleSheetItems(sheetName, includeDeleted = false) {
   await ensureSheetHeader(sheetName)
   const range = `${sheetName}!A2:N`
@@ -248,6 +280,97 @@ async function listGoogleSheetItems(sheetName, includeDeleted = false) {
   const all = rows.map((row, idx) => rowToItem(row, idx + 2)).filter((item) => item.id && item.title)
   const items = includeDeleted ? all : all.filter((x) => !x.isDeleted)
   return items
+}
+
+async function listTodoTimelineCandidates(todoSheetName) {
+  const meta = await googleRequest('?fields=sheets.properties.title')
+  const titles = (meta.sheets || []).map((sheet) => String(sheet?.properties?.title || '').trim())
+  if (!titles.includes(todoSheetName)) return []
+
+  const headerRange = `${todoSheetName}!A1:${TODO_SHEET_LAST_COLUMN}1`
+  const headerResult = await googleRequest(`/values/${encodeURIComponent(headerRange)}`)
+  const header = headerResult.values?.[0] || []
+  const expected = TODO_SHEET_COLUMNS
+  const hasTodoHeader = expected.every((value, idx) => String(header[idx] || '').trim() === value)
+  if (!hasTodoHeader) return []
+
+  const range = `${todoSheetName}!A2:${TODO_SHEET_LAST_COLUMN}`
+  const result = await googleRequest(`/values/${encodeURIComponent(range)}`)
+  const rows = result.values || []
+  return rows.map((row) => normalizeTodoRow(row)).filter((item) => {
+    return item.id
+      && item.title
+      && item.sourceType === 'todo'
+      && !item.isDeleted
+      && item.start
+      && item.end
+      && /^\d{4}-\d{2}-\d{2}$/.test(item.start)
+      && /^\d{4}-\d{2}-\d{2}$/.test(item.end)
+      && item.end >= item.start
+  })
+}
+
+async function rebuildPlannerFromTodo(sheetName) {
+  const todoSheetName = firstEnv('GOOGLE_TASK_SHEET_TAB_NAME', 'GOOGLE_TODO_SHEET_TAB_NAME') || 'PlannerTasks'
+  const todoItems = await listTodoTimelineCandidates(todoSheetName)
+  const existingAll = await listGoogleSheetItems(sheetName, true)
+
+  const desiredById = new Map(
+    todoItems.map((todo) => {
+      const plannerId = `todo_${todo.id}`
+      return [plannerId, {
+        id: plannerId,
+        key: todo.key || '',
+        title: todo.title || '',
+        sprint: '',
+        start: todo.start,
+        end: todo.end,
+        owner: todo.owner || '',
+        note: todo.note || '',
+        color: /^#[0-9a-fA-F]{6}$/.test(String(todo.color || '').trim()) ? String(todo.color).trim() : DEFAULT_MANUAL_COLOR,
+        entityType: 'manual'
+      }]
+    })
+  )
+
+  let created = 0
+  let updated = 0
+  let deleted = 0
+
+  for (const [plannerId, desired] of desiredById.entries()) {
+    const existing = existingAll.find((item) => item.id === plannerId)
+    if (!existing) {
+      const next = normalizeItem({ ...desired, isDeleted: 'false', deletedAt: '' }, true)
+      await appendGoogleSheetItem(sheetName, next)
+      created += 1
+      continue
+    }
+    if (!plannerItemMatchesTodoSync(existing, desired)) {
+      await updateGoogleSheetItem(sheetName, plannerId, { ...desired, isDeleted: 'false', deletedAt: '' })
+      updated += 1
+    } else if (existing.isDeleted) {
+      await updateGoogleSheetItem(sheetName, plannerId, { isDeleted: 'false', deletedAt: '' })
+      updated += 1
+    }
+  }
+
+  const desiredIds = new Set(desiredById.keys())
+  for (const existing of existingAll) {
+    if (!String(existing.id || '').startsWith('todo_')) continue
+    if (desiredIds.has(existing.id)) continue
+    if (existing.isDeleted) continue
+    await softDeleteGoogleSheetItem(sheetName, existing.id)
+    deleted += 1
+  }
+
+  return {
+    ok: true,
+    source: 'google_sheets',
+    created,
+    updated,
+    deleted,
+    totalTodoCandidates: todoItems.length
+  }
 }
 
 async function appendGoogleSheetItem(sheetName, item) {
@@ -361,9 +484,15 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
 
   const sheetName = firstEnv('GOOGLE_SHEETS_TAB_NAME', 'GOOGLE_PLANNER_SHEET_TAB_NAME') || 'Planner'
+  const action = String(req.query?.action || '').trim().toLowerCase()
 
   try {
     if (isGoogleSheetsConfigured()) {
+      if (req.method === 'POST' && action === 'rebuild_todo') {
+        const result = await rebuildPlannerFromTodo(sheetName)
+        return res.status(200).json(result)
+      }
+
       if (req.method === 'GET') {
         const includeDeleted = String(req.query?.includeDeleted || '').toLowerCase() === 'true'
         const rawItems = await listGoogleSheetItems(sheetName, includeDeleted)
@@ -404,6 +533,9 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
+      if (action === 'rebuild_todo') {
+        return res.status(400).json({ error: 'rebuild_todo requires Google Sheets configuration' })
+      }
       const item = normalizeItem(parseBody(req))
       memoryStore.unshift(item)
       return res.status(201).json({ ok: true, item, source: 'memory', warning: 'Google Sheets not configured' })
