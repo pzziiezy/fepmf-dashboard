@@ -5,11 +5,6 @@ const tokenCache = {
   accessToken: '',
   expiresAt: 0
 }
-const listCache = {
-  key: '',
-  items: null,
-  expiresAt: 0
-}
 
 const SHEET_COLUMNS = ['id', 'key', 'title', 'sprint', 'start', 'end', 'owner', 'note', 'color', 'createdAt', 'updatedAt', 'isDeleted', 'deletedAt', 'entityType']
 const DEFAULT_GOOGLE_SHEETS_URL = 'https://docs.google.com/spreadsheets/d/1FzgaU35q3dvDVAf3vAqirRcUFemd_OThXr1o7NdJrGI/edit?usp=sharing'
@@ -29,12 +24,6 @@ function nowIso() {
 
 function cloneItems(items = []) {
   return items.map((item) => ({ ...item }))
-}
-
-function invalidateListCache() {
-  listCache.key = ''
-  listCache.items = null
-  listCache.expiresAt = 0
 }
 
 function normalizeItem(raw = {}, forUpdate = false) {
@@ -252,22 +241,12 @@ function rowToItem(row = [], rowNumber = 0) {
 }
 
 async function listGoogleSheetItems(sheetName, includeDeleted = false) {
-  const cacheKey = `${sheetName}:${includeDeleted ? 'all' : 'active'}`
-  if (listCache.key === cacheKey && listCache.items && listCache.expiresAt > Date.now()) {
-    return cloneItems(listCache.items)
-  }
-
   await ensureSheetHeader(sheetName)
   const range = `${sheetName}!A2:N`
   const result = await googleRequest(`/values/${encodeURIComponent(range)}`)
   const rows = result.values || []
   const all = rows.map((row, idx) => rowToItem(row, idx + 2)).filter((item) => item.id && item.title)
   const items = includeDeleted ? all : all.filter((x) => !x.isDeleted)
-
-  listCache.key = cacheKey
-  listCache.items = cloneItems(items)
-  listCache.expiresAt = Date.now() + 30_000
-
   return items
 }
 
@@ -277,7 +256,6 @@ async function appendGoogleSheetItem(sheetName, item) {
     method: 'POST',
     body: JSON.stringify({ values: [toRowValues(item)] })
   })
-  invalidateListCache()
   return item
 }
 
@@ -294,7 +272,6 @@ async function updateGoogleSheetItem(sheetName, id, patch) {
     method: 'PUT',
     body: JSON.stringify({ values: [toRowValues(merged)] })
   })
-  invalidateListCache()
   return merged
 }
 
@@ -309,7 +286,6 @@ async function softDeleteGoogleSheetItem(sheetName, id) {
     method: 'PUT',
     body: JSON.stringify({ values: [toRowValues(deleted)] })
   })
-  invalidateListCache()
   return { ok: true, id, softDeleted: true }
 }
 

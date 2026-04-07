@@ -2294,9 +2294,9 @@ textarea {
 }
 
 .todo-kpi {
-  min-height: 108px;
-  border-radius: 16px;
-  padding: 12px;
+  min-height: 54px;
+  border-radius: 14px;
+  padding: 8px 10px;
   border: 1px solid #dde6f0;
   background: linear-gradient(180deg, #ffffff 0%, #f7faff 100%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
@@ -2304,17 +2304,17 @@ textarea {
 
 .todo-kpi-label {
   display: block;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
   color: #72849b;
 }
 
 .todo-kpi-value {
   display: block;
-  margin-top: 8px;
-  font-size: 26px;
+  margin-top: 4px;
+  font-size: 16px;
   line-height: 1;
   color: #122947;
 }
