@@ -2396,6 +2396,22 @@ textarea {
   word-break: break-word;
 }
 
+.todo-table-updated-cell {
+  display: grid;
+  gap: 2px;
+  min-width: 240px;
+}
+
+.todo-table-updated-time {
+  color: #173f70;
+  font-weight: 600;
+}
+
+.todo-table-updated-by {
+  color: #355779;
+  font-size: 12px;
+}
+
 .todo-check-inline {
   margin-top: 0;
 }

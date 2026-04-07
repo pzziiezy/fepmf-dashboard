@@ -68,6 +68,20 @@ function formatThaiDateTime(value) {
   })
 }
 
+function formatThaiDateTimeSeconds(value) {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString('th-TH', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  })
+}
+
 function formatThaiDate(value) {
   if (!value) return '-'
   const date = new Date(`${value}T00:00:00Z`)
@@ -832,6 +846,15 @@ function todoGetUpdatedLineText(item) {
   return `Updated ${updatedText}${actorText ? ` | By ${actorText}` : ''}`
 }
 
+function todoGetUpdatedParts(item) {
+  const datetime = formatThaiDateTimeSeconds(item.updatedAt || item.createdAt)
+  const actorText = String(item.updatedByEmail || item.createdByEmail || '').trim()
+  return {
+    datetime,
+    byLine: actorText ? `By ${actorText}` : 'By -'
+  }
+}
+
 function todoRenderLogPanel(item) {
   const logs = Array.isArray(item.logs) ? item.logs : []
   return `
@@ -904,6 +927,7 @@ function todoRenderTableRows(item) {
   const doneText = item.isDone && item.doneAt
     ? `Done ${formatThaiDateTime(item.doneAt)}${item.doneByEmail ? ` - ${item.doneByEmail}` : ''}`
     : '-'
+  const updatedParts = todoGetUpdatedParts(item)
 
   return `
     <tr class="${esc(rowClass)}" data-uid="${esc(item.uid)}"${rowStyle}>
@@ -922,8 +946,14 @@ function todoRenderTableRows(item) {
       <td>${item.key ? `<span class="todo-context-inlinebar"><span class="todo-context-bartext">${esc(item.key)}</span></span>` : '-'}</td>
       <td>${esc(String(item.owner || '-'))}</td>
       <td class="todo-table-col-note">${esc(String(item.note || '-'))}</td>
-      <td>${esc(todoGetTimelineText(item))}</td>
-      <td>${esc(todoGetUpdatedLineText(item))}</td>
+      <td>${esc(formatThaiDate(item.start || ''))}</td>
+      <td>${esc(formatThaiDate(item.end || ''))}</td>
+      <td>
+        <div class="todo-table-updated-cell">
+          <div class="todo-table-updated-time">${esc(updatedParts.datetime)}</div>
+          <div class="todo-table-updated-by">${esc(updatedParts.byLine)}</div>
+        </div>
+      </td>
       <td>${esc(doneText)}</td>
       <td>${esc(String(logs.length))}</td>
       <td>
@@ -937,7 +967,7 @@ function todoRenderTableRows(item) {
     </tr>
     ${isExpanded ? `
       <tr class="todo-table-log-row" data-uid="${esc(item.uid)}"${rowStyle}>
-        <td colspan="10">
+        <td colspan="11">
           <div class="todo-table-log-shell">
             ${item.note ? `<div class="todo-table-note">Note: ${esc(item.note)}</div>` : ''}
             ${todoRenderLogPanel(item)}
@@ -975,7 +1005,8 @@ function renderList() {
               <th>Context</th>
               <th>Owner</th>
               <th>Note</th>
-              <th>Timeline</th>
+              <th>Start</th>
+              <th>End</th>
               <th>Updated</th>
               <th>Done info</th>
               <th>Logs</th>
