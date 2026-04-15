@@ -37,6 +37,12 @@
       min-width: 180px;
       max-width: 220px;
     }
+    .uni-work-tools {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      justify-self: end;
+    }
     .uni-work-quick {
       min-width: 220px;
       max-width: 280px;
@@ -124,14 +130,39 @@
     .uni-table .col-doneinfo { width:198px; }
     .uni-table .col-logs { width:42px; }
     .uni-table .col-actions { width:154px; }
+    .uni-table .badge {
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      line-height: 1.1;
+    }
     .uni-table tbody tr.uni-data-row td {
       background: linear-gradient(90deg, var(--row-soft), var(--row-soft-2));
     }
     .uni-table tbody tr.uni-data-row td:first-child {
       box-shadow: inset 3px 0 0 var(--row-accent);
     }
+    .uni-table tbody tr.uni-data-row td:nth-child(3) {
+      position: relative;
+      padding-left: 14px;
+    }
+    .uni-table tbody tr.uni-data-row td:nth-child(3)::before {
+      content: "";
+      position: absolute;
+      left: 6px;
+      top: 10px;
+      bottom: 10px;
+      width: 3px;
+      border-radius: 999px;
+      background: var(--row-accent);
+      opacity: .95;
+    }
+    .uni-table tbody tr.uni-data-row .todo-context-inlinebar {
+      border-left-color: var(--row-accent) !important;
+      background: color-mix(in srgb, var(--row-soft) 115%, #ffffff 0%);
+    }
     .uni-table tbody tr.uni-data-row:hover td {
-      background: linear-gradient(90deg, color-mix(in srgb, var(--row-soft) 115%, #fff 0%), color-mix(in srgb, var(--row-soft-2) 115%, #fff 0%));
+      background: linear-gradient(90deg, color-mix(in srgb, var(--row-soft) 122%, #fff 0%), color-mix(in srgb, var(--row-soft-2) 122%, #fff 0%));
     }
     .uni-log-row td { background:#f8fbff; }
 
@@ -535,16 +566,18 @@
                 <div class="section-label">Workspace</div>
                 <h2 class="todo-panel-title">Main View</h2>
               </div>
-              <div id="uniMonthWrap" hidden>
-                <input id="uniMonthPicker" class="search uni-work-month" type="month" />
-              </div>
-              <div id="uniQuickTypeWrap" class="uni-work-quick" hidden>
-                <button id="uniQuickTypeBtn" class="search uni-work-month uni-filter-trigger" type="button" aria-expanded="false">Filter: Checklist</button>
-                <div id="uniQuickTypeBox" class="uni-quick-box" hidden>
-                  <label><input type="checkbox" value="All" /> All</label>
-                  <label><input type="checkbox" value="Planner" /> Planner</label>
-                  <label><input type="checkbox" value="Checklist" checked /> Checklist</label>
-                  <label><input type="checkbox" value="Jira" /> Jira</label>
+              <div class="uni-work-tools">
+                <div id="uniMonthWrap" hidden>
+                  <input id="uniMonthPicker" class="search uni-work-month" type="month" />
+                </div>
+                <div id="uniQuickTypeWrap" class="uni-work-quick">
+                  <button id="uniQuickTypeBtn" class="search uni-work-month uni-filter-trigger" type="button" aria-expanded="false">Checklist</button>
+                  <div id="uniQuickTypeBox" class="uni-quick-box" hidden>
+                    <label><input type="checkbox" value="All" /> All</label>
+                    <label><input type="checkbox" value="Planner" /> Planner</label>
+                    <label><input type="checkbox" value="Checklist" checked /> Checklist</label>
+                    <label><input type="checkbox" value="Jira" /> Jira</label>
+                  </div>
                 </div>
               </div>
             </div>
@@ -616,6 +649,6 @@
     </section>
   </div>
 
-  <script src="/unified-planner.js?v=20260416aa"></script>
+  <script src="/unified-planner.js?v=20260416ab"></script>
 </body>
 </html>
