@@ -74,13 +74,28 @@
     .uni-view-host { min-height:360px; }
     .uni-card-list { display:grid; gap:10px; }
     .uni-table-wrap { overflow:auto; border:1px solid #d8e2f2; border-radius:12px; background:#fff; }
-    .uni-table { width:100%; border-collapse:collapse; min-width:1120px; }
-    .uni-table th, .uni-table td { padding:10px; border-bottom:1px solid #e8eef8; font-size:12px; text-align:left; vertical-align:top; }
+    .uni-table { width:100%; border-collapse:collapse; min-width:1400px; table-layout:fixed; }
+    .uni-table th, .uni-table td { padding:10px 10px; border-bottom:1px solid #e8eef8; font-size:12px; text-align:left; vertical-align:top; line-height:1.35; }
     .uni-table th { font-weight:800; color:#3f608f; background:#f5f8ff; position:sticky; top:0; z-index:1; }
     .uni-th-sort { cursor: pointer; user-select: none; }
     .uni-th-sort:hover { background: #eaf2ff; }
-    .uni-table-actions { display:flex; gap:8px; flex-wrap:wrap; }
+    .uni-table-actions { display:flex; gap:6px; flex-wrap:wrap; }
     .uni-action-text { border:none; background:none; color:#225ea6; font-weight:700; cursor:pointer; padding:0; }
+    .uni-table strong { display:inline; word-break:break-word; }
+    .uni-cell-task, .uni-cell-context, .uni-cell-note, .uni-cell-doneinfo { word-break:break-word; }
+    .uni-cell-note, .uni-cell-doneinfo { color:#2b4b79; }
+    .uni-table .col-done { width:54px; }
+    .uni-table .col-task { width:240px; }
+    .uni-table .col-context { width:220px; }
+    .uni-table .col-status { width:84px; }
+    .uni-table .col-owner { width:74px; }
+    .uni-table .col-note { width:420px; }
+    .uni-table .col-start { width:58px; }
+    .uni-table .col-end { width:58px; }
+    .uni-table .col-updated { width:120px; }
+    .uni-table .col-doneinfo { width:198px; }
+    .uni-table .col-logs { width:42px; }
+    .uni-table .col-actions { width:154px; }
     .uni-log-row td { background:#f8fbff; }
 
     .uni-inspector-pop { position:fixed; z-index:90; width:min(430px,calc(100vw - 20px)); max-height:calc(100vh - 20px); overflow:auto; display:none; }
@@ -564,6 +579,6 @@
     </section>
   </div>
 
-  <script src="/unified-planner.js?v=20260415ac"></script>
+  <script src="/unified-planner.js?v=20260415ad"></script>
 </body>
 </html>
