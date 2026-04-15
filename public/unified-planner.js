@@ -1,7 +1,8 @@
 ﻿const AUTH_KEY='unified_actor_session_v1'
 const DEF_COLOR='#2c6e91'
 const FILTERS=['Pending','Done','S0','S1','S2','S3','S4','S5','S6','S7']
-const st={tasks:[],month:'',search:'',view:'card',sort:'updatedAt',dir:'desc',statusFilters:['Pending'],typeFilters:['Checklist'],sel:'',log:'',auth:null,busy:'',editingId:'',editingActorEmail:'',sheetName:'PlannerTasks',liveEdits:{}}
+const DEFAULT_STATUS_FILTERS=['Pending','S0','S1','S2','S3','S4','S5','S6','S7']
+const st={tasks:[],jiraRows:[],month:'',search:'',view:'card',sort:'updatedAt',dir:'desc',statusFilters:[...DEFAULT_STATUS_FILTERS],typeFilters:['Checklist','Jira'],sel:'',log:'',auth:null,busy:'',editingId:'',editingActorEmail:'',sheetName:'PlannerTasks',liveEdits:{}}
 const $=id=>document.getElementById(id)
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))
 const notice=(el,m,t='info')=>{if(!el)return;el.textContent=m||'';el.classList.remove('notice-success','notice-error');if(t==='success')el.classList.add('notice-success');if(t==='error')el.classList.add('notice-error')}
@@ -32,9 +33,59 @@ const isJiraTask=t=>{const src=String(t.sourceType||'').toLowerCase(),typ=String
 const viewStatus=i=>i.isJiraStatus?(i.status||'-'):(i.isDone?'Done':'Pending')
 const timelineText=i=>i.start&&i.end?`${thai(i.start)} - ${thai(i.end)}<br/>${durationDays(i.start,i.end)} days`:'No timeline date'
 const escAttr=v=>String(v??'').replace(/\\/g,'\\\\').replace(/"/g,'\\"')
+const jiraColorByStatus=s=>{
+  const m={
+    S0:'#2b4a9b',
+    S1:'#3158b0',
+    S2:'#3b67c4',
+    S3:'#c56b1f',
+    S4:'#d89418',
+    S5:'#18a8bf',
+    S6:'#4667c8',
+    S7:'#2b9a43'
+  }
+  return m[String(s||'').toUpperCase().trim()]||'#4667c8'
+}
+
+function buildJiraItems(){
+  const rows=Array.isArray(st.jiraRows)?st.jiraRows:[]
+  if(!rows.length)return []
+  return rows.map(row=>{
+    const parent=row?.parent||{}
+    const timeline=row?.timeline||{}
+    const key=String(parent.key||timeline.key||'').trim()
+    if(!key)return null
+    const status=String(parent.status||timeline.status||'').toUpperCase().trim()
+    const color=jiraColorByStatus(status)
+    return {
+      uid:`jira:${key}`,
+      taskId:'',
+      source:'Jira',
+      sourceType:'jira',
+      taskType:'jira',
+      title:String(parent.summary||timeline.summary||key),
+      key,
+      owner:String(parent.assignee||'-'),
+      note:String(parent.summary||''),
+      color,
+      start:String(timeline.start||''),
+      end:String(timeline.end||''),
+      logs:[],
+      isDone:status==='S7',
+      doneAt:'',
+      doneByEmail:'',
+      updatedAt:String(parent.updated||''),
+      updatedByEmail:'',
+      status,
+      isJiraStatus:true,
+      browseUrl:String(parent.browseUrl||timeline.browseUrl||''),
+      readOnly:true
+    }
+  }).filter(Boolean)
+}
 
 function mergeItems(){
-  return st.tasks
+  const todoItems=st.tasks
     .filter(t=>String(t.isDeleted||'').toLowerCase()!=='true')
     .map(t=>{
       const uid=`todo:${t.id}`
@@ -68,9 +119,12 @@ function mergeItems(){
       updatedAt:String(row.updatedAt||row.createdAt||''),
       updatedByEmail:String(row.updatedByEmail||row.createdByEmail||''),
       status:jiraStatus,
-      isJiraStatus
+      isJiraStatus,
+      browseUrl:'',
+      readOnly:false
     }
   })
+  return [...todoItems,...buildJiraItems()]
 }
 
 function list(){
@@ -109,7 +163,7 @@ function renderFilters(){
     t.innerHTML=opts.map(f=>`<label><input type="checkbox" value="${f}" ${st.typeFilters.includes(f)?'checked':''}/><span>${f}</span></label>`).join('')
     t.querySelectorAll('input').forEach(i=>i.onchange=()=>{
       let vals=[...t.querySelectorAll('input:checked')].map(x=>x.value)
-      if(!vals.length)vals=['Checklist']
+      if(!vals.length)vals=['Checklist','Jira']
       st.typeFilters=vals
       syncQuickType()
       render()
@@ -117,11 +171,9 @@ function renderFilters(){
   }
   const s=$('uniStatusFilterGrid')
   s.innerHTML=FILTERS.map(f=>`<label><input type="checkbox" value="${f}" ${st.statusFilters.includes(f)?'checked':''}/><span>${f}</span></label>`).join('')
-  s.querySelectorAll('input').forEach(i=>i.onchange=()=>{const vals=[...s.querySelectorAll('input:checked')].map(x=>x.value);st.statusFilters=vals.length?vals:['Pending'];render()})
+  s.querySelectorAll('input').forEach(i=>i.onchange=()=>{const vals=[...s.querySelectorAll('input:checked')].map(x=>x.value);st.statusFilters=vals.length?vals:[...DEFAULT_STATUS_FILTERS];render()})
 }
-function quickTypeLabel(){
-  return st.typeFilters.join(', ')
-}
+function quickTypeLabel(){return st.typeFilters.length===2?'All Task Types':st.typeFilters.join(', ')}
 function syncQuickType(){
   const btn=$('uniQuickTypeBtn')
   if(btn)btn.textContent=quickTypeLabel()
@@ -133,12 +185,12 @@ function syncQuickType(){
 
 function cardHTML(items){
   if(!items.length)return '<div class="empty">No items</div>'
-  return `<div class="uni-card-list">${items.map(i=>{const ex=st.log===i.uid,logs=Array.isArray(i.logs)?i.logs:[],tt=i.start&&i.end?`${thai(i.start)} - ${thai(i.end)}`:'No timeline date',stTag=viewStatus(i);return `<article class="todo-card ${i.isDone?'is-done':''} todo-card-checklist" data-uid="${esc(i.uid)}" style="--todo-accent:${esc(i.color)}"><div class="todo-card-main"><label class="todo-check"><input type="checkbox" data-role="toggle" ${i.isDone?'checked':''}/><span></span></label><div class="todo-copy"><div class="todo-title-row"><span class="badge badge-checklist">${esc(i.source)}</span><span class="badge status-default">${esc(stTag)}</span><strong>${esc(i.title)}</strong>${i.key?`<span class="todo-context-inlinebar"><span class="todo-context-bartext">${esc(i.key)}</span></span>`:''}</div><div class="todo-meta-line">${esc(tt)}</div><div class="todo-meta-line">Updated ${esc(thaiDT(i.updatedAt))}${i.updatedByEmail?` | By ${esc(i.updatedByEmail)}`:''}</div><div class="todo-note">${esc(i.note||'No note')}</div><div class="todo-log-summary">${logs.length} update logs</div>${ex?`<section class="todo-log-panel"><div class="todo-log-list">${logs.length?logs.map(e=>`<article class="todo-log-entry"><div class="todo-log-time">${esc(thaiDT(e.createdAt))}${e.actorEmail?` | ${esc(e.actorEmail)}`:''}</div><div class="todo-log-message">${esc(e.message)}</div></article>`).join(''):'<div class="mini-empty">No update log yet</div>'}</div><form class="todo-log-form" data-role="log-form"><textarea name="message" placeholder="Add update log"></textarea><div class="todo-log-actions"><button class="btn primary" type="submit">Add update log</button></div></form></section>`:''}</div></div><div class="todo-card-actions"><button class="btn" type="button" data-role="edit">Edit</button><button class="btn" type="button" data-role="delete">Delete</button><button class="btn" type="button" data-role="log">${ex?'Hide logs':'View logs'}</button></div></article>`}).join('')}</div>`
+  return `<div class="uni-card-list">${items.map(i=>{const ex=st.log===i.uid,logs=Array.isArray(i.logs)?i.logs:[],tt=i.start&&i.end?`${thai(i.start)} - ${thai(i.end)}`:'No timeline date',stTag=viewStatus(i),isRO=Boolean(i.readOnly),sourceBadge=i.source==='Jira'?'status-s6':'badge-checklist';return `<article class="todo-card ${i.isDone?'is-done':''} todo-card-checklist" data-uid="${esc(i.uid)}" style="--todo-accent:${esc(i.color)}"><div class="todo-card-main">${isRO?'':`<label class="todo-check"><input type="checkbox" data-role="toggle" ${i.isDone?'checked':''}/><span></span></label>`}<div class="todo-copy"><div class="todo-title-row"><span class="badge ${sourceBadge}">${esc(i.source)}</span><span class="badge status-default">${esc(stTag)}</span><strong>${esc(i.title)}</strong>${i.key?`<span class="todo-context-inlinebar"><span class="todo-context-bartext">${esc(i.key)}</span></span>`:''}</div><div class="todo-meta-line">${esc(tt)}</div><div class="todo-meta-line">Updated ${esc(thaiDT(i.updatedAt))}${i.updatedByEmail?` | By ${esc(i.updatedByEmail)}`:''}</div><div class="todo-note">${esc(i.note||'No note')}</div>${isRO?'<div class="todo-log-summary">Jira project item</div>':`<div class="todo-log-summary">${logs.length} update logs</div>${ex?`<section class="todo-log-panel"><div class="todo-log-list">${logs.length?logs.map(e=>`<article class="todo-log-entry"><div class="todo-log-time">${esc(thaiDT(e.createdAt))}${e.actorEmail?` | ${esc(e.actorEmail)}`:''}</div><div class="todo-log-message">${esc(e.message)}</div></article>`).join(''):'<div class="mini-empty">No update log yet</div>'}</div><form class="todo-log-form" data-role="log-form"><textarea name="message" placeholder="Add update log"></textarea><div class="todo-log-actions"><button class="btn primary" type="submit">Add update log</button></div></form></section>`:''}`}</div></div><div class="todo-card-actions">${isRO?`${i.browseUrl?`<a class="btn" href="${esc(i.browseUrl)}" target="_blank" rel="noopener noreferrer">Open Jira</a>`:''}`:`<button class="btn" type="button" data-role="edit">Edit</button><button class="btn" type="button" data-role="delete">Delete</button><button class="btn" type="button" data-role="log">${ex?'Hide logs':'View logs'}</button>`}</div></article>`}).join('')}</div>`
 }
 function tableHTML(items){
   if(!items.length)return '<div class="empty">No rows</div>'
   const sh=(label,key)=>{const active=st.sort===key;const icon=active?(st.dir==='asc'?'▲':'▼'):'↕';return `<th data-sort="${key}" class="uni-th-sort ${active?'active':''}"><span class="uni-th-label">${label}</span><span class="uni-th-icon">${icon}</span></th>`}
-  return `<div class="uni-table-wrap"><table class="uni-table"><colgroup><col class="col-done"/><col class="col-task"/><col class="col-context"/><col class="col-status"/><col class="col-owner"/><col class="col-note"/><col class="col-start"/><col class="col-end"/><col class="col-updated"/><col class="col-doneinfo"/><col class="col-logs"/><col class="col-actions"/></colgroup><thead><tr>${sh('Done','done')}${sh('Task','title')}${sh('Context','context')}${sh('Status','status')}${sh('Owner','owner')}${sh('Note','note')}${sh('Start','start')}${sh('End','end')}${sh('Updated','updatedAt')}${sh('Done info','doneInfo')}${sh('Logs','logs')}<th>Actions</th></tr></thead><tbody>${items.map(i=>{const ex=st.log===i.uid,done=i.isDone&&i.doneAt?`Done ${thaiDT(i.doneAt)}${i.doneByEmail?` - ${i.doneByEmail}`:''}`:'-';return `<tr data-uid="${esc(i.uid)}" class="uni-data-row" style="--row-accent:${esc(i.color)};--row-soft:${esc(hexToRgba(i.color,.22))};--row-soft-2:${esc(hexToRgba(i.color,.13))};"><td><label class="todo-check todo-check-inline"><input type="checkbox" data-role="toggle" ${i.isDone?'checked':''}/><span></span></label></td><td class="uni-cell-task"><span class="badge ${i.source==='Planner'?'status-manual':(i.source==='Jira'?'status-s6':'badge-checklist')}">${esc(i.source)}</span> <strong>${esc(i.title)}</strong></td><td class="uni-cell-context">${i.key?`<span class="todo-context-inlinebar"><span class="todo-context-bartext">${esc(i.key)}</span></span>`:'-'}</td><td>${esc(viewStatus(i))}</td><td>${esc(i.owner||'-')}</td><td class="uni-cell-note">${esc(i.note||'-')}</td><td>${esc(thai(i.start))}</td><td>${esc(thai(i.end))}</td><td>${esc(thaiDT(i.updatedAt))}${i.updatedByEmail?`<br/><small>${esc(i.updatedByEmail)}</small>`:''}</td><td class="uni-cell-doneinfo">${esc(done)}</td><td>${esc(String((i.logs||[]).length))}</td><td><div class="uni-table-actions"><button class="uni-action-text" type="button" data-role="log">${ex?'Hide logs':'View logs'}</button><button class="uni-action-text" type="button" data-role="edit">Edit</button><button class="uni-action-text" type="button" data-role="delete">Delete</button></div></td></tr>${ex?`<tr class="uni-log-row" data-uid="${esc(i.uid)}"><td colspan="12"><section class="todo-log-panel"><div class="todo-log-list">${(i.logs||[]).length?(i.logs||[]).map(e=>`<article class="todo-log-entry"><div class="todo-log-time">${esc(thaiDT(e.createdAt))}${e.actorEmail?` | ${esc(e.actorEmail)}`:''}</div><div class="todo-log-message">${esc(e.message)}</div></article>`).join(''):'<div class="mini-empty">No update log yet</div>'}</div><form class="todo-log-form" data-role="log-form"><textarea name="message" placeholder="Add update log"></textarea><div class="todo-log-actions"><button class="btn primary" type="submit">Add update log</button></div></form></section></td></tr>`:''}`}).join('')}</tbody></table></div>`
+  return `<div class="uni-table-wrap"><table class="uni-table"><colgroup><col class="col-done"/><col class="col-task"/><col class="col-context"/><col class="col-status"/><col class="col-owner"/><col class="col-note"/><col class="col-start"/><col class="col-end"/><col class="col-updated"/><col class="col-doneinfo"/><col class="col-logs"/><col class="col-actions"/></colgroup><thead><tr>${sh('Done','done')}${sh('Task','title')}${sh('Context','context')}${sh('Status','status')}${sh('Owner','owner')}${sh('Note','note')}${sh('Start','start')}${sh('End','end')}${sh('Updated','updatedAt')}${sh('Done info','doneInfo')}${sh('Logs','logs')}<th>Actions</th></tr></thead><tbody>${items.map(i=>{const ex=st.log===i.uid,done=i.isDone&&i.doneAt?`Done ${thaiDT(i.doneAt)}${i.doneByEmail?` - ${i.doneByEmail}`:''}`:'-',isRO=Boolean(i.readOnly),sourceBadge=i.source==='Jira'?'status-s6':'badge-checklist';return `<tr data-uid="${esc(i.uid)}" class="uni-data-row" style="--row-accent:${esc(i.color)};--row-soft:${esc(hexToRgba(i.color,.22))};--row-soft-2:${esc(hexToRgba(i.color,.13))};"><td>${isRO?'-':`<label class="todo-check todo-check-inline"><input type="checkbox" data-role="toggle" ${i.isDone?'checked':''}/><span></span></label>`}</td><td class="uni-cell-task"><span class="badge ${sourceBadge}">${esc(i.source)}</span> <strong>${esc(i.title)}</strong></td><td class="uni-cell-context">${i.key?`<span class="todo-context-inlinebar"><span class="todo-context-bartext">${esc(i.key)}</span></span>`:'-'}</td><td>${esc(viewStatus(i))}</td><td>${esc(i.owner||'-')}</td><td class="uni-cell-note">${esc(i.note||'-')}</td><td>${esc(thai(i.start))}</td><td>${esc(thai(i.end))}</td><td>${esc(thaiDT(i.updatedAt))}${i.updatedByEmail?`<br/><small>${esc(i.updatedByEmail)}</small>`:''}</td><td class="uni-cell-doneinfo">${esc(done)}</td><td>${esc(String((i.logs||[]).length))}</td><td><div class="uni-table-actions">${isRO?`${i.browseUrl?`<a class="uni-action-text" href="${esc(i.browseUrl)}" target="_blank" rel="noopener noreferrer">Open Jira</a>`:'-'}`:`<button class="uni-action-text" type="button" data-role="log">${ex?'Hide logs':'View logs'}</button><button class="uni-action-text" type="button" data-role="edit">Edit</button><button class="uni-action-text" type="button" data-role="delete">Delete</button>`}</div></td></tr>${!isRO&&ex?`<tr class="uni-log-row" data-uid="${esc(i.uid)}"><td colspan="12"><section class="todo-log-panel"><div class="todo-log-list">${(i.logs||[]).length?(i.logs||[]).map(e=>`<article class="todo-log-entry"><div class="todo-log-time">${esc(thaiDT(e.createdAt))}${e.actorEmail?` | ${esc(e.actorEmail)}`:''}</div><div class="todo-log-message">${esc(e.message)}</div></article>`).join(''):'<div class="mini-empty">No update log yet</div>'}</div><form class="todo-log-form" data-role="log-form"><textarea name="message" placeholder="Add update log"></textarea><div class="todo-log-actions"><button class="btn primary" type="submit">Add update log</button></div></form></section></td></tr>`:''}`}).join('')}</tbody></table></div>`
 }
 function timelineHTML(items){
   const x=items.filter(i=>i.start&&i.end);if(!x.length)return '<div class="empty">No timeline item</div>'
@@ -271,7 +323,7 @@ function inspect(uid,anchor){
         <label class="uni-pop-field"><span>Start Date</span><input type="date" name="start" value="${esc(it.start||'')}" required /></label>
         <label class="uni-pop-field"><span>End Date</span><input type="date" name="end" value="${esc(it.end||'')}" required /></label>
         <label class="uni-pop-field"><span>Task Type</span><select name="taskType"><option value="planner_only" ${it.taskType==='planner_only'?'selected':''}>Planner</option><option value="planner_and_checklist" ${it.taskType==='planner_and_checklist'?'selected':''}>Checklist</option></select></label>
-        <label class="uni-pop-field"><span>Status (Jira)</span><select name="status" ${isJiraEditable?'':'disabled'}><option value="">-</option>${FILTERS.map(s=>`<option value="${s}" ${it.status===s?'selected':''}>${s}</option>`).join('')}</select></label>
+        <label class="uni-pop-field"><span>Status (Jira)</span><select name="status" ${isJiraEditable?'':'disabled'}><option value="">-</option>${FILTERS.filter(s=>/^S[0-7]$/.test(s)).map(s=>`<option value="${s}" ${it.status===s?'selected':''}>${s}</option>`).join('')}</select></label>
         <label class="uni-pop-field"><span>Owner</span><input name="owner" value="${esc(it.owner||'')}" /></label>
         <label class="uni-pop-field uni-pop-color-field"><span>Color</span><input type="color" name="color" value="${esc(col(it.color||DEF_COLOR))}" /></label>
         <label class="uni-pop-field full"><span>Note</span><textarea name="note">${esc(it.note||'')}</textarea></label>
@@ -302,15 +354,14 @@ function inspect(uid,anchor){
       <p class="uni-pop-note">${esc(it.note||'No note')}</p>
       <article class="uni-pop-done"><span>Done Info</span><strong>${esc(doneInfo(it))}</strong></article>
       <div class="uni-pop-actions">
-        <button class="btn ${it.isDone?'':'primary'}" type="button" id="uniInspectorDoneBtn">${it.isDone?'Undo Done':'Done'}</button>
-        <button class="btn" type="button" id="uniInspectorEditBtn">Edit</button>
-        <button class="btn" type="button" id="uniInspectorDeleteBtn">Delete</button>
+        ${it.readOnly?'':`<button class="btn ${it.isDone?'':'primary'}" type="button" id="uniInspectorDoneBtn">${it.isDone?'Undo Done':'Done'}</button><button class="btn" type="button" id="uniInspectorEditBtn">Edit</button><button class="btn" type="button" id="uniInspectorDeleteBtn">Delete</button>`}
+        ${it.readOnly&&it.browseUrl?`<a class="btn" href="${esc(it.browseUrl)}" target="_blank" rel="noopener noreferrer">Open Jira</a>`:''}
         <span id="uniInspectorStatus" class="notice"></span>
       </div>
-      <form id="uniInspectorLogForm" class="uni-pop-log">
+      ${it.readOnly?'':`<form id="uniInspectorLogForm" class="uni-pop-log">
         <textarea name="message" placeholder="Add update log"></textarea>
         <div class="todo-log-actions"><button class="btn primary" type="submit">Add update log</button></div>
-      </form>
+      </form>`}
     </div>`
     $('uniInspectorClose').onclick=()=>pop.classList.remove('open')
     if(editing){
@@ -395,26 +446,28 @@ function inspect(uid,anchor){
       requestAnimationFrame(place)
       return
     }
-    $('uniInspectorDoneBtn').onclick=async e=>{e.preventDefault();e.stopPropagation();const s=$('uniInspectorStatus');notice(s,it.isDone?'Updating...':'Marking...');const ok=await setDone(it.uid,!it.isDone);if(!ok)notice(s,'Unable','error')}
-    $('uniInspectorEditBtn').onclick=async e=>{
-      e.preventDefault()
-      e.stopPropagation()
-      editing=true
-      pop.classList.add('open')
-      render()
-      try{
-        const a=await askAuth('open edit mode')
-        editActorEmail=em(a?.email)
-        const s=$('uniInspectorStatus')
-        if(!editActorEmail){notice(s,'Jira email is required','error');return}
-        notice(s,`Authenticated as ${editActorEmail}`,'success')
-      }catch(err){
-        const s=$('uniInspectorStatus')
-        notice(s,err.message||'Auth is required before save','error')
+    if(!it.readOnly){
+      $('uniInspectorDoneBtn').onclick=async e=>{e.preventDefault();e.stopPropagation();const s=$('uniInspectorStatus');notice(s,it.isDone?'Updating...':'Marking...');const ok=await setDone(it.uid,!it.isDone);if(!ok)notice(s,'Unable','error')}
+      $('uniInspectorEditBtn').onclick=async e=>{
+        e.preventDefault()
+        e.stopPropagation()
+        editing=true
+        pop.classList.add('open')
+        render()
+        try{
+          const a=await askAuth('open edit mode')
+          editActorEmail=em(a?.email)
+          const s=$('uniInspectorStatus')
+          if(!editActorEmail){notice(s,'Jira email is required','error');return}
+          notice(s,`Authenticated as ${editActorEmail}`,'success')
+        }catch(err){
+          const s=$('uniInspectorStatus')
+          notice(s,err.message||'Auth is required before save','error')
+        }
       }
+      $('uniInspectorDeleteBtn').onclick=async e=>{e.preventDefault();e.stopPropagation();await deleteItem(it.uid)}
+      $('uniInspectorLogForm').onsubmit=async e=>{e.preventDefault();e.stopPropagation();const m=String(e.currentTarget.message.value||'').trim();if(!m)return;await addLog(it.uid,m)}
     }
-    $('uniInspectorDeleteBtn').onclick=async e=>{e.preventDefault();e.stopPropagation();await deleteItem(it.uid)}
-    $('uniInspectorLogForm').onsubmit=async e=>{e.preventDefault();e.stopPropagation();const m=String(e.currentTarget.message.value||'').trim();if(!m)return;await addLog(it.uid,m)}
     requestAnimationFrame(place)
   }
   render()
@@ -431,18 +484,34 @@ function resetForm(){st.editingId='';st.editingActorEmail='';const f=$('uniCreat
 async function createFromForm(f){const p={title:String(f.title.value||'').trim(),key:String(f.key.value||'').trim(),start:dt(f.start.value||''),end:dt(f.end.value||''),owner:String(f.owner.value||'').trim(),note:String(f.note.value||'').trim(),color:col(f.color.value||DEF_COLOR)};if(!p.title)throw new Error('Task title is required');if(!p.start||!p.end)throw new Error('Start and End are required');if(p.end<p.start)throw new Error('End date must be on or after Start date');const a=st.editingId&&st.editingActorEmail?{email:st.editingActorEmail}:await askAuth(st.editingId?'update item':'create item'),e=em(a?.email);if(!e)throw new Error('Jira email is required');const payload={sourceType:'todo',taskType:'planner_and_checklist',title:p.title,key:p.key,owner:p.owner,note:p.note,color:p.color,start:p.start,end:p.end,actorEmail:e};if(st.editingId)await api('/api/todo',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({...payload,id:st.editingId})});else await api('/api/todo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})}
 
 async function load(apply=true){
-  if(apply)notice($('uniSync'),'Loading unified planner from PlannerTasks...')
-  const t=await api(`/api/todo?_ts=${Date.now()}`)
+  if(apply)notice($('uniSync'),'Loading unified planner from PlannerTasks + Jira...')
+  const ts=Date.now()
+  const [todoRes,dashRes]=await Promise.allSettled([
+    api(`/api/todo?_ts=${ts}`),
+    api(`/api/dashboard?_ts=${ts}`)
+  ])
+  if(todoRes.status!=='fulfilled')throw todoRes.reason||new Error('Unable to load PlannerTasks')
+  const t=todoRes.value||{}
+  const dash=dashRes.status==='fulfilled'?(dashRes.value||{}):{}
+  const timelineByKey=new Map((Array.isArray(dash.timelineItems)?dash.timelineItems:[]).map(item=>[String(item.key||''),item]))
+  const jiraRows=(Array.isArray(dash.parents)?dash.parents:[]).map(row=>{
+    const parent=row?.parent||{}
+    const key=String(parent.key||'')
+    const timeline=timelineByKey.get(key)||null
+    return timeline?{parent,timeline}:null
+  }).filter(Boolean)
   if(apply){
     st.tasks=Array.isArray(t.items)?t.items:[]
+    st.jiraRows=jiraRows
     st.liveEdits={}
     st.sheetName=String(t.sheetName||'PlannerTasks')
     if($('uniSheetTag'))$('uniSheetTag').textContent=`Sheet: ${st.sheetName}`
-    notice($('uniSync'),`Loaded ${st.tasks.length} items from ${st.sheetName}`,'success')
+    const jiraMsg=dashRes.status==='fulfilled'?`${jiraRows.length} Jira projects`:'Jira unavailable'
+    notice($('uniSync'),`Loaded ${st.tasks.length} items from ${st.sheetName} + ${jiraMsg}`,'success')
   }
-  return {items:Array.isArray(t.items)?t.items:[],sheetName:String(t.sheetName||'PlannerTasks')}
+  return {items:Array.isArray(t.items)?t.items:[],sheetName:String(t.sheetName||'PlannerTasks'),jiraRows}
 }
 
-function bind(){const d=new Date();st.month=`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`;$('uniMonthPicker').value=st.month;renderSwitch();renderFilters();toggleMonthFilter();$('uniMonthPicker').onchange=e=>{st.month=e.target.value||st.month;render()};$('uniSearch').oninput=e=>{st.search=String(e.target.value||'');render()};$('uniSortField').onchange=e=>{st.sort=e.target.value||'updatedAt';render()};$('uniSortDir').onchange=e=>{st.dir=e.target.value||'desc';render()};$('uniRefreshBtn').onclick=async()=>{await load();render()};$('uniOpenCreateBtn').onclick=()=>{resetForm();openCreateModal()};$('uniCloseCreateBtn').onclick=()=>{closeCreateModal();resetForm()};$('uniCreateBackdrop').onclick=()=>{closeCreateModal();resetForm()};const quickBtn=$('uniQuickTypeBtn'),quickBox=$('uniQuickTypeBox');if(quickBtn&&quickBox){const closeQuick=()=>{quickBox.hidden=true;quickBtn.setAttribute('aria-expanded','false')};quickBtn.onclick=e=>{e.stopPropagation();const show=quickBox.hidden;quickBox.hidden=!show;quickBtn.setAttribute('aria-expanded',show?'true':'false')};quickBox.onclick=e=>e.stopPropagation();quickBox.querySelectorAll('input').forEach(i=>i.onchange=()=>{let vals=[...quickBox.querySelectorAll('input:checked')].map(x=>x.value);if(!vals.length)vals=['Checklist'];st.typeFilters=vals;syncQuickType();renderFilters();render();setTimeout(closeQuick,0)});document.addEventListener('click',e=>{if(e.target.closest('#uniQuickTypeWrap'))return;closeQuick()});document.addEventListener('keydown',e=>{if(e.key==='Escape')closeQuick()});window.addEventListener('blur',closeQuick);window.addEventListener('scroll',closeQuick,true)}syncQuickType();$('uniColorPreview').onclick=()=>$('uniColorInput').click();$('uniColorInput').oninput=syncColor;syncColor();$('uniCreateForm').onsubmit=async e=>{e.preventDefault();const s=$('uniCreateStatus');notice(s,st.editingId?'Updating item...':'Creating item...');try{await createFromForm(e.currentTarget);await load();render();resetForm();closeCreateModal();notice($('uniSync'),'Saved successfully','success')}catch(err){notice(s,err.message||'Unable to save item','error')}};$('uniCancelEditBtn').onclick=resetForm;$('uniAuthCancel').onclick=()=>cancelAuthModal();$('uniAuthBackdrop').onclick=()=>cancelAuthModal();$('uniAuthForm').onsubmit=async e=>{e.preventDefault();const p=st.auth;if(!p)return;const email=em($('uniAuthEmail').value),remember=Boolean($('uniAuthRemember').checked),s=$('uniAuthStatus'),b=$('uniAuthConfirm');if(!email){notice(s,'Jira email is required','error');return}try{b.disabled=true;notice(s,'Validating Jira email...');const r=await validateJiraEmail(email);if(!r?.valid)throw new Error(r?.reason||'Jira email not found');const actor={email:em(r?.user?.email||email),displayName:String(r?.user?.displayName||''),accountId:String(r?.user?.accountId||'')};if(remember)setActor(actor);else sessionStorage.removeItem(AUTH_KEY);st.auth=null;closeAuthModal();p.res(actor)}catch(err){notice(s,err.message||'Auth failed','error')}finally{b.disabled=false}};document.addEventListener('click',e=>{if(!$('uniAuthModal').hidden)return;const pop=$('uniInspectorPop');if(!pop.classList.contains('open'))return;if(e.target.closest('#uniInspectorPop'))return;if(e.target.closest('[data-role="inspect"]'))return;pop.classList.remove('open')})}
+function bind(){const d=new Date();st.month=`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`;$('uniMonthPicker').value=st.month;renderSwitch();renderFilters();toggleMonthFilter();$('uniMonthPicker').onchange=e=>{st.month=e.target.value||st.month;render()};$('uniSearch').oninput=e=>{st.search=String(e.target.value||'');render()};$('uniSortField').onchange=e=>{st.sort=e.target.value||'updatedAt';render()};$('uniSortDir').onchange=e=>{st.dir=e.target.value||'desc';render()};$('uniRefreshBtn').onclick=async()=>{await load();render()};$('uniOpenCreateBtn').onclick=()=>{resetForm();openCreateModal()};$('uniCloseCreateBtn').onclick=()=>{closeCreateModal();resetForm()};$('uniCreateBackdrop').onclick=()=>{closeCreateModal();resetForm()};const quickBtn=$('uniQuickTypeBtn'),quickBox=$('uniQuickTypeBox');if(quickBtn&&quickBox){const closeQuick=()=>{quickBox.hidden=true;quickBtn.setAttribute('aria-expanded','false')};quickBtn.onclick=e=>{e.stopPropagation();const show=quickBox.hidden;quickBox.hidden=!show;quickBtn.setAttribute('aria-expanded',show?'true':'false')};quickBox.onclick=e=>e.stopPropagation();quickBox.querySelectorAll('input').forEach(i=>i.onchange=()=>{let vals=[...quickBox.querySelectorAll('input:checked')].map(x=>x.value);if(!vals.length)vals=['Checklist','Jira'];st.typeFilters=vals;syncQuickType();renderFilters();render();setTimeout(closeQuick,0)});document.addEventListener('click',e=>{if(e.target.closest('#uniQuickTypeWrap'))return;closeQuick()});document.addEventListener('keydown',e=>{if(e.key==='Escape')closeQuick()});window.addEventListener('blur',closeQuick);window.addEventListener('scroll',closeQuick,true)}syncQuickType();$('uniColorPreview').onclick=()=>$('uniColorInput').click();$('uniColorInput').oninput=syncColor;syncColor();$('uniCreateForm').onsubmit=async e=>{e.preventDefault();const s=$('uniCreateStatus');notice(s,st.editingId?'Updating item...':'Creating item...');try{await createFromForm(e.currentTarget);await load();render();resetForm();closeCreateModal();notice($('uniSync'),'Saved successfully','success')}catch(err){notice(s,err.message||'Unable to save item','error')}};$('uniCancelEditBtn').onclick=resetForm;$('uniAuthCancel').onclick=()=>cancelAuthModal();$('uniAuthBackdrop').onclick=()=>cancelAuthModal();$('uniAuthForm').onsubmit=async e=>{e.preventDefault();const p=st.auth;if(!p)return;const email=em($('uniAuthEmail').value),remember=Boolean($('uniAuthRemember').checked),s=$('uniAuthStatus'),b=$('uniAuthConfirm');if(!email){notice(s,'Jira email is required','error');return}try{b.disabled=true;notice(s,'Validating Jira email...');const r=await validateJiraEmail(email);if(!r?.valid)throw new Error(r?.reason||'Jira email not found');const actor={email:em(r?.user?.email||email),displayName:String(r?.user?.displayName||''),accountId:String(r?.user?.accountId||'')};if(remember)setActor(actor);else sessionStorage.removeItem(AUTH_KEY);st.auth=null;closeAuthModal();p.res(actor)}catch(err){notice(s,err.message||'Auth failed','error')}finally{b.disabled=false}};document.addEventListener('click',e=>{if(!$('uniAuthModal').hidden)return;const pop=$('uniInspectorPop');if(!pop.classList.contains('open'))return;if(e.target.closest('#uniInspectorPop'))return;if(e.target.closest('[data-role="inspect"]'))return;pop.classList.remove('open')})}
 
 bind();load().then(()=>render()).catch(err=>notice($('uniSync'),err.message||'Unable to load unified planner','error'))
