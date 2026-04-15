@@ -29,6 +29,7 @@ const hasJiraStatus=s=>FILTERS.includes(String(s||'').toUpperCase().trim())
 const isJiraTask=t=>{const src=String(t.sourceType||'').toLowerCase(),typ=String(t.taskType||'').toLowerCase();return src==='jira'||typ==='jira'}
 const viewStatus=i=>i.isJiraStatus?(i.status||'-'):(i.isDone?'Done':'Pending')
 const timelineText=i=>i.start&&i.end?`${thai(i.start)} - ${thai(i.end)}<br/>${durationDays(i.start,i.end)} days`:'No timeline date'
+const escAttr=v=>String(v??'').replace(/\\/g,'\\\\').replace(/"/g,'\\"')
 
 function mergeItems(){
   return st.tasks
@@ -169,7 +170,6 @@ function inspect(uid,anchor){
   const accent=col(it.color||DEF_COLOR)
   const accentSoft=hexToRgba(accent,.14)
   const accentBorder=hexToRgba(accent,.42)
-  const wait=ms=>new Promise(res=>setTimeout(res,ms))
   const place=()=>{
     const r=anchor?.getBoundingClientRect()
     const w=pop.offsetWidth||430
@@ -180,6 +180,15 @@ function inspect(uid,anchor){
     const top=Math.max(8,Math.min(window.innerHeight-h-8,prefTop))
     pop.style.left=`${left}px`
     pop.style.top=`${top}px`
+  }
+  const paintEditedItemNow=(itemUid,colorHex)=>{
+    const safe=`[data-uid="${escAttr(itemUid)}"]`
+    document.querySelectorAll(`.planner-lab-bar${safe}`).forEach(el=>{
+      el.style.setProperty('--lab-bar',colorHex)
+    })
+    document.querySelectorAll(`.uni-cal-bar${safe}`).forEach(el=>{
+      el.style.background=colorHex
+    })
   }
   const applyLocalPatch=payload=>{
     const targetId=String(it.taskId||uid.replace(/^todo:/,'')||'').trim()
@@ -339,15 +348,8 @@ function inspect(uid,anchor){
           render()
           if(st.view==='timeline'||st.view==='calendar'){render()}
           inspect(uid,anchor)
-          let synced=false
-          for(let i=0;i<6;i+=1){
-            const remote=await load(false)
-            const fresh=(remote.items||[]).find(x=>String(x.id||'')===String(it.taskId))
-            if(fresh&&String(fresh.color||'').toLowerCase()===String(payload.color||'').toLowerCase()&&String(fresh.title||'')===payload.title&&String(fresh.key||'')===payload.key){synced=true;st.tasks=remote.items;st.sheetName=String(remote.sheetName||st.sheetName||'PlannerTasks');break}
-            await wait(700)
-          }
-          if(!synced)notice($('uniSync'),'Saved locally. Source still syncing...','info')
-          else{delete st.liveEdits[uid];notice($('uniSync'),'Saved and synced','success')}
+          paintEditedItemNow(uid,payload.color)
+          notice($('uniSync'),'Saved','success')
           render()
           inspect(uid,anchor)
         }catch(err){notice(s,err.message||'Unable to save item','error')}
