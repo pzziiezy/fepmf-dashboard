@@ -152,18 +152,19 @@
     .uni-table-actions { display:flex; gap:6px; flex-wrap:wrap; }
     .uni-action-text { border:none; background:none; color:#225ea6; font-weight:700; cursor:pointer; padding:0; }
     .uni-table strong { display:inline; word-break:break-word; }
-    .uni-cell-task, .uni-cell-context, .uni-cell-note, .uni-cell-doneinfo { word-break:break-word; }
-    .uni-cell-note, .uni-cell-doneinfo { color:#2b4b79; }
+    .uni-cell-task, .uni-cell-context, .uni-cell-note, .uni-cell-doneinfo, .uni-cell-updated { word-break:break-word; }
+    .uni-cell-note, .uni-cell-doneinfo, .uni-cell-updated { color:#2b4b79; }
+    .uni-cell-updated, .uni-cell-doneinfo { font-size:12px; line-height:1.35; }
     .uni-table .col-done { width:54px; }
-    .uni-table .col-task { width:240px; }
-    .uni-table .col-context { width:320px; }
+    .uni-table .col-task { width:220px; }
+    .uni-table .col-context { width:360px; }
     .uni-table .col-status { width:84px; }
-    .uni-table .col-owner { width:74px; }
-    .uni-table .col-note { width:280px; }
+    .uni-table .col-owner { width:110px; }
+    .uni-table .col-note { width:220px; }
     .uni-table .col-start { width:58px; }
     .uni-table .col-end { width:58px; }
-    .uni-table .col-updated { width:120px; }
-    .uni-table .col-doneinfo { width:198px; }
+    .uni-table .col-updated { width:170px; }
+    .uni-table .col-doneinfo { width:170px; }
     .uni-table .col-logs { width:42px; }
     .uni-table .col-actions { width:154px; }
     .uni-table .badge {
@@ -723,6 +724,6 @@
     </section>
   </div>
 
-  <script src="/unified-planner.js?v=20260416af"></script>
+  <script src="/unified-planner.js?v=20260416ag"></script>
 </body>
 </html>
