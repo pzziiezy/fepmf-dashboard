@@ -34,9 +34,32 @@
     .uni-create-btn {
       min-height: 36px;
       border-radius: 999px;
-      padding: 0 14px;
+      padding: 0 16px;
       font-size: 13px;
       font-weight: 800;
+      border-color: #1457b6;
+      background: linear-gradient(135deg, #1f74df 0%, #0f56b7 100%);
+      box-shadow: 0 12px 24px rgba(16, 77, 160, 0.24);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .uni-create-btn::before {
+      content: "+";
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.2);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      line-height: 1;
+      font-weight: 900;
+    }
+    .uni-create-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 14px 28px rgba(16, 77, 160, 0.3);
     }
     #uniMonthWrap {
       display: flex;
@@ -158,6 +181,9 @@
     .uni-table tbody tr.uni-data-row .todo-context-inlinebar {
       border-left-color: var(--row-accent) !important;
       background: color-mix(in srgb, var(--row-soft) 115%, #ffffff 0%);
+    }
+    .uni-table tbody tr.uni-data-row .todo-context-inlinebar::before {
+      background: var(--row-accent) !important;
     }
     .uni-table tbody tr.uni-data-row:hover td {
       background: linear-gradient(90deg, color-mix(in srgb, var(--row-soft) 122%, #fff 0%), color-mix(in srgb, var(--row-soft-2) 122%, #fff 0%));
@@ -411,6 +437,48 @@
       margin-top: 10px;
     }
     .uni-create-form .full { grid-column: 1 / -1; }
+    .uni-create-form .field span {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      color: #4f6887;
+      text-transform: none;
+    }
+    .uni-create-form input,
+    .uni-create-form textarea {
+      width: 100%;
+      border: 1px solid #cfdbeb;
+      border-radius: 12px;
+      padding: 10px 12px;
+      font: inherit;
+      color: #153862;
+      background: #fcfeff;
+    }
+    .uni-create-form textarea { min-height: 92px; resize: vertical; }
+    .uni-create-form .todo-color-shell {
+      position: relative;
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+    }
+    .uni-create-form input[type="color"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .uni-create-form .todo-color-preview {
+      width: 100%;
+      height: 42px;
+      border: 1px solid #cfdbeb;
+      border-radius: 12px;
+      box-shadow: none;
+    }
+    .uni-create-form .planner-lab-form-actions {
+      margin-top: 4px;
+    }
 
     .uni-create-mode { display:inline-flex; border:1px solid rgba(128,151,190,.36); border-radius:999px; overflow:hidden; background:rgba(244,248,255,.88); }
     .uni-create-mode label { padding:6px 12px; font-size:12px; font-weight:700; color:#2d4f7f; cursor:pointer; }
