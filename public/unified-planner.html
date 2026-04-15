@@ -67,6 +67,7 @@
       padding: 11px;
       display: grid;
       gap: 9px;
+      position: relative;
     }
     .uni-pop-head {
       display: flex;
@@ -259,6 +260,24 @@
       gap: 8px;
       align-items: center;
       flex-wrap: wrap;
+    }
+    .uni-pop-loader {
+      display: none;
+      position: absolute;
+      inset: 0;
+      border-radius: 14px;
+      background: rgba(248, 252, 255, 0.72);
+      backdrop-filter: blur(1px);
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 800;
+      color: #1f4f8f;
+      letter-spacing: .01em;
+      z-index: 2;
+    }
+    .uni-pop-card.is-saving .uni-pop-loader {
+      display: flex;
     }
 
     .uni-create-mode { display:inline-flex; border:1px solid rgba(128,151,190,.36); border-radius:999px; overflow:hidden; background:rgba(244,248,255,.88); }
@@ -497,6 +516,6 @@
     </section>
   </div>
 
-  <script src="/unified-planner.js?v=20260415r"></script>
+  <script src="/unified-planner.js?v=20260415s"></script>
 </body>
 </html>

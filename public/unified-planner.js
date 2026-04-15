@@ -166,6 +166,7 @@ function inspect(uid,anchor){
   const accent=col(it.color||DEF_COLOR)
   const accentSoft=hexToRgba(accent,.14)
   const accentBorder=hexToRgba(accent,.42)
+  const wait=ms=>new Promise(res=>setTimeout(res,ms))
   const place=()=>{
     const r=anchor?.getBoundingClientRect()
     const w=pop.offsetWidth||430
@@ -195,7 +196,7 @@ function inspect(uid,anchor){
         <label class="uni-pop-field"><span>Task Type</span><select name="taskType"><option value="planner_only" ${it.taskType==='planner_only'?'selected':''}>Planner</option><option value="planner_and_checklist" ${it.taskType==='planner_and_checklist'?'selected':''}>Checklist</option></select></label>
         <label class="uni-pop-field"><span>Status (Jira)</span><select name="status" ${isJiraEditable?'':'disabled'}><option value="">-</option>${FILTERS.map(s=>`<option value="${s}" ${it.status===s?'selected':''}>${s}</option>`).join('')}</select></label>
         <label class="uni-pop-field"><span>Owner</span><input name="owner" value="${esc(it.owner||'')}" /></label>
-        <label class="uni-pop-field"><span>Color</span><input type="color" name="color" value="${esc(col(it.color||DEF_COLOR))}" /></label>
+        <label class="uni-pop-field full"><span>Color</span><input type="color" name="color" value="${esc(col(it.color||DEF_COLOR))}" /></label>
         <label class="uni-pop-field full"><span>Note</span><textarea name="note">${esc(it.note||'')}</textarea></label>
         <div class="uni-pop-edit-actions full">
           <button class="btn primary" type="submit">Save</button>
@@ -203,6 +204,7 @@ function inspect(uid,anchor){
           <span id="uniInspectorStatus" class="notice"></span>
         </div>
       </form>
+      <div class="uni-pop-loader">Updating...</div>
     </div>`:`
     <div class="uni-pop-card" style="--uni-accent:${esc(accent)};--uni-accent-soft:${esc(accentSoft)};--uni-accent-border:${esc(accentBorder)};">
       <header class="uni-pop-head">
@@ -256,8 +258,17 @@ function inspect(uid,anchor){
         if(!payload.start||!payload.end){notice(s,'Start and End are required','error');return}
         if(payload.end<payload.start){notice(s,'End date must be on or after Start date','error');return}
         if(payload.status&&!FILTERS.includes(payload.status)){notice(s,'Invalid Jira status','error');return}
+        const card=pop.querySelector('.uni-pop-card')
+        const controls=[...e.currentTarget.querySelectorAll('input,select,textarea,button')]
+        const submitBtn=e.currentTarget.querySelector('button[type="submit"]')
+        const setSaving=v=>{
+          card?.classList.toggle('is-saving',v)
+          controls.forEach(el=>{el.disabled=v})
+          if(submitBtn)submitBtn.textContent=v?'Saving...':'Save'
+        }
         try{
-          notice(s,'Saving...')
+          notice(s,'Saving and syncing...')
+          setSaving(true)
           const eMail=editActorEmail||em((await askAuth('update item'))?.email)
           if(!eMail)throw new Error('Jira email is required')
           await api('/api/todo',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({
@@ -274,11 +285,18 @@ function inspect(uid,anchor){
             status:payload.status,
             actorEmail:eMail
           })})
-          await load()
-          const fresh=list().find(x=>x.uid===uid)
-          if(fresh)inspect(uid,anchor)
+          let synced=false
+          for(let i=0;i<6;i+=1){
+            await load()
+            const fresh=list().find(x=>x.uid===uid)
+            if(fresh&&fresh.title===payload.title&&fresh.key===payload.key&&fresh.owner===payload.owner&&fresh.note===payload.note&&fresh.start===payload.start&&fresh.end===payload.end&&fresh.color===payload.color&&fresh.taskType===payload.taskType){synced=true;break}
+            await wait(700)
+          }
+          if(!synced)notice(s,'Saved, waiting data sync...','info')
           render()
+          inspect(uid,anchor)
         }catch(err){notice(s,err.message||'Unable to save item','error')}
+        finally{setSaving(false)}
       }
       requestAnimationFrame(place)
       return
