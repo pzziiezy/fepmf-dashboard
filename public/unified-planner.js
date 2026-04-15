@@ -179,8 +179,15 @@ function inspect(uid,anchor){
     pop.style.top=`${top}px`
   }
   const applyLocalPatch=payload=>{
-    const targetId=String(it.taskId||uid.replace(/^todo:/,'')||'')
-    const idx=st.tasks.findIndex(t=>String(t.id||'')===targetId)
+    const targetId=String(it.taskId||uid.replace(/^todo:/,'')||'').trim()
+    const idxById=st.tasks.findIndex(t=>String(t.id||'').trim()===targetId)
+    const idxByShape=idxById>=0?idxById:st.tasks.findIndex(t=>
+      String(t.title||'')===String(it.title||'') &&
+      String(t.key||'')===String(it.key||'') &&
+      String(t.start||'')===String(it.start||'') &&
+      String(t.end||'')===String(it.end||'')
+    )
+    const idx=idxByShape
     if(idx<0)return false
     st.tasks[idx]={
       ...st.tasks[idx],
@@ -190,7 +197,7 @@ function inspect(uid,anchor){
       key:payload.key,
       owner:payload.owner,
       note:payload.note,
-      color:payload.color,
+      color:col(payload.color||DEF_COLOR),
       start:payload.start,
       end:payload.end,
       status:payload.status,
@@ -306,8 +313,13 @@ function inspect(uid,anchor){
             status:payload.status,
             actorEmail:eMail
           })})
-          applyLocalPatch({...payload,actorEmail:eMail})
+          const patched=applyLocalPatch({...payload,actorEmail:eMail})
+          if(!patched){
+            notice(s,'Saved, but local item not found. Reloading...','info')
+            await load()
+          }
           render()
+          if(st.view==='timeline'||st.view==='calendar'){render()}
           inspect(uid,anchor)
           let synced=false
           for(let i=0;i<6;i+=1){
