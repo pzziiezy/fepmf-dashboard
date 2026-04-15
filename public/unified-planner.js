@@ -1,7 +1,7 @@
 ﻿const AUTH_KEY='unified_actor_session_v1'
 const DEF_COLOR='#2c6e91'
 const FILTERS=['S0','S1','S2','S3','S4','S5','S6','S7']
-const st={tasks:[],month:'',search:'',view:'card',sort:'updatedAt',dir:'desc',statusFilters:[...FILTERS],typeFilters:['Planner','Checklist'],sel:'',log:'',auth:null,busy:'',editingId:'',editingActorEmail:'',sheetName:'PlannerTasks',liveEdits:{}}
+const st={tasks:[],month:'',search:'',view:'card',sort:'updatedAt',dir:'desc',statusFilters:[...FILTERS],typeFilters:['Checklist'],sel:'',log:'',auth:null,busy:'',editingId:'',editingActorEmail:'',sheetName:'PlannerTasks',liveEdits:{}}
 const $=id=>document.getElementById(id)
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))
 const notice=(el,m,t='info')=>{if(!el)return;el.textContent=m||'';el.classList.remove('notice-success','notice-error');if(t==='success')el.classList.add('notice-success');if(t==='error')el.classList.add('notice-error')}
@@ -41,7 +41,7 @@ function mergeItems(){
       const key=String(row.key||'').trim()
       const sourceType=String(row.sourceType||'todo').toLowerCase()
       const taskType=String(row.taskType||'').toLowerCase()|| (sourceType==='planner'?'planner_only':'planner_and_checklist')
-      const source=taskType==='planner_only'?'Planner':'Checklist'
+      const source=(sourceType==='jira'||taskType==='jira')?'Jira':(taskType==='planner_only'?'Planner':'Checklist')
       const statusDirect=String(row.status||'').toUpperCase().trim()
       const inferredStatus=((`${row.title||''} ${row.note||''} ${key}`.toUpperCase().match(/\bS[0-7]\b/)||[])[0]||'')
       const jiraStatus=hasJiraStatus(statusDirect)?statusDirect:(hasJiraStatus(inferredStatus)?inferredStatus:'')
@@ -73,11 +73,26 @@ function mergeItems(){
 
 function list(){
   const q=st.search.trim().toLowerCase(),typeAct=new Set(st.typeFilters),statusAct=new Set(st.statusFilters)
+  const allowAll=typeAct.has('All')
   let it=mergeItems()
-    .filter(i=>typeAct.has(i.source))
+    .filter(i=>allowAll||typeAct.has(i.source))
     .filter(i=>!i.isJiraStatus||!i.status||statusAct.has(i.status))
     .filter(i=>!q||`${i.title} ${i.key} ${i.owner} ${i.note} ${i.source} ${viewStatus(i)}`.toLowerCase().includes(q))
-  it.sort((a,b)=>{let r=0;if(st.sort==='title')r=cmp(a.title,b.title);else if(st.sort==='owner')r=cmp(a.owner,b.owner);else if(st.sort==='start')r=cmp(a.start,b.start,'d');else if(st.sort==='end')r=cmp(a.end,b.end,'d');else r=cmp(a.updatedAt,b.updatedAt,'d');return st.dir==='asc'?r:-r})
+  it.sort((a,b)=>{let r=0
+    if(st.sort==='done')r=(a.isDone===b.isDone)?0:(a.isDone?1:-1)
+    else if(st.sort==='title')r=cmp(a.title,b.title)
+    else if(st.sort==='context')r=cmp(a.key,b.key)
+    else if(st.sort==='status')r=cmp(viewStatus(a),viewStatus(b))
+    else if(st.sort==='owner')r=cmp(a.owner,b.owner)
+    else if(st.sort==='note')r=cmp(a.note,b.note)
+    else if(st.sort==='start')r=cmp(a.start,b.start,'d')
+    else if(st.sort==='end')r=cmp(a.end,b.end,'d')
+    else if(st.sort==='doneInfo')r=cmp(doneInfo(a),doneInfo(b))
+    else if(st.sort==='logs')r=(a.logs?.length||0)-(b.logs?.length||0)
+    else if(st.sort==='type')r=cmp(a.source,b.source)
+    else r=cmp(a.updatedAt,b.updatedAt,'d')
+    return st.dir==='asc'?r:-r
+  })
   return it
 }
 
@@ -88,11 +103,31 @@ function renderSwitch(){
 }
 function renderFilters(){
   const t=$('uniTypeFilterGrid')
-  t.innerHTML=['Planner','Checklist'].map(f=>`<label><input type="checkbox" value="${f}" ${st.typeFilters.includes(f)?'checked':''}/><span>${f}</span></label>`).join('')
-  t.querySelectorAll('input').forEach(i=>i.onchange=()=>{st.typeFilters=[...t.querySelectorAll('input:checked')].map(x=>x.value);render()})
+  const opts=['All','Planner','Checklist','Jira']
+  t.innerHTML=opts.map(f=>`<label><input type="checkbox" value="${f}" ${st.typeFilters.includes(f)?'checked':''}/><span>${f}</span></label>`).join('')
+  t.querySelectorAll('input').forEach(i=>i.onchange=()=>{
+    let vals=[...t.querySelectorAll('input:checked')].map(x=>x.value)
+    if(vals.includes('All'))vals=['All']
+    if(!vals.length)vals=['Checklist']
+    st.typeFilters=vals
+    syncQuickType()
+    render()
+  })
   const s=$('uniStatusFilterGrid')
   s.innerHTML=FILTERS.map(f=>`<label><input type="checkbox" value="${f}" ${st.statusFilters.includes(f)?'checked':''}/><span>${f}</span></label>`).join('')
   s.querySelectorAll('input').forEach(i=>i.onchange=()=>{st.statusFilters=[...s.querySelectorAll('input:checked')].map(x=>x.value);render()})
+}
+function quickTypeLabel(){
+  if(st.typeFilters.includes('All'))return 'Task Type: All'
+  return `Task Type: ${st.typeFilters.join(', ')}`
+}
+function syncQuickType(){
+  const btn=$('uniQuickTypeBtn')
+  if(btn)btn.textContent=quickTypeLabel()
+  const box=$('uniQuickTypeBox')
+  if(box){
+    box.querySelectorAll('input').forEach(i=>{i.checked=st.typeFilters.includes(i.value)})
+  }
 }
 
 function cardHTML(items){
@@ -101,7 +136,8 @@ function cardHTML(items){
 }
 function tableHTML(items){
   if(!items.length)return '<div class="empty">No rows</div>'
-  return `<div class="uni-table-wrap"><table class="uni-table"><thead><tr><th>Done</th><th>Task</th><th>Context</th><th>Status</th><th>Owner</th><th>Note</th><th>Start</th><th>End</th><th>Updated</th><th>Done info</th><th>Logs</th><th>Actions</th></tr></thead><tbody>${items.map(i=>{const ex=st.log===i.uid,done=i.isDone&&i.doneAt?`Done ${thaiDT(i.doneAt)}${i.doneByEmail?` - ${i.doneByEmail}`:''}`:'-';return `<tr data-uid="${esc(i.uid)}"><td><label class="todo-check todo-check-inline"><input type="checkbox" data-role="toggle" ${i.isDone?'checked':''}/><span></span></label></td><td><span class="badge ${i.source==='Planner'?'status-manual':'badge-checklist'}">${esc(i.source)}</span> <strong>${esc(i.title)}</strong></td><td>${i.key?`<span class="todo-context-inlinebar"><span class="todo-context-bartext">${esc(i.key)}</span></span>`:'-'}</td><td>${esc(viewStatus(i))}</td><td>${esc(i.owner||'-')}</td><td>${esc(i.note||'-')}</td><td>${esc(thai(i.start))}</td><td>${esc(thai(i.end))}</td><td>${esc(thaiDT(i.updatedAt))}${i.updatedByEmail?`<br/><small>${esc(i.updatedByEmail)}</small>`:''}</td><td>${esc(done)}</td><td>${esc(String((i.logs||[]).length))}</td><td><div class="uni-table-actions"><button class="uni-action-text" type="button" data-role="inspect">Inspector</button><button class="uni-action-text" type="button" data-role="log">${ex?'Hide logs':'View logs'}</button><button class="uni-action-text" type="button" data-role="edit">Edit</button><button class="uni-action-text" type="button" data-role="delete">Delete</button></div></td></tr>${ex?`<tr class="uni-log-row" data-uid="${esc(i.uid)}"><td colspan="12"><section class="todo-log-panel"><div class="todo-log-list">${(i.logs||[]).length?(i.logs||[]).map(e=>`<article class="todo-log-entry"><div class="todo-log-time">${esc(thaiDT(e.createdAt))}${e.actorEmail?` | ${esc(e.actorEmail)}`:''}</div><div class="todo-log-message">${esc(e.message)}</div></article>`).join(''):'<div class="mini-empty">No update log yet</div>'}</div><form class="todo-log-form" data-role="log-form"><textarea name="message" placeholder="Add update log"></textarea><div class="todo-log-actions"><button class="btn primary" type="submit">Add update log</button></div></form></section></td></tr>`:''}`}).join('')}</tbody></table></div>`
+  const sh=(label,key)=>`<th data-sort="${key}" class="uni-th-sort">${label}${st.sort===key?` <span>${st.dir==='asc'?'▲':'▼'}</span>`:''}</th>`
+  return `<div class="uni-table-wrap"><table class="uni-table"><thead><tr>${sh('Done','done')}${sh('Task','title')}${sh('Context','context')}${sh('Status','status')}${sh('Owner','owner')}${sh('Note','note')}${sh('Start','start')}${sh('End','end')}${sh('Updated','updatedAt')}${sh('Done info','doneInfo')}${sh('Logs','logs')}<th>Actions</th></tr></thead><tbody>${items.map(i=>{const ex=st.log===i.uid,done=i.isDone&&i.doneAt?`Done ${thaiDT(i.doneAt)}${i.doneByEmail?` - ${i.doneByEmail}`:''}`:'-';return `<tr data-uid="${esc(i.uid)}"><td><label class="todo-check todo-check-inline"><input type="checkbox" data-role="toggle" ${i.isDone?'checked':''}/><span></span></label></td><td><span class="badge ${i.source==='Planner'?'status-manual':(i.source==='Jira'?'status-s6':'badge-checklist')}">${esc(i.source)}</span> <strong>${esc(i.title)}</strong></td><td>${i.key?`<span class="todo-context-inlinebar"><span class="todo-context-bartext">${esc(i.key)}</span></span>`:'-'}</td><td>${esc(viewStatus(i))}</td><td>${esc(i.owner||'-')}</td><td>${esc(i.note||'-')}</td><td>${esc(thai(i.start))}</td><td>${esc(thai(i.end))}</td><td>${esc(thaiDT(i.updatedAt))}${i.updatedByEmail?`<br/><small>${esc(i.updatedByEmail)}</small>`:''}</td><td>${esc(done)}</td><td>${esc(String((i.logs||[]).length))}</td><td><div class="uni-table-actions"><button class="uni-action-text" type="button" data-role="inspect">Inspector</button><button class="uni-action-text" type="button" data-role="log">${ex?'Hide logs':'View logs'}</button><button class="uni-action-text" type="button" data-role="edit">Edit</button><button class="uni-action-text" type="button" data-role="delete">Delete</button></div></td></tr>${ex?`<tr class="uni-log-row" data-uid="${esc(i.uid)}"><td colspan="12"><section class="todo-log-panel"><div class="todo-log-list">${(i.logs||[]).length?(i.logs||[]).map(e=>`<article class="todo-log-entry"><div class="todo-log-time">${esc(thaiDT(e.createdAt))}${e.actorEmail?` | ${esc(e.actorEmail)}`:''}</div><div class="todo-log-message">${esc(e.message)}</div></article>`).join(''):'<div class="mini-empty">No update log yet</div>'}</div><form class="todo-log-form" data-role="log-form"><textarea name="message" placeholder="Add update log"></textarea><div class="todo-log-actions"><button class="btn primary" type="submit">Add update log</button></div></form></section></td></tr>`:''}`}).join('')}</tbody></table></div>`
 }
 function timelineHTML(items){
   const x=items.filter(i=>i.start&&i.end);if(!x.length)return '<div class="empty">No timeline item</div>'
@@ -385,10 +421,10 @@ function inspect(uid,anchor){
   requestAnimationFrame(place)
 }
 
-function bindHost(items){const h=$('uniViewHost');h.querySelectorAll('[data-role="inspect"]').forEach(n=>n.onclick=()=>{const uid=n.getAttribute('data-uid')||n.closest('[data-uid]')?.getAttribute('data-uid')||'';inspect(uid,n)});h.querySelectorAll('[data-role="toggle"]').forEach(n=>n.onchange=async e=>{const uid=e.target.closest('[data-uid]')?.getAttribute('data-uid')||'';const ok=await setDone(uid,Boolean(e.target.checked));if(!ok)e.target.checked=!e.target.checked});h.querySelectorAll('[data-role="edit"]').forEach(n=>n.onclick=async()=>{const uid=n.closest('[data-uid]')?.getAttribute('data-uid')||'';await editItem(uid)});h.querySelectorAll('[data-role="delete"]').forEach(n=>n.onclick=async()=>{const uid=n.closest('[data-uid]')?.getAttribute('data-uid')||'';await deleteItem(uid)});h.querySelectorAll('[data-role="log"]').forEach(n=>n.onclick=()=>{const uid=n.closest('[data-uid]')?.getAttribute('data-uid')||'';st.log=st.log===uid?'':uid;render()});h.querySelectorAll('[data-role="log-form"]').forEach(f=>f.onsubmit=async e=>{e.preventDefault();const uid=f.closest('[data-uid]')?.getAttribute('data-uid')||'',m=String(f.message.value||'').trim();if(!uid||!m)return;await addLog(uid,m)})}
+function bindHost(items){const h=$('uniViewHost');h.querySelectorAll('[data-role="inspect"]').forEach(n=>n.onclick=()=>{const uid=n.getAttribute('data-uid')||n.closest('[data-uid]')?.getAttribute('data-uid')||'';inspect(uid,n)});h.querySelectorAll('[data-role="toggle"]').forEach(n=>n.onchange=async e=>{const uid=e.target.closest('[data-uid]')?.getAttribute('data-uid')||'';const ok=await setDone(uid,Boolean(e.target.checked));if(!ok)e.target.checked=!e.target.checked});h.querySelectorAll('[data-role="edit"]').forEach(n=>n.onclick=async()=>{const uid=n.closest('[data-uid]')?.getAttribute('data-uid')||'';await editItem(uid)});h.querySelectorAll('[data-role="delete"]').forEach(n=>n.onclick=async()=>{const uid=n.closest('[data-uid]')?.getAttribute('data-uid')||'';await deleteItem(uid)});h.querySelectorAll('[data-role="log"]').forEach(n=>n.onclick=()=>{const uid=n.closest('[data-uid]')?.getAttribute('data-uid')||'';st.log=st.log===uid?'':uid;render()});h.querySelectorAll('[data-role="log-form"]').forEach(f=>f.onsubmit=async e=>{e.preventDefault();const uid=f.closest('[data-uid]')?.getAttribute('data-uid')||'',m=String(f.message.value||'').trim();if(!uid||!m)return;await addLog(uid,m)});h.querySelectorAll('th[data-sort]').forEach(th=>th.onclick=()=>{const k=th.getAttribute('data-sort');if(!k)return;if(st.sort===k)st.dir=st.dir==='asc'?'desc':'asc';else{st.sort=k;st.dir='asc'};if($('uniSortField'))$('uniSortField').value=(k==='context'?'title':(k==='doneInfo'||k==='done'||k==='logs'?'updatedAt':k));if($('uniSortDir'))$('uniSortDir').value=st.dir;render()})}
 
 function render(){const items=list(),done=items.filter(i=>i.isDone).length,planner=items.filter(i=>i.source==='Planner').length,checklist=items.filter(i=>i.source==='Checklist').length;notice($('uniSummary'),`${items.length} items | done ${done} | planner ${planner} | checklist ${checklist} | view ${st.view.toUpperCase()}`);let html='';if(st.view==='table')html=tableHTML(items);else if(st.view==='timeline')html=timelineHTML(items);else if(st.view==='calendar')html=calendarHTML(items);else html=cardHTML(items);$('uniViewHost').innerHTML=html;bindHost(items)}
-function toggleMonthFilter(){const w=$('uniMonthWrap');if(!w)return;w.hidden=!(st.view==='timeline'||st.view==='calendar')}
+function toggleMonthFilter(){const w=$('uniMonthWrap'),q=$('uniQuickTypeWrap');if(w)w.hidden=!(st.view==='timeline'||st.view==='calendar');if(q)q.hidden=!(st.view==='card'||st.view==='table')}
 
 function resetForm(){st.editingId='';st.editingActorEmail='';const f=$('uniCreateForm');f.reset();f.color.value=DEF_COLOR;f.createMode.value='plan_only';syncColor();$('uniSaveBtn').textContent='Create item';$('uniCancelEditBtn').style.display='none';notice($('uniCreateStatus'),'')}
 async function createFromForm(f){const p={title:String(f.title.value||'').trim(),key:String(f.key.value||'').trim(),start:dt(f.start.value||''),end:dt(f.end.value||''),owner:String(f.owner.value||'').trim(),note:String(f.note.value||'').trim(),color:col(f.color.value||DEF_COLOR),mode:String(f.createMode.value||'plan_only')};if(!p.title)throw new Error('Task title is required');if(!p.start||!p.end)throw new Error('Start and End are required');if(p.end<p.start)throw new Error('End date must be on or after Start date');const a=st.editingId&&st.editingActorEmail?{email:st.editingActorEmail}:await askAuth(st.editingId?'update item':'create item'),e=em(a?.email);if(!e)throw new Error('Jira email is required');const payload={sourceType:p.mode==='checklist_and_plan'?'todo':'planner',taskType:p.mode==='checklist_and_plan'?'planner_and_checklist':'planner_only',title:p.title,key:p.key,owner:p.owner,note:p.note,color:p.color,start:p.start,end:p.end,actorEmail:e};if(st.editingId)await api('/api/todo',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({...payload,id:st.editingId})});else await api('/api/todo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})}
@@ -406,6 +442,6 @@ async function load(apply=true){
   return {items:Array.isArray(t.items)?t.items:[],sheetName:String(t.sheetName||'PlannerTasks')}
 }
 
-function bind(){const d=new Date();st.month=`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`;$('uniMonthPicker').value=st.month;renderSwitch();renderFilters();toggleMonthFilter();$('uniMonthPicker').onchange=e=>{st.month=e.target.value||st.month;render()};$('uniSearch').oninput=e=>{st.search=String(e.target.value||'');render()};$('uniSortField').onchange=e=>{st.sort=e.target.value||'updatedAt';render()};$('uniSortDir').onchange=e=>{st.dir=e.target.value||'desc';render()};$('uniRefreshBtn').onclick=async()=>{await load();render()};$('uniColorPreview').onclick=()=>$('uniColorInput').click();$('uniColorInput').oninput=syncColor;syncColor();$('uniCreateForm').onsubmit=async e=>{e.preventDefault();const s=$('uniCreateStatus');notice(s,st.editingId?'Updating item...':'Creating item...');try{await createFromForm(e.currentTarget);await load();render();resetForm();notice(s,'Saved successfully','success')}catch(err){notice(s,err.message||'Unable to save item','error')}};$('uniCancelEditBtn').onclick=resetForm;$('uniAuthCancel').onclick=()=>cancelAuthModal();$('uniAuthBackdrop').onclick=()=>cancelAuthModal();$('uniAuthForm').onsubmit=async e=>{e.preventDefault();const p=st.auth;if(!p)return;const email=em($('uniAuthEmail').value),remember=Boolean($('uniAuthRemember').checked),s=$('uniAuthStatus'),b=$('uniAuthConfirm');if(!email){notice(s,'Jira email is required','error');return}try{b.disabled=true;notice(s,'Validating Jira email...');const r=await validateJiraEmail(email);if(!r?.valid)throw new Error(r?.reason||'Jira email not found');const actor={email:em(r?.user?.email||email),displayName:String(r?.user?.displayName||''),accountId:String(r?.user?.accountId||'')};if(remember)setActor(actor);else sessionStorage.removeItem(AUTH_KEY);st.auth=null;closeAuthModal();p.res(actor)}catch(err){notice(s,err.message||'Auth failed','error')}finally{b.disabled=false}};document.addEventListener('click',e=>{if(!$('uniAuthModal').hidden)return;const pop=$('uniInspectorPop');if(!pop.classList.contains('open'))return;if(e.target.closest('#uniInspectorPop'))return;if(e.target.closest('[data-role="inspect"]'))return;pop.classList.remove('open')})}
+function bind(){const d=new Date();st.month=`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`;$('uniMonthPicker').value=st.month;renderSwitch();renderFilters();toggleMonthFilter();$('uniMonthPicker').onchange=e=>{st.month=e.target.value||st.month;render()};$('uniSearch').oninput=e=>{st.search=String(e.target.value||'');render()};$('uniSortField').onchange=e=>{st.sort=e.target.value||'updatedAt';render()};$('uniSortDir').onchange=e=>{st.dir=e.target.value||'desc';render()};$('uniRefreshBtn').onclick=async()=>{await load();render()};const quickBtn=$('uniQuickTypeBtn'),quickBox=$('uniQuickTypeBox');if(quickBtn&&quickBox){quickBtn.onclick=()=>quickBox.hidden=!quickBox.hidden;quickBox.querySelectorAll('input').forEach(i=>i.onchange=()=>{let vals=[...quickBox.querySelectorAll('input:checked')].map(x=>x.value);if(vals.includes('All'))vals=['All'];if(!vals.length)vals=['Checklist'];st.typeFilters=vals;syncQuickType();renderFilters();render()});document.addEventListener('click',e=>{if(e.target.closest('#uniQuickTypeWrap'))return;quickBox.hidden=true})}syncQuickType();$('uniColorPreview').onclick=()=>$('uniColorInput').click();$('uniColorInput').oninput=syncColor;syncColor();$('uniCreateForm').onsubmit=async e=>{e.preventDefault();const s=$('uniCreateStatus');notice(s,st.editingId?'Updating item...':'Creating item...');try{await createFromForm(e.currentTarget);await load();render();resetForm();notice(s,'Saved successfully','success')}catch(err){notice(s,err.message||'Unable to save item','error')}};$('uniCancelEditBtn').onclick=resetForm;$('uniAuthCancel').onclick=()=>cancelAuthModal();$('uniAuthBackdrop').onclick=()=>cancelAuthModal();$('uniAuthForm').onsubmit=async e=>{e.preventDefault();const p=st.auth;if(!p)return;const email=em($('uniAuthEmail').value),remember=Boolean($('uniAuthRemember').checked),s=$('uniAuthStatus'),b=$('uniAuthConfirm');if(!email){notice(s,'Jira email is required','error');return}try{b.disabled=true;notice(s,'Validating Jira email...');const r=await validateJiraEmail(email);if(!r?.valid)throw new Error(r?.reason||'Jira email not found');const actor={email:em(r?.user?.email||email),displayName:String(r?.user?.displayName||''),accountId:String(r?.user?.accountId||'')};if(remember)setActor(actor);else sessionStorage.removeItem(AUTH_KEY);st.auth=null;closeAuthModal();p.res(actor)}catch(err){notice(s,err.message||'Auth failed','error')}finally{b.disabled=false}};document.addEventListener('click',e=>{if(!$('uniAuthModal').hidden)return;const pop=$('uniInspectorPop');if(!pop.classList.contains('open'))return;if(e.target.closest('#uniInspectorPop'))return;if(e.target.closest('[data-role="inspect"]'))return;pop.classList.remove('open')})}
 
 bind();load().then(()=>render()).catch(err=>notice($('uniSync'),err.message||'Unable to load unified planner','error'))

@@ -34,6 +34,33 @@
       min-width: 180px;
       max-width: 220px;
     }
+    .uni-work-quick {
+      min-width: 220px;
+      max-width: 280px;
+      position: relative;
+    }
+    .uni-quick-box {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 6px);
+      z-index: 40;
+      background: #fff;
+      border: 1px solid #cfe0f4;
+      border-radius: 10px;
+      padding: 8px;
+      box-shadow: 0 12px 24px rgba(18, 55, 104, .14);
+      display: grid;
+      gap: 6px;
+      min-width: 220px;
+    }
+    .uni-quick-box label {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12px;
+      color: #2f4f7c;
+      font-weight: 700;
+    }
     .uni-controls { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
     .uni-controls .todo-sort-select { width:auto; min-width:170px; max-width:220px; }
     .uni-controls .btn { min-width:96px; }
@@ -50,6 +77,8 @@
     .uni-table { width:100%; border-collapse:collapse; min-width:1120px; }
     .uni-table th, .uni-table td { padding:10px; border-bottom:1px solid #e8eef8; font-size:12px; text-align:left; vertical-align:top; }
     .uni-table th { font-weight:800; color:#3f608f; background:#f5f8ff; position:sticky; top:0; z-index:1; }
+    .uni-th-sort { cursor: pointer; user-select: none; }
+    .uni-th-sort:hover { background: #eaf2ff; }
     .uni-table-actions { display:flex; gap:8px; flex-wrap:wrap; }
     .uni-action-text { border:none; background:none; color:#225ea6; font-weight:700; cursor:pointer; padding:0; }
     .uni-log-row td { background:#f8fbff; }
@@ -457,6 +486,15 @@
               <div id="uniMonthWrap" hidden>
                 <input id="uniMonthPicker" class="search uni-work-month" type="month" />
               </div>
+              <div id="uniQuickTypeWrap" class="uni-work-quick" hidden>
+                <button id="uniQuickTypeBtn" class="search uni-work-month" type="button">Task Type: Checklist</button>
+                <div id="uniQuickTypeBox" class="uni-quick-box" hidden>
+                  <label><input type="checkbox" value="All" /> All</label>
+                  <label><input type="checkbox" value="Planner" /> Planner</label>
+                  <label><input type="checkbox" value="Checklist" checked /> Checklist</label>
+                  <label><input type="checkbox" value="Jira" /> Jira</label>
+                </div>
+              </div>
             </div>
           </div>
           <div id="uniViewHost" class="uni-view-host"></div>
@@ -526,6 +564,6 @@
     </section>
   </div>
 
-  <script src="/unified-planner.js?v=20260415ab"></script>
+  <script src="/unified-planner.js?v=20260415ac"></script>
 </body>
 </html>
