@@ -607,19 +607,6 @@
       <div class="uni-toolbar-foot">
         <div id="uniSummary" class="notice">Preparing unified planner...</div>
         <div class="uni-controls">
-          <label class="todo-sort-label" for="uniSortField">Sort by</label>
-          <select id="uniSortField" class="todo-sort-select">
-            <option value="updatedAt">Updated date</option>
-            <option value="title">Task title</option>
-            <option value="owner">Owner</option>
-            <option value="start">Start date</option>
-            <option value="end">End date</option>
-            <option value="status">Status</option>
-          </select>
-          <select id="uniSortDir" class="todo-sort-select">
-            <option value="desc">Desc</option>
-            <option value="asc">Asc</option>
-          </select>
           <button id="uniRefreshBtn" class="btn" type="button">Refresh</button>
         </div>
         <div class="uni-filters">
@@ -648,14 +635,27 @@
                 </div>
               </div>
               <div class="uni-work-tools">
+                <div id="uniSortWrap" class="uni-controls" hidden>
+                  <label class="todo-sort-label" for="uniSortField">Sort by</label>
+                  <select id="uniSortField" class="todo-sort-select">
+                    <option value="updatedAt">Updated date</option>
+                    <option value="title">Task title</option>
+                    <option value="owner">Owner</option>
+                    <option value="start">Start date</option>
+                    <option value="end">End date</option>
+                    <option value="status">Status</option>
+                  </select>
+                  <select id="uniSortDir" class="todo-sort-select">
+                    <option value="desc">Desc</option>
+                    <option value="asc">Asc</option>
+                  </select>
+                </div>
                 <div id="uniMonthWrap" hidden>
                   <input id="uniMonthPicker" class="search uni-work-month" type="month" />
                 </div>
                 <div id="uniQuickTypeWrap" class="uni-work-quick">
                   <button id="uniQuickTypeBtn" class="search uni-work-month uni-filter-trigger" type="button" aria-expanded="false">Checklist</button>
                   <div id="uniQuickTypeBox" class="uni-quick-box" hidden>
-                    <label><input type="checkbox" value="All" /> All</label>
-                    <label><input type="checkbox" value="Planner" /> Planner</label>
                     <label><input type="checkbox" value="Checklist" checked /> Checklist</label>
                     <label><input type="checkbox" value="Jira" /> Jira</label>
                   </div>
@@ -692,10 +692,7 @@
         </label>
         <label class="field full"><span>Note</span><textarea name="note"></textarea></label>
         <div class="full">
-          <div class="uni-create-mode">
-            <label><input type="radio" name="createMode" value="plan_only" checked />Plan Only</label>
-            <label><input type="radio" name="createMode" value="checklist_and_plan" />Checklist + Plan</label>
-          </div>
+          <div class="notice">New task will be created as Checklist.</div>
         </div>
         <div class="full planner-lab-form-actions">
           <button id="uniSaveBtn" class="btn primary" type="submit">Create item</button>
@@ -730,6 +727,6 @@
     </section>
   </div>
 
-  <script src="/unified-planner.js?v=20260416ac"></script>
+  <script src="/unified-planner.js?v=20260416ad"></script>
 </body>
 </html>
