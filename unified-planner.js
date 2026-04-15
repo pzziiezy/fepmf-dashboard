@@ -221,7 +221,7 @@ function calendarHTML(items){
     const laneEnd=[]
     segs.forEach(seg=>{let lane=0;while(lane<laneEnd.length&&laneEnd[lane]>=seg.si)lane+=1;seg.lane=lane;laneEnd[lane]=seg.ei})
     const lanes=Math.max(1,laneEnd.length),bh=20,g=4,h=lanes*bh+(lanes-1)*g+8
-    const bars=segs.map(seg=>{const left=(seg.si/7)*100,width=(seg.span/7)*100,top=seg.lane*(bh+g)+4,label=seg.i.key?`${seg.i.title} : ${seg.i.key}`:seg.i.title;return `<button class="uni-cal-bar" type="button" data-role="inspect" data-uid="${esc(seg.i.uid)}" style="left:${left}%;width:${width}%;top:${top}px;background:${esc(seg.i.color)};" title="${esc(label)}">${esc(label)}</button>`}).join('')
+    const bars=segs.map(seg=>{const left=(seg.si/7)*100,width=(seg.span/7)*100,top=seg.lane*(bh+g)+4,isJira=seg.i.source==='Jira',label=seg.i.key?(isJira?`${seg.i.key} : ${seg.i.title}`:`${seg.i.title} : ${seg.i.key}`):seg.i.title;return `<button class="uni-cal-bar" type="button" data-role="inspect" data-uid="${esc(seg.i.uid)}" style="left:${left}%;width:${width}%;top:${top}px;background:${esc(seg.i.color)};" title="${esc(label)}">${esc(label)}</button>`}).join('')
     const cells=days.map(d=>{const dIso=iso(d),off=dIso<monthStartIso||dIso>monthEndIso,current=dIso===todayIso,count=x.filter(i=>i.start<=dIso&&i.end>=dIso).length;return `<div class="uni-cal-day ${off?'off':''} ${current?'current':''}"><strong>${d.getUTCDate()}</strong>${count?`<div class="uni-cal-count">${count} item${count>1?'s':''}</div>`:''}</div>`}).join('')
     weeks.push(`<div class="uni-cal-week" style="--bar-zone:${h}px"><div class="uni-cal-days">${cells}</div><div class="uni-cal-bars">${bars}</div></div>`)
     c.setUTCDate(c.getUTCDate()+7)
