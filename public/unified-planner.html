@@ -131,11 +131,11 @@
     .uni-controls { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
     .uni-controls .todo-sort-select { width:auto; min-width:170px; max-width:220px; }
     .uni-controls .btn { min-width:96px; }
-    .uni-filters { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
-    .uni-filter-box { border:1px solid #d8e2f2; border-radius:12px; padding:10px; background:#f7faff; display:grid; gap:8px; }
-    .uni-filter-box h3 { margin:0; font-size:12px; color:#3f608f; letter-spacing:.02em; text-transform:uppercase; }
-    .uni-check-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
-    .uni-check-grid label { font-size:12px; color:#31517f; display:flex; align-items:center; gap:6px; }
+    .uni-filters { display:grid; grid-template-columns:minmax(0,1fr); gap:10px; }
+    .uni-filter-box { border:1px solid #d8e2f2; border-radius:14px; padding:12px 14px; background:linear-gradient(180deg,#fbfdff 0%,#f3f8ff 100%); display:grid; gap:10px; box-shadow: inset 0 1px 0 rgba(255,255,255,.8); }
+    .uni-filter-box h3 { margin:0; font-size:12px; color:#365986; letter-spacing:.02em; text-transform:uppercase; }
+    .uni-check-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px; }
+    .uni-check-grid label { font-size:12px; color:#2f4f7c; display:flex; align-items:center; gap:6px; padding:6px 8px; border-radius:999px; background:rgba(255,255,255,.75); border:1px solid #d8e4f5; font-weight:700; }
 
     .uni-main { display:grid; grid-template-columns:minmax(0,1fr); gap:14px; align-items:start; }
     .uni-view-host { min-height:360px; }
@@ -611,11 +611,7 @@
         </div>
         <div class="uni-filters">
           <section class="uni-filter-box">
-            <h3>Filter Task Type</h3>
-            <div class="uni-check-grid" id="uniTypeFilterGrid"></div>
-          </section>
-          <section class="uni-filter-box">
-            <h3>Filter Status (S0-S7)</h3>
+            <h3>Filter Status</h3>
             <div class="uni-check-grid" id="uniStatusFilterGrid"></div>
           </section>
         </div>
@@ -727,6 +723,6 @@
     </section>
   </div>
 
-  <script src="/unified-planner.js?v=20260416ad"></script>
+  <script src="/unified-planner.js?v=20260416ae"></script>
 </body>
 </html>

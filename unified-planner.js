@@ -1,7 +1,7 @@
 ﻿const AUTH_KEY='unified_actor_session_v1'
 const DEF_COLOR='#2c6e91'
-const FILTERS=['S0','S1','S2','S3','S4','S5','S6','S7']
-const st={tasks:[],month:'',search:'',view:'card',sort:'updatedAt',dir:'desc',statusFilters:[...FILTERS],typeFilters:['Checklist'],sel:'',log:'',auth:null,busy:'',editingId:'',editingActorEmail:'',sheetName:'PlannerTasks',liveEdits:{}}
+const FILTERS=['Pending','Done','S0','S1','S2','S3','S4','S5','S6','S7']
+const st={tasks:[],month:'',search:'',view:'card',sort:'updatedAt',dir:'desc',statusFilters:['Pending'],typeFilters:['Checklist'],sel:'',log:'',auth:null,busy:'',editingId:'',editingActorEmail:'',sheetName:'PlannerTasks',liveEdits:{}}
 const $=id=>document.getElementById(id)
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))
 const notice=(el,m,t='info')=>{if(!el)return;el.textContent=m||'';el.classList.remove('notice-success','notice-error');if(t==='success')el.classList.add('notice-success');if(t==='error')el.classList.add('notice-error')}
@@ -77,7 +77,7 @@ function list(){
   const q=st.search.trim().toLowerCase(),typeAct=new Set(st.typeFilters),statusAct=new Set(st.statusFilters)
   let it=mergeItems()
     .filter(i=>typeAct.has(i.source))
-    .filter(i=>!i.isJiraStatus||!i.status||statusAct.has(i.status))
+    .filter(i=>statusAct.has(viewStatus(i)))
     .filter(i=>!q||`${i.title} ${i.key} ${i.owner} ${i.note} ${i.source} ${viewStatus(i)}`.toLowerCase().includes(q))
   it.sort((a,b)=>{let r=0
     if(st.sort==='done')r=(a.isDone===b.isDone)?0:(a.isDone?1:-1)
@@ -104,18 +104,20 @@ function renderSwitch(){
 }
 function renderFilters(){
   const t=$('uniTypeFilterGrid')
-  const opts=['Checklist','Jira']
-  t.innerHTML=opts.map(f=>`<label><input type="checkbox" value="${f}" ${st.typeFilters.includes(f)?'checked':''}/><span>${f}</span></label>`).join('')
-  t.querySelectorAll('input').forEach(i=>i.onchange=()=>{
-    let vals=[...t.querySelectorAll('input:checked')].map(x=>x.value)
-    if(!vals.length)vals=['Checklist']
-    st.typeFilters=vals
-    syncQuickType()
-    render()
-  })
+  if(t){
+    const opts=['Checklist','Jira']
+    t.innerHTML=opts.map(f=>`<label><input type="checkbox" value="${f}" ${st.typeFilters.includes(f)?'checked':''}/><span>${f}</span></label>`).join('')
+    t.querySelectorAll('input').forEach(i=>i.onchange=()=>{
+      let vals=[...t.querySelectorAll('input:checked')].map(x=>x.value)
+      if(!vals.length)vals=['Checklist']
+      st.typeFilters=vals
+      syncQuickType()
+      render()
+    })
+  }
   const s=$('uniStatusFilterGrid')
   s.innerHTML=FILTERS.map(f=>`<label><input type="checkbox" value="${f}" ${st.statusFilters.includes(f)?'checked':''}/><span>${f}</span></label>`).join('')
-  s.querySelectorAll('input').forEach(i=>i.onchange=()=>{st.statusFilters=[...s.querySelectorAll('input:checked')].map(x=>x.value);render()})
+  s.querySelectorAll('input').forEach(i=>i.onchange=()=>{const vals=[...s.querySelectorAll('input:checked')].map(x=>x.value);st.statusFilters=vals.length?vals:['Pending'];render()})
 }
 function quickTypeLabel(){
   return st.typeFilters.join(', ')
@@ -131,7 +133,7 @@ function syncQuickType(){
 
 function cardHTML(items){
   if(!items.length)return '<div class="empty">No items</div>'
-  return `<div class="uni-card-list">${items.map(i=>{const ex=st.log===i.uid,logs=Array.isArray(i.logs)?i.logs:[],tt=i.start&&i.end?`${thai(i.start)} - ${thai(i.end)}`:'No timeline date',stTag=viewStatus(i);return `<article class="todo-card ${i.isDone?'is-done':''} todo-card-checklist" data-uid="${esc(i.uid)}" style="--todo-accent:${esc(i.color)}"><div class="todo-card-main"><label class="todo-check"><input type="checkbox" data-role="toggle" ${i.isDone?'checked':''}/><span></span></label><div class="todo-copy"><div class="todo-title-row"><span class="badge ${i.source==='Planner'?'status-manual':'badge-checklist'}">${esc(i.source)}</span><span class="badge status-default">${esc(stTag)}</span><strong>${esc(i.title)}</strong>${i.key?`<span class="todo-context-inlinebar"><span class="todo-context-bartext">${esc(i.key)}</span></span>`:''}</div><div class="todo-meta-line">${esc(tt)}</div><div class="todo-meta-line">Updated ${esc(thaiDT(i.updatedAt))}${i.updatedByEmail?` | By ${esc(i.updatedByEmail)}`:''}</div><div class="todo-note">${esc(i.note||'No note')}</div><div class="todo-log-summary">${logs.length} update logs</div>${ex?`<section class="todo-log-panel"><div class="todo-log-list">${logs.length?logs.map(e=>`<article class="todo-log-entry"><div class="todo-log-time">${esc(thaiDT(e.createdAt))}${e.actorEmail?` | ${esc(e.actorEmail)}`:''}</div><div class="todo-log-message">${esc(e.message)}</div></article>`).join(''):'<div class="mini-empty">No update log yet</div>'}</div><form class="todo-log-form" data-role="log-form"><textarea name="message" placeholder="Add update log"></textarea><div class="todo-log-actions"><button class="btn primary" type="submit">Add update log</button></div></form></section>`:''}</div></div><div class="todo-card-actions"><button class="btn" type="button" data-role="inspect">Inspector</button><button class="btn" type="button" data-role="edit">Edit</button><button class="btn" type="button" data-role="delete">Delete</button><button class="btn" type="button" data-role="log">${ex?'Hide logs':'View logs'}</button></div></article>`}).join('')}</div>`
+  return `<div class="uni-card-list">${items.map(i=>{const ex=st.log===i.uid,logs=Array.isArray(i.logs)?i.logs:[],tt=i.start&&i.end?`${thai(i.start)} - ${thai(i.end)}`:'No timeline date',stTag=viewStatus(i);return `<article class="todo-card ${i.isDone?'is-done':''} todo-card-checklist" data-uid="${esc(i.uid)}" style="--todo-accent:${esc(i.color)}"><div class="todo-card-main"><label class="todo-check"><input type="checkbox" data-role="toggle" ${i.isDone?'checked':''}/><span></span></label><div class="todo-copy"><div class="todo-title-row"><span class="badge badge-checklist">${esc(i.source)}</span><span class="badge status-default">${esc(stTag)}</span><strong>${esc(i.title)}</strong>${i.key?`<span class="todo-context-inlinebar"><span class="todo-context-bartext">${esc(i.key)}</span></span>`:''}</div><div class="todo-meta-line">${esc(tt)}</div><div class="todo-meta-line">Updated ${esc(thaiDT(i.updatedAt))}${i.updatedByEmail?` | By ${esc(i.updatedByEmail)}`:''}</div><div class="todo-note">${esc(i.note||'No note')}</div><div class="todo-log-summary">${logs.length} update logs</div>${ex?`<section class="todo-log-panel"><div class="todo-log-list">${logs.length?logs.map(e=>`<article class="todo-log-entry"><div class="todo-log-time">${esc(thaiDT(e.createdAt))}${e.actorEmail?` | ${esc(e.actorEmail)}`:''}</div><div class="todo-log-message">${esc(e.message)}</div></article>`).join(''):'<div class="mini-empty">No update log yet</div>'}</div><form class="todo-log-form" data-role="log-form"><textarea name="message" placeholder="Add update log"></textarea><div class="todo-log-actions"><button class="btn primary" type="submit">Add update log</button></div></form></section>`:''}</div></div><div class="todo-card-actions"><button class="btn" type="button" data-role="edit">Edit</button><button class="btn" type="button" data-role="delete">Delete</button><button class="btn" type="button" data-role="log">${ex?'Hide logs':'View logs'}</button></div></article>`}).join('')}</div>`
 }
 function tableHTML(items){
   if(!items.length)return '<div class="empty">No rows</div>'
