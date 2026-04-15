@@ -29,54 +29,57 @@ const hasJiraStatus=s=>FILTERS.includes(String(s||'').toUpperCase().trim())
 const isJiraTask=t=>{const src=String(t.sourceType||'').toLowerCase(),typ=String(t.taskType||'').toLowerCase();return src==='jira'||typ==='jira'}
 const viewStatus=i=>i.isJiraStatus?(i.status||'-'):(i.isDone?'Done':'Pending')
 const timelineText=i=>i.start&&i.end?`${thai(i.start)} - ${thai(i.end)}<br/>${durationDays(i.start,i.end)} days`:'No timeline date'
+const norm=v=>String(v||'').trim()
+const linkedTodoId=t=>{const ref=norm(t?.plannerRefId);if(!ref)return'';if(ref.startsWith('todo_todo_'))return ref.slice(5);if(ref.startsWith('todo_'))return ref;return''}
+const colorGroupKey=t=>{const id=norm(t?.id),src=String(t?.sourceType||'').toLowerCase(),linked=linkedTodoId(t);if(src==='planner')return linked||id||`row_${norm(t?._rowNumber)}`;if(src==='todo')return id||linked||`row_${norm(t?._rowNumber)}`;return linked||id||`row_${norm(t?._rowNumber)}`}
 
 function mergeItems(){
-  return st.tasks
-    .filter(t=>String(t.isDeleted||'').toLowerCase()!=='true')
-    .map(t=>{
-      const key=String(t.key||'').trim()
-      const sourceType=String(t.sourceType||'todo').toLowerCase()
-      const taskType=String(t.taskType||'').toLowerCase()|| (sourceType==='planner'?'planner_only':'planner_and_checklist')
-      const source=taskType==='planner_only'?'Planner':'Checklist'
-      const statusDirect=String(t.status||'').toUpperCase().trim()
-      const inferredStatus=((`${t.title||''} ${t.note||''} ${key}`.toUpperCase().match(/\bS[0-7]\b/)||[])[0]||'')
-      const jiraStatus=hasJiraStatus(statusDirect)?statusDirect:(hasJiraStatus(inferredStatus)?inferredStatus:'')
-      const isJiraStatus=isJiraTask({sourceType,taskType})||Boolean(jiraStatus)
-      const uid=`todo:${t.id}`
-      const base={
-        uid:`todo:${t.id}`,
-        taskId:String(t.id||''),
-        source,
-        sourceType,
-        taskType,
-        title:String(t.title||''),
-        key,
-        owner:String(t.owner||''),
-        note:String(t.note||''),
-        color:col(t.color||DEF_COLOR),
-        start:String(t.start||''),
-        end:String(t.end||''),
-        logs:Array.isArray(t.logs)?t.logs:[],
-        isDone:Boolean(t.isDone),
-        doneAt:String(t.doneAt||''),
-        doneByEmail:String(t.doneByEmail||''),
-        updatedAt:String(t.updatedAt||t.createdAt||''),
-        updatedByEmail:String(t.updatedByEmail||t.createdByEmail||''),
-        status:jiraStatus,
-        isJiraStatus
-      }
-      const ov=st.liveEdits[uid]
-      if(!ov)return base
-      return {
-        ...base,
-        ...ov,
-        uid,
-        taskId:base.taskId,
-        sourceType:String(ov.sourceType||base.sourceType||'').toLowerCase(),
-        taskType:String(ov.taskType||base.taskType||'').toLowerCase(),
-        color:col(ov.color||base.color||DEF_COLOR)
-      }
-    })
+  const alive=st.tasks.filter(t=>String(t.isDeleted||'').toLowerCase()!=='true')
+  const view=alive.map(t=>{const uid=`todo:${t.id}`;const ov=st.liveEdits[uid];return ov?{...t,...ov}:t})
+  const groupColor={}
+  const groupUpdatedTs={}
+  view.forEach(t=>{
+    const g=colorGroupKey(t)
+    const ts=Date.parse(String(t.updatedAt||t.createdAt||''))||0
+    if(groupUpdatedTs[g]===undefined||ts>=groupUpdatedTs[g]){
+      groupUpdatedTs[g]=ts
+      groupColor[g]=col(t.color||DEF_COLOR)
+    }
+  })
+  return view.map(t=>{
+    const key=norm(t.key)
+    const sourceType=String(t.sourceType||'todo').toLowerCase()
+    const taskType=String(t.taskType||'').toLowerCase()|| (sourceType==='planner'?'planner_only':'planner_and_checklist')
+    const source=taskType==='planner_only'?'Planner':'Checklist'
+    const statusDirect=norm(t.status).toUpperCase()
+    const inferredStatus=((`${t.title||''} ${t.note||''} ${key}`.toUpperCase().match(/\bS[0-7]\b/)||[])[0]||'')
+    const jiraStatus=hasJiraStatus(statusDirect)?statusDirect:(hasJiraStatus(inferredStatus)?inferredStatus:'')
+    const isJiraStatus=isJiraTask({sourceType,taskType})||Boolean(jiraStatus)
+    const uid=`todo:${t.id}`
+    const g=colorGroupKey(t)
+    return {
+      uid,
+      taskId:String(t.id||''),
+      source,
+      sourceType,
+      taskType,
+      title:String(t.title||''),
+      key,
+      owner:String(t.owner||''),
+      note:String(t.note||''),
+      color:col(groupColor[g]||t.color||DEF_COLOR),
+      start:String(t.start||''),
+      end:String(t.end||''),
+      logs:Array.isArray(t.logs)?t.logs:[],
+      isDone:Boolean(t.isDone),
+      doneAt:String(t.doneAt||''),
+      doneByEmail:String(t.doneByEmail||''),
+      updatedAt:String(t.updatedAt||t.createdAt||''),
+      updatedByEmail:String(t.updatedByEmail||t.createdByEmail||''),
+      status:jiraStatus,
+      isJiraStatus
+    }
+  })
 }
 
 function list(){
