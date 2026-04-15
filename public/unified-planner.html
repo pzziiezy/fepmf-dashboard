@@ -45,6 +45,24 @@
     #uniQuickTypeWrap[hidden] {
       display: none !important;
     }
+    .uni-filter-trigger {
+      min-width: 240px;
+      max-width: 320px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-weight: 800;
+      color: #1f4f8f;
+      border: 1px solid #bfd3ee;
+      background: linear-gradient(180deg,#fff 0%,#f3f8ff 100%);
+    }
+    .uni-filter-trigger::after {
+      content: "▾";
+      color: #3d679f;
+      font-size: 12px;
+      opacity: .9;
+    }
     .uni-quick-box {
       position: absolute;
       right: 0;
@@ -59,6 +77,7 @@
       gap: 6px;
       min-width: 220px;
     }
+    .uni-quick-box[hidden] { display:none !important; }
     .uni-quick-box label {
       display: flex;
       align-items: center;
@@ -84,6 +103,9 @@
     .uni-table th, .uni-table td { padding:10px 10px; border-bottom:1px solid #e8eef8; font-size:12px; text-align:left; vertical-align:top; line-height:1.35; }
     .uni-table th { font-weight:800; color:#3f608f; background:#f5f8ff; position:sticky; top:0; z-index:1; }
     .uni-th-sort { cursor: pointer; user-select: none; }
+    .uni-th-sort .uni-th-label { display:inline-block; }
+    .uni-th-sort .uni-th-icon { margin-left:4px; color:#7590b8; font-size:11px; font-weight:800; }
+    .uni-th-sort.active .uni-th-icon { color:#1f4f8f; }
     .uni-th-sort:hover { background: #eaf2ff; }
     .uni-table-actions { display:flex; gap:6px; flex-wrap:wrap; }
     .uni-action-text { border:none; background:none; color:#225ea6; font-weight:700; cursor:pointer; padding:0; }
@@ -92,16 +114,25 @@
     .uni-cell-note, .uni-cell-doneinfo { color:#2b4b79; }
     .uni-table .col-done { width:54px; }
     .uni-table .col-task { width:240px; }
-    .uni-table .col-context { width:220px; }
+    .uni-table .col-context { width:320px; }
     .uni-table .col-status { width:84px; }
     .uni-table .col-owner { width:74px; }
-    .uni-table .col-note { width:420px; }
+    .uni-table .col-note { width:280px; }
     .uni-table .col-start { width:58px; }
     .uni-table .col-end { width:58px; }
     .uni-table .col-updated { width:120px; }
     .uni-table .col-doneinfo { width:198px; }
     .uni-table .col-logs { width:42px; }
     .uni-table .col-actions { width:154px; }
+    .uni-table tbody tr.uni-data-row td {
+      background: linear-gradient(90deg, var(--row-soft), var(--row-soft-2));
+    }
+    .uni-table tbody tr.uni-data-row td:first-child {
+      box-shadow: inset 3px 0 0 var(--row-accent);
+    }
+    .uni-table tbody tr.uni-data-row:hover td {
+      background: linear-gradient(90deg, color-mix(in srgb, var(--row-soft) 115%, #fff 0%), color-mix(in srgb, var(--row-soft-2) 115%, #fff 0%));
+    }
     .uni-log-row td { background:#f8fbff; }
 
     .uni-inspector-pop { position:fixed; z-index:90; width:min(430px,calc(100vw - 20px)); max-height:calc(100vh - 20px); overflow:auto; display:none; }
@@ -508,7 +539,7 @@
                 <input id="uniMonthPicker" class="search uni-work-month" type="month" />
               </div>
               <div id="uniQuickTypeWrap" class="uni-work-quick" hidden>
-                <button id="uniQuickTypeBtn" class="search uni-work-month" type="button">Task Type: Checklist</button>
+                <button id="uniQuickTypeBtn" class="search uni-work-month uni-filter-trigger" type="button" aria-expanded="false">Filter: Checklist</button>
                 <div id="uniQuickTypeBox" class="uni-quick-box" hidden>
                   <label><input type="checkbox" value="All" /> All</label>
                   <label><input type="checkbox" value="Planner" /> Planner</label>
@@ -585,6 +616,6 @@
     </section>
   </div>
 
-  <script src="/unified-planner.js?v=20260415ad"></script>
+  <script src="/unified-planner.js?v=20260416aa"></script>
 </body>
 </html>
