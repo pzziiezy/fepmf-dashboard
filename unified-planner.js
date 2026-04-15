@@ -517,7 +517,7 @@ function resetForm(){st.editingId='';st.editingActorEmail='';const f=$('uniCreat
 async function createFromForm(f){const p={title:String(f.title.value||'').trim(),key:String(f.key.value||'').trim(),start:dt(f.start.value||''),end:dt(f.end.value||''),owner:String(f.owner.value||'').trim(),note:String(f.note.value||'').trim(),color:col(f.color.value||DEF_COLOR)};if(!p.title)throw new Error('Task title is required');if(!p.start||!p.end)throw new Error('Start and End are required');if(p.end<p.start)throw new Error('End date must be on or after Start date');const a=st.editingId&&st.editingActorEmail?{email:st.editingActorEmail}:await askAuth(st.editingId?'update item':'create item'),e=em(a?.email);if(!e)throw new Error('Jira email is required');const payload={sourceType:'todo',taskType:'planner_and_checklist',title:p.title,key:p.key,owner:p.owner,note:p.note,color:p.color,start:p.start,end:p.end,actorEmail:e};if(st.editingId)await api('/api/todo',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({...payload,id:st.editingId})});else await api('/api/todo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})}
 
 async function load(apply=true){
-  if(apply)notice($('uniSync'),'Loading unified planner from PlannerTasks + Jira...')
+  if(apply)notice($('uniSync'),'Loading PlannerTasks+Jira')
   const ts=Date.now()
   const [todoRes,dashRes]=await Promise.allSettled([
     api(`/api/todo?_ts=${ts}`),
