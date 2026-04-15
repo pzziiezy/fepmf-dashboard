@@ -1,0 +1,160 @@
+﻿const AUTH_KEY='unified_actor_session_v1'
+const DEF_COLOR='#2c6e91'
+const FILTERS=['S0','S1','S2','S3','S4','S5','S6','S7']
+const st={tasks:[],month:'',search:'',view:'card',sort:'updatedAt',dir:'desc',statusFilters:[...FILTERS],typeFilters:['Planner','Checklist'],sel:'',log:'',auth:null,busy:'',editingId:'',editingActorEmail:'',sheetName:'PlannerTasks'}
+const $=id=>document.getElementById(id)
+const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))
+const notice=(el,m,t='info')=>{if(!el)return;el.textContent=m||'';el.classList.remove('notice-success','notice-error');if(t==='success')el.classList.add('notice-success');if(t==='error')el.classList.add('notice-error')}
+const api=(u,o={})=>fetch(u,{cache:'no-store',...o}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok||d?.error)throw new Error(d?.error||'Request failed');return d})
+const em=v=>String(v||'').trim().toLowerCase()
+const col=(v,f=DEF_COLOR)=>/^#[0-9a-fA-F]{6}$/.test(String(v||'').trim())?String(v).trim():f
+const dt=v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||'').trim())?String(v).trim():''
+const thai=v=>{if(!v)return'-';const d=new Date(`${v}T00:00:00Z`);return Number.isNaN(d.getTime())?v:d.toLocaleDateString('th-TH',{year:'numeric',month:'short',day:'numeric',timeZone:'UTC'})}
+const thaiDT=v=>{if(!v)return'-';const d=new Date(v);return Number.isNaN(d.getTime())?v:d.toLocaleString('th-TH',{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}
+const iso=v=>{const d=v instanceof Date?v:new Date(v);if(Number.isNaN(d.getTime()))return'';return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`}
+const syncColor=()=>{const i=$('uniColorInput'),p=$('uniColorPreview');if(!i||!p)return;i.value=col(i.value||DEF_COLOR);p.style.background=i.value}
+const getActor=()=>{try{const r=sessionStorage.getItem(AUTH_KEY);if(!r)return null;const p=JSON.parse(r);const e=em(p?.email);return e?{email:e,displayName:String(p?.displayName||''),accountId:String(p?.accountId||'')}:null}catch{return null}}
+const setActor=a=>{const e=em(a?.email);if(!e)return;sessionStorage.setItem(AUTH_KEY,JSON.stringify({email:e,displayName:String(a?.displayName||''),accountId:String(a?.accountId||'')}))}
+const openAuth=l=>{const s=getActor();$('uniAuthSubtitle').textContent=`Enter your Jira email to ${l}`;$('uniAuthEmail').value=s?.email||'';$('uniAuthRemember').checked=Boolean(s);notice($('uniAuthStatus'),'');$('uniAuthModal').hidden=false;setTimeout(()=>$('uniAuthEmail').focus(),0)}
+const askAuth=l=>{const s=getActor();if(s)return Promise.resolve(s);return new Promise((res,rej)=>{st.auth={res,rej,l};openAuth(l)})}
+const validateJiraEmail=e=>api(`/api/jira?action=validate_email&email=${encodeURIComponent(String(e||'').trim())}`)
+const closeAuthModal=()=>{$('uniAuthModal').hidden=true}
+const cancelAuthModal=(m='Authentication cancelled')=>{const p=st.auth;st.auth=null;closeAuthModal();if(p?.rej)p.rej(new Error(m))}
+const monthRange=()=>{let y,m;if(/^\d{4}-\d{2}$/.test(st.month)){const x=st.month.split('-').map(Number);y=x[0];m=x[1]-1}else{const d=new Date();y=d.getUTCFullYear();m=d.getUTCMonth()}return{start:new Date(Date.UTC(y,m,1)),end:new Date(Date.UTC(y,m+1,0))}}
+const twoMonth=()=>{const r=monthRange();return{start:iso(r.start),end:iso(new Date(Date.UTC(r.start.getUTCFullYear(),r.start.getUTCMonth()+2,0)))}}
+const durationDays=(s,e)=>{const a=Date.parse(`${s||''}T00:00:00Z`),b=Date.parse(`${e||''}T00:00:00Z`);if(Number.isNaN(a)||Number.isNaN(b))return 0;return Math.floor((b-a)/86400000)+1}
+const cmp=(a,b,t='s')=>{if(t==='d'){const x=Date.parse(a||''),y=Date.parse(b||'');if(Number.isNaN(x)&&Number.isNaN(y))return 0;if(Number.isNaN(x))return 1;if(Number.isNaN(y))return -1;return x-y}return String(a||'').localeCompare(String(b||''),'th',{sensitivity:'base'})}
+
+function mergeItems(){
+  return st.tasks
+    .filter(t=>String(t.isDeleted||'').toLowerCase()!=='true')
+    .map(t=>{
+      const key=String(t.key||'').trim()
+      const sourceType=String(t.sourceType||'todo').toLowerCase()
+      const taskType=String(t.taskType||'').toLowerCase()|| (sourceType==='planner'?'planner_only':'planner_and_checklist')
+      const source=taskType==='planner_only'?'Planner':'Checklist'
+      const statusDirect=String(t.status||'').toUpperCase().trim()
+      const status=statusDirect&&FILTERS.includes(statusDirect)?statusDirect:((`${t.title||''} ${t.note||''} ${key}`.toUpperCase().match(/\bS[0-7]\b/)||[])[0]||'')
+      return {
+        uid:`todo:${t.id}`,
+        taskId:String(t.id||''),
+        source,
+        sourceType,
+        taskType,
+        title:String(t.title||''),
+        key,
+        owner:String(t.owner||''),
+        note:String(t.note||''),
+        color:col(t.color||DEF_COLOR),
+        start:String(t.start||''),
+        end:String(t.end||''),
+        logs:Array.isArray(t.logs)?t.logs:[],
+        isDone:Boolean(t.isDone),
+        doneAt:String(t.doneAt||''),
+        doneByEmail:String(t.doneByEmail||''),
+        updatedAt:String(t.updatedAt||t.createdAt||''),
+        updatedByEmail:String(t.updatedByEmail||t.createdByEmail||''),
+        status
+      }
+    })
+}
+
+function list(){
+  const q=st.search.trim().toLowerCase(),typeAct=new Set(st.typeFilters),statusAct=new Set(st.statusFilters)
+  let it=mergeItems().filter(i=>typeAct.has(i.source)).filter(i=>!i.status||statusAct.has(i.status)).filter(i=>!q||`${i.title} ${i.key} ${i.owner} ${i.note} ${i.source} ${i.status}`.toLowerCase().includes(q))
+  it.sort((a,b)=>{let r=0;if(st.sort==='title')r=cmp(a.title,b.title);else if(st.sort==='owner')r=cmp(a.owner,b.owner);else if(st.sort==='start')r=cmp(a.start,b.start,'d');else if(st.sort==='end')r=cmp(a.end,b.end,'d');else r=cmp(a.updatedAt,b.updatedAt,'d');return st.dir==='asc'?r:-r})
+  return it
+}
+
+function renderSwitch(){
+  const o=[['card','Card View'],['table','Table View'],['timeline','Timeline View'],['calendar','Calendar View']]
+  $('uniViewSwitch').innerHTML=o.map(([v,l])=>`<button type="button" class="todo-segment-btn ${st.view===v?'active':''}" data-v="${v}">${l}</button>`).join('')
+  $('uniViewSwitch').querySelectorAll('button').forEach(b=>b.onclick=()=>{st.view=b.dataset.v;renderSwitch();render()})
+}
+function renderFilters(){
+  const t=$('uniTypeFilterGrid')
+  t.innerHTML=['Planner','Checklist'].map(f=>`<label><input type="checkbox" value="${f}" ${st.typeFilters.includes(f)?'checked':''}/><span>${f}</span></label>`).join('')
+  t.querySelectorAll('input').forEach(i=>i.onchange=()=>{st.typeFilters=[...t.querySelectorAll('input:checked')].map(x=>x.value);render()})
+  const s=$('uniStatusFilterGrid')
+  s.innerHTML=FILTERS.map(f=>`<label><input type="checkbox" value="${f}" ${st.statusFilters.includes(f)?'checked':''}/><span>${f}</span></label>`).join('')
+  s.querySelectorAll('input').forEach(i=>i.onchange=()=>{st.statusFilters=[...s.querySelectorAll('input:checked')].map(x=>x.value);render()})
+}
+
+function cardHTML(items){
+  if(!items.length)return '<div class="empty">No items</div>'
+  return `<div class="uni-card-list">${items.map(i=>{const ex=st.log===i.uid,logs=Array.isArray(i.logs)?i.logs:[],tt=i.start&&i.end?`${thai(i.start)} - ${thai(i.end)}`:'No timeline date',stTag=i.status||'-';return `<article class="todo-card ${i.isDone?'is-done':''} todo-card-checklist" data-uid="${esc(i.uid)}" style="--todo-accent:${esc(i.color)}"><div class="todo-card-main"><label class="todo-check"><input type="checkbox" data-role="toggle" ${i.isDone?'checked':''}/><span></span></label><div class="todo-copy"><div class="todo-title-row"><span class="badge ${i.source==='Planner'?'status-manual':'badge-checklist'}">${esc(i.source)}</span><span class="badge status-default">${esc(stTag)}</span><strong>${esc(i.title)}</strong>${i.key?`<span class="todo-context-inlinebar"><span class="todo-context-bartext">${esc(i.key)}</span></span>`:''}</div><div class="todo-meta-line">${esc(tt)}</div><div class="todo-meta-line">Updated ${esc(thaiDT(i.updatedAt))}${i.updatedByEmail?` | By ${esc(i.updatedByEmail)}`:''}</div><div class="todo-note">${esc(i.note||'No note')}</div><div class="todo-log-summary">${logs.length} update logs</div>${ex?`<section class="todo-log-panel"><div class="todo-log-list">${logs.length?logs.map(e=>`<article class="todo-log-entry"><div class="todo-log-time">${esc(thaiDT(e.createdAt))}${e.actorEmail?` | ${esc(e.actorEmail)}`:''}</div><div class="todo-log-message">${esc(e.message)}</div></article>`).join(''):'<div class="mini-empty">No update log yet</div>'}</div><form class="todo-log-form" data-role="log-form"><textarea name="message" placeholder="Add update log"></textarea><div class="todo-log-actions"><button class="btn primary" type="submit">Add update log</button></div></form></section>`:''}</div></div><div class="todo-card-actions"><button class="btn" type="button" data-role="inspect">Inspector</button><button class="btn" type="button" data-role="edit">Edit</button><button class="btn" type="button" data-role="delete">Delete</button><button class="btn" type="button" data-role="log">${ex?'Hide logs':'View logs'}</button></div></article>`}).join('')}</div>`
+}
+function tableHTML(items){
+  if(!items.length)return '<div class="empty">No rows</div>'
+  return `<div class="uni-table-wrap"><table class="uni-table"><thead><tr><th>Done</th><th>Task</th><th>Context</th><th>Status</th><th>Owner</th><th>Note</th><th>Start</th><th>End</th><th>Updated</th><th>Done info</th><th>Logs</th><th>Actions</th></tr></thead><tbody>${items.map(i=>{const ex=st.log===i.uid,done=i.isDone&&i.doneAt?`Done ${thaiDT(i.doneAt)}${i.doneByEmail?` - ${i.doneByEmail}`:''}`:'-';return `<tr data-uid="${esc(i.uid)}"><td><label class="todo-check todo-check-inline"><input type="checkbox" data-role="toggle" ${i.isDone?'checked':''}/><span></span></label></td><td><span class="badge ${i.source==='Planner'?'status-manual':'badge-checklist'}">${esc(i.source)}</span> <strong>${esc(i.title)}</strong></td><td>${i.key?`<span class="todo-context-inlinebar"><span class="todo-context-bartext">${esc(i.key)}</span></span>`:'-'}</td><td>${esc(i.status||'-')}</td><td>${esc(i.owner||'-')}</td><td>${esc(i.note||'-')}</td><td>${esc(thai(i.start))}</td><td>${esc(thai(i.end))}</td><td>${esc(thaiDT(i.updatedAt))}${i.updatedByEmail?`<br/><small>${esc(i.updatedByEmail)}</small>`:''}</td><td>${esc(done)}</td><td>${esc(String((i.logs||[]).length))}</td><td><div class="uni-table-actions"><button class="uni-action-text" type="button" data-role="inspect">Inspector</button><button class="uni-action-text" type="button" data-role="log">${ex?'Hide logs':'View logs'}</button><button class="uni-action-text" type="button" data-role="edit">Edit</button><button class="uni-action-text" type="button" data-role="delete">Delete</button></div></td></tr>${ex?`<tr class="uni-log-row" data-uid="${esc(i.uid)}"><td colspan="12"><section class="todo-log-panel"><div class="todo-log-list">${(i.logs||[]).length?(i.logs||[]).map(e=>`<article class="todo-log-entry"><div class="todo-log-time">${esc(thaiDT(e.createdAt))}${e.actorEmail?` | ${esc(e.actorEmail)}`:''}</div><div class="todo-log-message">${esc(e.message)}</div></article>`).join(''):'<div class="mini-empty">No update log yet</div>'}</div><form class="todo-log-form" data-role="log-form"><textarea name="message" placeholder="Add update log"></textarea><div class="todo-log-actions"><button class="btn primary" type="submit">Add update log</button></div></form></section></td></tr>`:''}`}).join('')}</tbody></table></div>`
+}
+function timelineHTML(items){
+  const x=items.filter(i=>i.start&&i.end);if(!x.length)return '<div class="empty">No timeline item</div>'
+  const r=twoMonth(),a=new Date(`${r.start}T00:00:00Z`),b=new Date(`${r.end}T00:00:00Z`),days=Math.floor((b-a)/86400000)+1
+  const head=Array.from({length:days},(_,k)=>{const d=new Date(a.getTime());d.setUTCDate(d.getUTCDate()+k);const w=d.getUTCDay()===0||d.getUTCDay()===6;const l=d.toLocaleDateString('en-US',{weekday:'short',timeZone:'UTC'}).slice(0,2);return `<div class="planner-lab-day ${w?'is-weekend':''}" style="grid-column:${k+1}"><span>${l}</span><strong>${d.getUTCDate()}</strong></div>`}).join('')
+  const rows=x.map(i=>{const s=new Date(`${i.start}T00:00:00Z`),e=new Date(`${i.end}T00:00:00Z`),cs=s<a?a:s,ce=e>b?b:e,so=Math.floor((cs-a)/86400000),eo=Math.floor((ce-a)/86400000),sp=Math.max(1,eo-so+1);return `<div class="planner-lab-row"><div class="planner-lab-track">${Array.from({length:days},()=>'<div class="planner-lab-track-day"></div>').join('')}<button class="planner-lab-bar manual" type="button" data-role="inspect" data-uid="${esc(i.uid)}" style="grid-column:${so+1} / span ${sp};--lab-bar:${esc(i.color)}"><span>${esc(i.key?`${i.key} : ${i.title}`:i.title)}</span></button></div></div>`}).join('')
+  return `<div class="planner-lab-timeline-shell" style="--lab-days:${days}"><div class="planner-lab-head">${head}</div><div class="planner-lab-body">${rows}</div></div>`
+}
+function calendarHTML(items){
+  const x=items.filter(i=>i.start&&i.end),mr=monthRange(),nm=['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+  const start=new Date(mr.start.getTime());start.setUTCDate(start.getUTCDate()-start.getUTCDay())
+  const end=new Date(mr.end.getTime());end.setUTCDate(end.getUTCDate()+(6-end.getUTCDay()))
+  const monthStartIso=iso(mr.start),monthEndIso=iso(mr.end)
+  const weeks=[]
+  let c=new Date(start.getTime())
+  while(c<=end){
+    const weekStart=new Date(c.getTime()),weekEnd=new Date(c.getTime());weekEnd.setUTCDate(weekEnd.getUTCDate()+6)
+    const days=Array.from({length:7},(_,k)=>{const d=new Date(weekStart.getTime());d.setUTCDate(d.getUTCDate()+k);return d})
+    const segs=x.map(i=>{const s=new Date(`${i.start}T00:00:00Z`),e=new Date(`${i.end}T00:00:00Z`);if(e<weekStart||s>weekEnd)return null;const ss=s<weekStart?weekStart:s,ee=e>weekEnd?weekEnd:e,si=Math.floor((ss-weekStart)/86400000),ei=Math.floor((ee-weekStart)/86400000);return {i,si,ei,span:Math.max(1,ei-si+1),lane:0}}).filter(Boolean).sort((a,b)=>(a.si-b.si)||(b.span-a.span))
+    const laneEnd=[]
+    segs.forEach(seg=>{let lane=0;while(lane<laneEnd.length&&laneEnd[lane]>=seg.si)lane+=1;seg.lane=lane;laneEnd[lane]=seg.ei})
+    const lanes=Math.max(1,laneEnd.length),bh=20,g=4,h=lanes*bh+(lanes-1)*g+8
+    const bars=segs.map(seg=>{const left=(seg.si/7)*100,width=(seg.span/7)*100,top=seg.lane*(bh+g)+4;return `<button class="uni-cal-bar" type="button" data-role="inspect" data-uid="${esc(seg.i.uid)}" style="left:${left}%;width:${width}%;top:${top}px;background:${esc(seg.i.color)};" title="${esc(seg.i.title)}">${esc(seg.i.title)}</button>`}).join('')
+    const cells=days.map(d=>{const dIso=iso(d),off=dIso<monthStartIso||dIso>monthEndIso,count=x.filter(i=>i.start<=dIso&&i.end>=dIso).length;return `<div class="uni-cal-day ${off?'off':''}"><strong>${d.getUTCDate()}</strong>${count?`<div class="uni-cal-count">${count} item${count>1?'s':''}</div>`:''}</div>`}).join('')
+    weeks.push(`<div class="uni-cal-week"><div class="uni-cal-bars" style="height:${h}px">${bars}</div><div class="uni-cal-days">${cells}</div></div>`)
+    c.setUTCDate(c.getUTCDate()+7)
+  }
+  return `<div class="uni-calendar"><div class="uni-cal-head">${nm.map(n=>`<div>${n}</div>`).join('')}</div>${weeks.join('')}</div>`
+}
+
+function ensureTask(item,actor){
+  if(item.taskId)return Promise.resolve(item.taskId)
+  return Promise.reject(new Error('Task ID not found'))
+}
+async function setDone(uid,val){
+  const it=list().find(x=>x.uid===uid);if(!it)return false
+  try{const a=await askAuth(val?'change done status':'undo done status'),e=em(a?.email);if(!e)throw new Error('Jira email is required');const id=await ensureTask(it,e);await api('/api/todo',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,isDone:val,doneAt:val?new Date().toISOString():'',doneByEmail:val?e:'',actorEmail:e})});await load();render();if(st.sel===uid)inspect(uid);return true}catch(err){notice($('uniSync'),err.message||'Unable to update done','error');return false}
+}
+async function addLog(uid,msg){
+  const it=list().find(x=>x.uid===uid);if(!it)return
+  try{const a=await askAuth('add update log'),e=em(a?.email);if(!e)throw new Error('Jira email is required');const id=await ensureTask(it,e);const logs=Array.isArray(it.logs)?it.logs:[];await api('/api/todo',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,logs:[...logs,{id:`log_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,message:msg,createdAt:new Date().toISOString(),actorEmail:e}],actorEmail:e})});await load();st.log=uid;render();if(st.sel===uid)inspect(uid);notice($('uniSync'),'Update log saved','success')}catch(err){notice($('uniSync'),err.message||'Unable to save log','error')}
+}
+async function editItem(uid){
+  const it=list().find(x=>x.uid===uid);if(!it)return
+  try{const a=await askAuth('open edit mode'),e=em(a?.email);if(!e)throw new Error('Jira email is required');st.editingId=it.taskId;st.editingActorEmail=e;const f=$('uniCreateForm');f.title.value=it.title||'';f.key.value=it.key||'';f.start.value=it.start||'';f.end.value=it.end||'';f.owner.value=it.owner||'';f.note.value=it.note||'';f.color.value=col(it.color||DEF_COLOR);f.createMode.value=it.taskType==='planner_only'?'plan_only':'checklist_and_plan';syncColor();$('uniSaveBtn').textContent='Update item';$('uniCancelEditBtn').style.display='';notice($('uniCreateStatus'),`Editing item as ${e}...`);window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'})}catch(err){notice($('uniCreateStatus'),err.message||'Unable to edit','error')}
+}
+async function deleteItem(uid){
+  const it=list().find(x=>x.uid===uid);if(!it)return
+  try{const a=await askAuth('delete item'),e=em(a?.email);if(!e)throw new Error('Jira email is required');await api('/api/todo',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:it.taskId,actorEmail:e})});if(st.editingId===it.taskId)resetForm();if(st.sel===uid){const p=$('uniInspectorPop');p.classList.remove('open');p.innerHTML=''}await load();render();notice($('uniSync'),'Item deleted (soft delete)','success')}catch(err){notice($('uniSync'),err.message||'Unable to delete','error')}
+}
+function inspect(uid,anchor){const it=list().find(x=>x.uid===uid),pop=$('uniInspectorPop');if(!it){pop.classList.remove('open');pop.innerHTML='';return}st.sel=uid;pop.innerHTML=`<div class="planner-lab-inspector-card manual" style="--inspector-accent:${esc(it.color)};--inspector-accent-soft:rgba(70,119,200,.3);--inspector-surface:rgba(226,238,255,.97);--inspector-border:rgba(70,119,200,.42)"><div class="planner-lab-inspector-top"><div><div class="planner-lab-inspector-title">${esc(it.title)}</div><div class="planner-lab-inspector-key">${esc(it.key||'-')}</div></div><button class="btn uni-inspector-close" id="uniInspectorClose" type="button">Close</button></div><div class="planner-lab-inspector-note planner-lab-inspector-note-compact">${it.start&&it.end?`${esc(thai(it.start))} - ${esc(thai(it.end))} | ${durationDays(it.start,it.end)} days`:'No timeline date'}</div><div class="planner-lab-inspector-grid"><div><span>Task Type</span><strong>${esc(it.source)}</strong></div><div><span>Status</span><strong>${esc(it.status||'-')}</strong></div><div><span>Owner</span><strong>${esc(it.owner||'-')}</strong></div><div><span>Task ID</span><strong>${esc(it.taskId||'-')}</strong></div></div><div class="planner-lab-inspector-note">${esc(it.note||'No note')}</div><div class="planner-lab-inspector-actions" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><button class="btn ${it.isDone?'':'primary'}" type="button" id="uniInspectorDoneBtn">${it.isDone?'Undo Done':'Done'}</button><button class="btn" type="button" id="uniInspectorEditBtn">Edit</button><button class="btn" type="button" id="uniInspectorDeleteBtn">Delete</button><span id="uniInspectorStatus" class="notice"></span></div><form id="uniInspectorLogForm" class="todo-log-form" style="margin-top:8px;"><textarea name="message" placeholder="Add update log"></textarea><div class="todo-log-actions"><button class="btn primary" type="submit">Add update log</button></div></form></div>`;const r=anchor?.getBoundingClientRect();pop.style.left=`${Math.max(12,Math.min(window.innerWidth-500,(r?.right||window.innerWidth*0.5)+10))}px`;pop.style.top=`${Math.max(12,Math.min(window.innerHeight-460,(r?.top||80)-10))}px`;pop.classList.add('open');$('uniInspectorClose').onclick=()=>pop.classList.remove('open');$('uniInspectorDoneBtn').onclick=async()=>{const s=$('uniInspectorStatus');notice(s,it.isDone?'Updating...':'Marking...');const ok=await setDone(it.uid,!it.isDone);if(!ok)notice(s,'Unable','error')};$('uniInspectorEditBtn').onclick=async()=>{await editItem(it.uid);pop.classList.remove('open')};$('uniInspectorDeleteBtn').onclick=async()=>{await deleteItem(it.uid)};$('uniInspectorLogForm').onsubmit=async e=>{e.preventDefault();const m=String(e.currentTarget.message.value||'').trim();if(!m)return;await addLog(it.uid,m)}}
+
+function bindHost(items){const h=$('uniViewHost');h.querySelectorAll('[data-role="inspect"]').forEach(n=>n.onclick=()=>{const uid=n.getAttribute('data-uid')||n.closest('[data-uid]')?.getAttribute('data-uid')||'';inspect(uid,n)});h.querySelectorAll('[data-role="toggle"]').forEach(n=>n.onchange=async e=>{const uid=e.target.closest('[data-uid]')?.getAttribute('data-uid')||'';const ok=await setDone(uid,Boolean(e.target.checked));if(!ok)e.target.checked=!e.target.checked});h.querySelectorAll('[data-role="edit"]').forEach(n=>n.onclick=async()=>{const uid=n.closest('[data-uid]')?.getAttribute('data-uid')||'';await editItem(uid)});h.querySelectorAll('[data-role="delete"]').forEach(n=>n.onclick=async()=>{const uid=n.closest('[data-uid]')?.getAttribute('data-uid')||'';await deleteItem(uid)});h.querySelectorAll('[data-role="log"]').forEach(n=>n.onclick=()=>{const uid=n.closest('[data-uid]')?.getAttribute('data-uid')||'';st.log=st.log===uid?'':uid;render()});h.querySelectorAll('[data-role="log-form"]').forEach(f=>f.onsubmit=async e=>{e.preventDefault();const uid=f.closest('[data-uid]')?.getAttribute('data-uid')||'',m=String(f.message.value||'').trim();if(!uid||!m)return;await addLog(uid,m)})}
+
+function render(){const items=list(),done=items.filter(i=>i.isDone).length,planner=items.filter(i=>i.source==='Planner').length,checklist=items.filter(i=>i.source==='Checklist').length;notice($('uniSummary'),`${items.length} items | done ${done} | planner ${planner} | checklist ${checklist} | view ${st.view.toUpperCase()}`);let html='';if(st.view==='table')html=tableHTML(items);else if(st.view==='timeline')html=timelineHTML(items);else if(st.view==='calendar')html=calendarHTML(items);else html=cardHTML(items);$('uniViewHost').innerHTML=html;bindHost(items)}
+
+function resetForm(){st.editingId='';st.editingActorEmail='';const f=$('uniCreateForm');f.reset();f.color.value=DEF_COLOR;f.createMode.value='plan_only';syncColor();$('uniSaveBtn').textContent='Create item';$('uniCancelEditBtn').style.display='none';notice($('uniCreateStatus'),'')}
+async function createFromForm(f){const p={title:String(f.title.value||'').trim(),key:String(f.key.value||'').trim(),start:dt(f.start.value||''),end:dt(f.end.value||''),owner:String(f.owner.value||'').trim(),note:String(f.note.value||'').trim(),color:col(f.color.value||DEF_COLOR),mode:String(f.createMode.value||'plan_only')};if(!p.title)throw new Error('Task title is required');if(!p.start||!p.end)throw new Error('Start and End are required');if(p.end<p.start)throw new Error('End date must be on or after Start date');const a=st.editingId&&st.editingActorEmail?{email:st.editingActorEmail}:await askAuth(st.editingId?'update item':'create item'),e=em(a?.email);if(!e)throw new Error('Jira email is required');const payload={sourceType:p.mode==='checklist_and_plan'?'todo':'planner',taskType:p.mode==='checklist_and_plan'?'planner_and_checklist':'planner_only',title:p.title,key:p.key,owner:p.owner,note:p.note,color:p.color,start:p.start,end:p.end,actorEmail:e};if(st.editingId)await api('/api/todo',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({...payload,id:st.editingId})});else await api('/api/todo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})}
+
+async function load(){
+  notice($('uniSync'),'Loading unified planner from PlannerTasks...')
+  const t=await api(`/api/todo?_ts=${Date.now()}`)
+  st.tasks=Array.isArray(t.items)?t.items:[]
+  st.sheetName=String(t.sheetName||'PlannerTasks')
+  if($('uniSheetTag'))$('uniSheetTag').textContent=`Sheet: ${st.sheetName}`
+  notice($('uniSync'),`Loaded ${st.tasks.length} items from ${st.sheetName}`,'success')
+}
+
+function bind(){const d=new Date();st.month=`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`;$('uniMonthPicker').value=st.month;renderSwitch();renderFilters();$('uniMonthPicker').onchange=e=>{st.month=e.target.value||st.month;render()};$('uniSearch').oninput=e=>{st.search=String(e.target.value||'');render()};$('uniSortField').onchange=e=>{st.sort=e.target.value||'updatedAt';render()};$('uniSortDir').onchange=e=>{st.dir=e.target.value||'desc';render()};$('uniRefreshBtn').onclick=async()=>{await load();render()};$('uniColorPreview').onclick=()=>$('uniColorInput').click();$('uniColorInput').oninput=syncColor;syncColor();$('uniCreateForm').onsubmit=async e=>{e.preventDefault();const s=$('uniCreateStatus');notice(s,st.editingId?'Updating item...':'Creating item...');try{await createFromForm(e.currentTarget);await load();render();resetForm();notice(s,'Saved successfully','success')}catch(err){notice(s,err.message||'Unable to save item','error')}};$('uniCancelEditBtn').onclick=resetForm;$('uniAuthCancel').onclick=()=>cancelAuthModal();$('uniAuthBackdrop').onclick=()=>cancelAuthModal();$('uniAuthForm').onsubmit=async e=>{e.preventDefault();const p=st.auth;if(!p)return;const email=em($('uniAuthEmail').value),remember=Boolean($('uniAuthRemember').checked),s=$('uniAuthStatus'),b=$('uniAuthConfirm');if(!email){notice(s,'Jira email is required','error');return}try{b.disabled=true;notice(s,'Validating Jira email...');const r=await validateJiraEmail(email);if(!r?.valid)throw new Error(r?.reason||'Jira email not found');const actor={email:em(r?.user?.email||email),displayName:String(r?.user?.displayName||''),accountId:String(r?.user?.accountId||'')};if(remember)setActor(actor);else sessionStorage.removeItem(AUTH_KEY);st.auth=null;closeAuthModal();p.res(actor)}catch(err){notice(s,err.message||'Auth failed','error')}finally{b.disabled=false}};document.addEventListener('click',e=>{const pop=$('uniInspectorPop');if(!pop.classList.contains('open'))return;if(e.target.closest('#uniInspectorPop'))return;if(e.target.closest('[data-role="inspect"]'))return;pop.classList.remove('open')})}
+
+bind();load().then(()=>render()).catch(err=>notice($('uniSync'),err.message||'Unable to load unified planner','error'))

@@ -11,7 +11,7 @@ const listCache = {
   expiresAt: 0
 }
 
-const SHEET_COLUMNS = ['id', 'plannerRefId', 'sourceType', 'key', 'title', 'owner', 'note', 'color', 'isDone', 'doneAt', 'createdAt', 'updatedAt', 'isDeleted', 'deletedAt', 'start', 'end', 'logsJson', 'createdByEmail', 'updatedByEmail', 'deletedByEmail', 'auditJson', 'doneByEmail']
+const SHEET_COLUMNS = ['id', 'plannerRefId', 'sourceType', 'taskType', 'key', 'title', 'owner', 'note', 'color', 'isDone', 'doneAt', 'createdAt', 'updatedAt', 'isDeleted', 'deletedAt', 'start', 'end', 'logsJson', 'createdByEmail', 'updatedByEmail', 'deletedByEmail', 'auditJson', 'doneByEmail']
 const DEFAULT_GOOGLE_SHEETS_URL = 'https://docs.google.com/spreadsheets/d/1FzgaU35q3dvDVAf3vAqirRcUFemd_OThXr1o7NdJrGI/edit?usp=sharing'
 const DEFAULT_TASK_COLOR = '#2c6e91'
 
@@ -118,6 +118,10 @@ function normalizeTodo(raw = {}, forUpdate = false) {
   const id = String(raw.id || '').trim() || `todo_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
   const plannerRefId = String(raw.plannerRefId || '').trim()
   const sourceType = String(raw.sourceType || 'todo').trim().toLowerCase() || 'todo'
+  const taskTypeRaw = String(raw.taskType || '').trim().toLowerCase()
+  const taskType = taskTypeRaw === 'planner_only' || taskTypeRaw === 'planner_and_checklist'
+    ? taskTypeRaw
+    : (sourceType === 'planner' ? 'planner_only' : 'planner_and_checklist')
   const key = String(raw.key || '').trim().toUpperCase()
   const title = String(raw.title || '').trim()
   const owner = String(raw.owner || '').trim()
@@ -157,6 +161,7 @@ function normalizeTodo(raw = {}, forUpdate = false) {
     id,
     plannerRefId,
     sourceType,
+    taskType,
     key,
     title,
     owner,
@@ -319,6 +324,7 @@ function toRowValues(item) {
     item.id,
     item.plannerRefId || '',
     item.sourceType || 'todo',
+    item.taskType || (String(item.sourceType || 'todo').toLowerCase() === 'planner' ? 'planner_only' : 'planner_and_checklist'),
     item.key || '',
     item.title || '',
     item.owner || '',
@@ -343,29 +349,36 @@ function toRowValues(item) {
 
 function rowToItem(row = [], rowNumber = 0) {
   const getCell = (index) => String(row?.[index] || '').trim()
+  const hasTaskTypeColumn = row.length >= 23
+    || ['planner_only', 'planner_and_checklist'].includes(getCell(3).toLowerCase())
+  const taskType = hasTaskTypeColumn
+    ? (getCell(3) || (getCell(2).toLowerCase() === 'planner' ? 'planner_only' : 'planner_and_checklist'))
+    : (getCell(2).toLowerCase() === 'planner' ? 'planner_only' : 'planner_and_checklist')
+  const offset = hasTaskTypeColumn ? 0 : -1
   return {
     id: getCell(0),
     plannerRefId: getCell(1),
     sourceType: getCell(2).toLowerCase() || 'todo',
-    key: getCell(3),
-    title: getCell(4),
-    owner: getCell(5),
-    note: getCell(6),
-    color: getCell(7) || DEFAULT_TASK_COLOR,
-    isDone: getCell(8).toLowerCase() === 'true',
-    doneAt: getCell(9),
-    createdAt: getCell(10),
-    updatedAt: getCell(11),
-    isDeleted: getCell(12).toLowerCase() === 'true',
-    deletedAt: getCell(13),
-    start: getCell(14),
-    end: getCell(15),
-    logs: normalizeLogs(getCell(16)),
-    createdByEmail: normalizeEmail(getCell(17)),
-    updatedByEmail: normalizeEmail(getCell(18)),
-    deletedByEmail: normalizeEmail(getCell(19)),
-    auditTrail: normalizeAuditTrail(getCell(20)),
-    doneByEmail: normalizeEmail(getCell(21)),
+    taskType,
+    key: getCell(4 + offset),
+    title: getCell(5 + offset),
+    owner: getCell(6 + offset),
+    note: getCell(7 + offset),
+    color: getCell(8 + offset) || DEFAULT_TASK_COLOR,
+    isDone: getCell(9 + offset).toLowerCase() === 'true',
+    doneAt: getCell(10 + offset),
+    createdAt: getCell(11 + offset),
+    updatedAt: getCell(12 + offset),
+    isDeleted: getCell(13 + offset).toLowerCase() === 'true',
+    deletedAt: getCell(14 + offset),
+    start: getCell(15 + offset),
+    end: getCell(16 + offset),
+    logs: normalizeLogs(getCell(17 + offset)),
+    createdByEmail: normalizeEmail(getCell(18 + offset)),
+    updatedByEmail: normalizeEmail(getCell(19 + offset)),
+    deletedByEmail: normalizeEmail(getCell(20 + offset)),
+    auditTrail: normalizeAuditTrail(getCell(21 + offset)),
+    doneByEmail: normalizeEmail(getCell(22 + offset)),
     _rowNumber: rowNumber
   }
 }

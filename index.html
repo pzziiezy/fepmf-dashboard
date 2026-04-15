@@ -24,6 +24,7 @@
           <a class="active" href="/" target="_blank" rel="noopener noreferrer">Calendar Planner</a>
           <a href="/shift-planner.html" target="_blank" rel="noopener noreferrer">Shift Planner</a>
           <a href="/todo.html" target="_blank" rel="noopener noreferrer">To Do Checklist</a>
+          <a href="/unified-planner.html" target="_blank" rel="noopener noreferrer">Unified Planner</a>
         </nav>
       </div>
       <div class="header-meta planner-lab-meta">
@@ -104,6 +105,28 @@
       </aside>
     </section>
   </div>
-  <script src="/calendar-live.js?v=20260402c"></script>
+  <div id="labAuthModal" class="todo-auth-modal" hidden>
+    <div id="labAuthBackdrop" class="todo-auth-backdrop"></div>
+    <section class="todo-auth-dialog" role="dialog" aria-modal="true" aria-labelledby="labAuthTitle">
+      <h3 id="labAuthTitle">Confirm Identity</h3>
+      <p id="labAuthSubtitle" class="todo-auth-subtitle">Enter your Jira email to continue</p>
+      <form id="labAuthForm" class="todo-auth-form">
+        <label class="field">
+          <span>Jira email</span>
+          <input id="labAuthEmail" type="email" placeholder="name@company.com" required />
+        </label>
+        <label class="todo-auth-remember">
+          <input id="labAuthRemember" type="checkbox" />
+          <span>Remember in this session</span>
+        </label>
+        <div id="labAuthStatus" class="notice"></div>
+        <div class="todo-auth-actions">
+          <button id="labAuthCancel" class="btn" type="button">Cancel</button>
+          <button id="labAuthConfirm" class="btn primary" type="submit">Confirm</button>
+        </div>
+      </form>
+    </section>
+  </div>
+  <script src="/calendar-live.js?v=20260415b"></script>
 </body>
 </html>

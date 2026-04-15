@@ -1,4 +1,5 @@
 const LAB_DEFAULT_COLOR = '#b66a00'
+const LAB_AUTH_SESSION_KEY = 'planner_actor_session_v1'
 
 const state = {
   plans: [],
@@ -14,6 +15,9 @@ const state = {
   selectedEventId: '',
   inspectorEditingId: '',
   editingId: '',
+  todoPlannerTaskMap: new Map(),
+  authPending: null,
+  inspectorDonePendingId: '',
   filters: {
     status: ['Manual']
   },
@@ -31,6 +35,99 @@ function setNotice(el, message, type = 'info') {
   el.classList.remove('notice-success', 'notice-error')
   if (type === 'success') el.classList.add('notice-success')
   if (type === 'error') el.classList.add('notice-error')
+}
+
+function byId(id) {
+  return document.getElementById(id)
+}
+
+function apiFetch(url, options = {}) {
+  return fetch(url, { cache: 'no-store', ...options })
+    .then(async (response) => {
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || data?.error) throw new Error(data?.error || 'Request failed')
+      return data
+    })
+}
+
+function normalizeEmail(value) {
+  return String(value || '').trim().toLowerCase()
+}
+
+function getStoredActor() {
+  try {
+    const raw = sessionStorage.getItem(LAB_AUTH_SESSION_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    const email = normalizeEmail(parsed?.email)
+    if (!email) return null
+    return {
+      email,
+      displayName: String(parsed?.displayName || '').trim(),
+      accountId: String(parsed?.accountId || '').trim()
+    }
+  } catch {
+    return null
+  }
+}
+
+function storeActor(actor) {
+  const email = normalizeEmail(actor?.email)
+  if (!email) return
+  sessionStorage.setItem(LAB_AUTH_SESSION_KEY, JSON.stringify({
+    email,
+    displayName: String(actor?.displayName || '').trim(),
+    accountId: String(actor?.accountId || '').trim()
+  }))
+}
+
+function clearStoredActor() {
+  sessionStorage.removeItem(LAB_AUTH_SESSION_KEY)
+}
+
+async function validateJiraEmail(email) {
+  return apiFetch(`/api/jira?action=validate_email&email=${encodeURIComponent(normalizeEmail(email))}`)
+}
+
+function closeAuthModal() {
+  const modal = byId('labAuthModal')
+  if (modal) modal.hidden = true
+}
+
+function cancelAuthModal(message = 'Auth cancelled') {
+  const pending = state.authPending
+  state.authPending = null
+  closeAuthModal()
+  if (pending?.reject) pending.reject(new Error(message))
+}
+
+function openAuthModal(actionLabel = 'do this action') {
+  const modal = byId('labAuthModal')
+  const subtitle = byId('labAuthSubtitle')
+  const emailInput = byId('labAuthEmail')
+  const remember = byId('labAuthRemember')
+  const status = byId('labAuthStatus')
+  if (!modal || !subtitle || !emailInput || !remember || !status) {
+    throw new Error('Auth dialog is unavailable on this page')
+  }
+
+  const saved = getStoredActor()
+  subtitle.textContent = `กรอกอีเมล Jira เพื่อยืนยันก่อน${actionLabel}`
+  emailInput.value = saved?.email || ''
+  remember.checked = Boolean(saved)
+  setNotice(status, '')
+  modal.hidden = false
+  setTimeout(() => emailInput.focus(), 0)
+}
+
+function requestActorAuth(actionLabel) {
+  const saved = getStoredActor()
+  if (saved) return Promise.resolve(saved)
+
+  return new Promise((resolve, reject) => {
+    state.authPending = { actionLabel, resolve, reject }
+    openAuthModal(actionLabel)
+  })
 }
 
 function getBangkokDateParts(value = new Date()) {
@@ -64,6 +161,19 @@ function formatThaiDate(value) {
   const d = new Date(`${value}T00:00:00Z`)
   if (Number.isNaN(d.getTime())) return value
   return d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
+}
+
+function formatThaiDateTime(value) {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString('th-TH', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
 }
 
 function getTwoMonthRange() {
@@ -290,7 +400,9 @@ function buildStatusFilter() {
 }
 
 function buildManualEvents() {
-  return (state.plans || []).map((item) => ({
+  return (state.plans || []).map((item) => {
+    const plannerTask = state.todoPlannerTaskMap.get(item.id)
+    return ({
     id: item.id,
     key: item.key || '-',
     title: item.title,
@@ -302,8 +414,13 @@ function buildManualEvents() {
     note: item.note || '',
     sprint: item.sprint || '',
     color: item.color || LAB_DEFAULT_COLOR,
-    source: 'manual'
-  }))
+    source: 'manual',
+    isDone: Boolean(plannerTask?.isDone),
+    doneAt: plannerTask?.doneAt || '',
+    doneByEmail: plannerTask?.doneByEmail || '',
+    todoTaskId: plannerTask?.id || ''
+  })
+  })
 }
 
 function buildProjectEvents() {
@@ -363,6 +480,72 @@ async function saveManualPlan(payload, editingId = '') {
   const data = await response.json()
   if (data.error) throw new Error(data.error)
   return data
+}
+
+async function loadTodoPlannerTasks() {
+  try {
+    const data = await apiFetch('/api/todo')
+    const items = Array.isArray(data.items) ? data.items : []
+    const byPlannerRef = new Map()
+    items.forEach((item) => {
+      const plannerRefId = String(item.plannerRefId || '').trim()
+      if (!plannerRefId) return
+      const sourceType = String(item.sourceType || 'todo').trim().toLowerCase()
+      const existing = byPlannerRef.get(plannerRefId)
+      const existingSource = String(existing?.sourceType || 'todo').trim().toLowerCase()
+      const shouldPreferCurrent = !existing || (existingSource === 'planner' && sourceType === 'todo')
+      if (shouldPreferCurrent) byPlannerRef.set(plannerRefId, item)
+    })
+    state.todoPlannerTaskMap = byPlannerRef
+  } catch (_error) {
+    state.todoPlannerTaskMap = new Map()
+  }
+}
+
+async function setPlannerDone(selected, nextChecked, actorEmail) {
+  const plannerRefId = String(selected?.id || '').trim()
+  if (!plannerRefId) throw new Error('Missing planner item id')
+
+  const existingTask = state.todoPlannerTaskMap.get(plannerRefId)
+  const doneAt = nextChecked ? new Date().toISOString() : ''
+  const doneByEmail = nextChecked ? normalizeEmail(actorEmail) : ''
+
+  if (existingTask) {
+    await apiFetch('/api/todo', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: existingTask.id,
+        isDone: nextChecked,
+        doneAt,
+        doneByEmail,
+        actorEmail: normalizeEmail(actorEmail)
+      })
+    })
+    return
+  }
+
+  if (!nextChecked) return
+
+  await apiFetch('/api/todo', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      plannerRefId,
+      sourceType: 'planner',
+      title: selected.title || '',
+      key: selected.key || '',
+      owner: selected.owner || '',
+      note: selected.note || '',
+      color: normalizeHexColor(selected.color, LAB_DEFAULT_COLOR),
+      start: selected.start || '',
+      end: selected.end || '',
+      isDone: true,
+      doneAt,
+      doneByEmail,
+      actorEmail: normalizeEmail(actorEmail)
+    })
+  })
 }
 
 async function rebuildCalendarFromTodo() {
@@ -569,14 +752,39 @@ function renderInspector(selected) {
         <div><span>Sprint</span><strong>${esc(selected.sprint || '-')}</strong></div>
       </div>
       <div class="planner-lab-inspector-note">${esc(selected.note || 'ไม่มี note เพิ่มเติม')}</div>
+      ${selected.source === 'manual' && selected.isDone ? `<div class="planner-lab-inspector-note">Done ${esc(formatThaiDateTime(selected.doneAt))}${selected.doneByEmail ? ` | By ${esc(selected.doneByEmail)}` : ''}</div>` : ''}
       <div class="planner-lab-inspector-actions">
+        ${selected.source === 'manual' ? `<button class="btn ${selected.isDone ? '' : 'primary'}" type="button" id="labInspectorDoneBtn">${selected.isDone ? 'Undo Done' : 'Done'}</button>` : ''}
         ${selected.source === 'manual' ? `<button class="btn" type="button" id="labInspectorEditBtn">แก้ไขแผนงาน</button>` : ''}
         ${selected.url ? `<a class="btn primary" href="${esc(selected.url)}" target="_blank" rel="noopener noreferrer">Open Jira</a>` : ''}
+        ${selected.source === 'manual' ? '<span id="labInspectorActionStatus" class="notice"></span>' : ''}
       </div>
     </div>
   `
 
   if (selected.source === 'manual') {
+    const doneBtn = document.getElementById('labInspectorDoneBtn')
+    doneBtn?.addEventListener('click', async () => {
+      if (state.inspectorDonePendingId === selected.id) return
+      const status = byId('labInspectorActionStatus')
+      doneBtn.disabled = true
+      state.inspectorDonePendingId = selected.id
+      setNotice(status, selected.isDone ? 'Updating done status...' : 'Marking as done...')
+      try {
+        const actor = await requestActorAuth(selected.isDone ? 'ยกเลิก done' : 'เปลี่ยนสถานะ done')
+        const actorEmail = normalizeEmail(actor?.email)
+        if (!actorEmail) throw new Error('Jira email is required')
+        await setPlannerDone(selected, !selected.isDone, actorEmail)
+        await loadTodoPlannerTasks()
+        renderAll()
+      } catch (error) {
+        setNotice(status, error.message || 'Unable to update done status', 'error')
+      } finally {
+        state.inspectorDonePendingId = ''
+        doneBtn.disabled = false
+      }
+    })
+
     const editBtn = document.getElementById('labInspectorEditBtn')
     editBtn?.addEventListener('click', () => {
       state.inspectorEditingId = selected.id
@@ -720,12 +928,55 @@ function renderAll() {
 
 async function reloadPageData() {
   await loadManualPlans()
+  await loadTodoPlannerTasks()
   if (state.includeProjects) await ensureDashboardLoaded()
   renderAll()
   scheduleBackgroundWarmup()
 }
 
 function bindEvents() {
+  byId('labAuthCancel')?.addEventListener('click', () => cancelAuthModal())
+  byId('labAuthBackdrop')?.addEventListener('click', () => cancelAuthModal())
+  byId('labAuthForm')?.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    const pending = state.authPending
+    if (!pending) return
+
+    const email = normalizeEmail(byId('labAuthEmail')?.value)
+    const remember = Boolean(byId('labAuthRemember')?.checked)
+    const status = byId('labAuthStatus')
+    const confirmBtn = byId('labAuthConfirm')
+
+    if (!email) {
+      setNotice(status, 'กรุณากรอกอีเมล Jira', 'error')
+      return
+    }
+
+    try {
+      if (confirmBtn) confirmBtn.disabled = true
+      setNotice(status, 'กำลังตรวจสอบอีเมลกับ Jira...')
+      const result = await validateJiraEmail(email)
+      if (!result?.valid) throw new Error(result?.reason || 'ไม่พบอีเมลนี้ใน Jira')
+
+      const actor = {
+        email: normalizeEmail(result?.user?.email || email),
+        displayName: String(result?.user?.displayName || '').trim(),
+        accountId: String(result?.user?.accountId || '').trim()
+      }
+
+      if (remember) storeActor(actor)
+      else clearStoredActor()
+
+      state.authPending = null
+      closeAuthModal()
+      pending.resolve(actor)
+    } catch (error) {
+      setNotice(status, error.message || 'ยืนยันตัวตนไม่สำเร็จ', 'error')
+    } finally {
+      if (confirmBtn) confirmBtn.disabled = false
+    }
+  })
+
   const picker = document.getElementById('labMonthPicker')
   const today = getBangkokDateParts(new Date())
   const currentMonth = `${today.year}-${String(today.month).padStart(2, '0')}`
