@@ -16,7 +16,7 @@
     .uni-page .panel { padding:14px; }
     .uni-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:14px; }
     .uni-toolbar { display:grid; gap:12px; }
-    .uni-toolbar-top { display:grid; grid-template-columns:minmax(260px,1fr) auto; gap:10px; align-items:center; }
+    .uni-toolbar-top { display:grid; grid-template-columns:minmax(260px,1fr) auto auto; gap:10px; align-items:center; }
     .uni-toolbar-foot { display:grid; gap:10px; }
     .uni-work-head {
       display: grid;
@@ -175,11 +175,7 @@
     .uni-controls { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
     .uni-controls .todo-sort-select { width:auto; min-width:170px; max-width:220px; }
     .uni-controls .btn { min-width:96px; }
-    .uni-filters { display:grid; grid-template-columns:minmax(0,1fr); gap:10px; }
-    .uni-filter-box { border:1px solid #d8e2f2; border-radius:14px; padding:12px 14px; background:linear-gradient(180deg,#fbfdff 0%,#f3f8ff 100%); display:grid; gap:10px; box-shadow: inset 0 1px 0 rgba(255,255,255,.8); }
-    .uni-filter-box h3 { margin:0; font-size:12px; color:#365986; letter-spacing:.02em; text-transform:uppercase; }
-    .uni-check-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px; }
-    .uni-check-grid label { font-size:12px; color:#2f4f7c; display:flex; align-items:center; gap:6px; padding:6px 8px; border-radius:999px; background:rgba(255,255,255,.75); border:1px solid #d8e4f5; font-weight:700; }
+    .uni-filters { display:none; }
 
     .uni-main { display:grid; grid-template-columns:minmax(0,1fr); gap:14px; align-items:start; }
     .uni-view-host { min-height:360px; }
@@ -645,29 +641,24 @@
     <section class="panel uni-toolbar">
       <div class="uni-toolbar-top">
         <input id="uniSearch" class="search" placeholder="Search title, key, owner, note" />
+        <div id="uniStatusFilterWrap" class="uni-work-quick uni-status-wrap">
+          <button id="uniStatusFilterBtn" class="search uni-work-month uni-filter-trigger" type="button" aria-expanded="false">Status: Pending, S4, S5, S6</button>
+          <div id="uniStatusFilterBox" class="uni-quick-box uni-status-box" hidden>
+            <div class="uni-status-search">
+              <input id="uniStatusSearch" type="text" placeholder="Search status" />
+            </div>
+            <div id="uniStatusFilterOptions" class="uni-status-options"></div>
+            <div class="uni-status-actions">
+              <button id="uniStatusDefaultBtn" class="btn" type="button">Default</button>
+              <button id="uniStatusCloseBtn" class="btn" type="button">Close</button>
+            </div>
+          </div>
+        </div>
         <div id="uniViewSwitch" class="list-view-mode-switch todo-switch"></div>
       </div>
       <div class="uni-toolbar-foot">
         <div class="uni-controls">
           <button id="uniRefreshBtn" class="btn" type="button">Refresh</button>
-        </div>
-        <div class="uni-filters">
-          <section class="uni-filter-box">
-            <h3>Filter Status</h3>
-            <div id="uniStatusFilterWrap" class="uni-work-quick uni-status-wrap">
-              <button id="uniStatusFilterBtn" class="search uni-work-month uni-filter-trigger" type="button" aria-expanded="false">Status: Pending, S4, S5, S6</button>
-              <div id="uniStatusFilterBox" class="uni-quick-box uni-status-box" hidden>
-                <div class="uni-status-search">
-                  <input id="uniStatusSearch" type="text" placeholder="Search status" />
-                </div>
-                <div id="uniStatusFilterOptions" class="uni-status-options"></div>
-                <div class="uni-status-actions">
-                  <button id="uniStatusDefaultBtn" class="btn" type="button">Default</button>
-                  <button id="uniStatusCloseBtn" class="btn" type="button">Close</button>
-                </div>
-              </div>
-            </div>
-          </section>
         </div>
       </div>
     </section>
