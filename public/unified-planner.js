@@ -155,10 +155,37 @@ function inspect(uid,anchor){
   const it=list().find(x=>x.uid===uid),pop=$('uniInspectorPop')
   if(!it){pop.classList.remove('open');pop.innerHTML='';return}
   st.sel=uid
+  let editing=false
   const accent=col(it.color||DEF_COLOR)
   const accentSoft=hexToRgba(accent,.14)
   const accentBorder=hexToRgba(accent,.42)
-  pop.innerHTML=`
+  const render=()=>{
+    pop.innerHTML=editing?`
+    <div class="uni-pop-card" style="--uni-accent:${esc(accent)};--uni-accent-soft:${esc(accentSoft)};--uni-accent-border:${esc(accentBorder)};">
+      <header class="uni-pop-head">
+        <div>
+          <h3 class="uni-pop-title">Edit ${esc(it.title)}</h3>
+          <div class="uni-pop-key">${esc(it.key||'-')}</div>
+        </div>
+        <button class="btn uni-inspector-close" id="uniInspectorClose" type="button">Close</button>
+      </header>
+      <form id="uniInspectorEditForm" class="uni-pop-edit-grid">
+        <label class="uni-pop-field full"><span>Task Title</span><input name="title" value="${esc(it.title||'')}" required /></label>
+        <label class="uni-pop-field full"><span>Key</span><input name="key" value="${esc(it.key||'')}" /></label>
+        <label class="uni-pop-field"><span>Start Date</span><input type="date" name="start" value="${esc(it.start||'')}" required /></label>
+        <label class="uni-pop-field"><span>End Date</span><input type="date" name="end" value="${esc(it.end||'')}" required /></label>
+        <label class="uni-pop-field"><span>Task Type</span><select name="taskType"><option value="planner_only" ${it.taskType==='planner_only'?'selected':''}>Planner</option><option value="planner_and_checklist" ${it.taskType==='planner_and_checklist'?'selected':''}>Checklist</option></select></label>
+        <label class="uni-pop-field"><span>Status (Jira)</span><select name="status"><option value="">-</option>${FILTERS.map(s=>`<option value="${s}" ${it.status===s?'selected':''}>${s}</option>`).join('')}</select></label>
+        <label class="uni-pop-field"><span>Owner</span><input name="owner" value="${esc(it.owner||'')}" /></label>
+        <label class="uni-pop-field"><span>Color</span><input type="color" name="color" value="${esc(col(it.color||DEF_COLOR))}" /></label>
+        <label class="uni-pop-field full"><span>Note</span><textarea name="note">${esc(it.note||'')}</textarea></label>
+        <div class="uni-pop-edit-actions full">
+          <button class="btn primary" type="submit">Save</button>
+          <button class="btn" type="button" id="uniInspectorCancelEdit">Cancel</button>
+          <span id="uniInspectorStatus" class="notice"></span>
+        </div>
+      </form>
+    </div>`:`
     <div class="uni-pop-card" style="--uni-accent:${esc(accent)};--uni-accent-soft:${esc(accentSoft)};--uni-accent-border:${esc(accentBorder)};">
       <header class="uni-pop-head">
         <div>
@@ -188,15 +215,65 @@ function inspect(uid,anchor){
         <div class="todo-log-actions"><button class="btn primary" type="submit">Add update log</button></div>
       </form>
     </div>`
+    $('uniInspectorClose').onclick=()=>pop.classList.remove('open')
+    if(editing){
+      $('uniInspectorCancelEdit').onclick=()=>{editing=false;render()}
+      $('uniInspectorEditForm').onsubmit=async e=>{
+        e.preventDefault()
+        const s=$('uniInspectorStatus')
+        const f=e.currentTarget
+        const payload={
+          title:String(f.title.value||'').trim(),
+          key:String(f.key.value||'').trim(),
+          start:dt(f.start.value||''),
+          end:dt(f.end.value||''),
+          owner:String(f.owner.value||'').trim(),
+          note:String(f.note.value||'').trim(),
+          color:col(f.color.value||DEF_COLOR),
+          taskType:String(f.taskType.value||'planner_only'),
+          status:String(f.status.value||'').toUpperCase().trim()
+        }
+        if(!payload.title){notice(s,'Task title is required','error');return}
+        if(!payload.start||!payload.end){notice(s,'Start and End are required','error');return}
+        if(payload.end<payload.start){notice(s,'End date must be on or after Start date','error');return}
+        if(payload.status&&!FILTERS.includes(payload.status)){notice(s,'Invalid Jira status','error');return}
+        try{
+          notice(s,'Saving...')
+          const a=await askAuth('update item')
+          const eMail=em(a?.email)
+          if(!eMail)throw new Error('Jira email is required')
+          await api('/api/todo',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+            id:it.taskId,
+            sourceType:payload.taskType==='planner_only'?'planner':'todo',
+            taskType:payload.taskType,
+            title:payload.title,
+            key:payload.key,
+            owner:payload.owner,
+            note:payload.note,
+            color:payload.color,
+            start:payload.start,
+            end:payload.end,
+            status:payload.status,
+            actorEmail:eMail
+          })})
+          await load()
+          const fresh=list().find(x=>x.uid===uid)
+          if(fresh)inspect(uid,anchor)
+          render()
+        }catch(err){notice(s,err.message||'Unable to save item','error')}
+      }
+      return
+    }
+    $('uniInspectorDoneBtn').onclick=async()=>{const s=$('uniInspectorStatus');notice(s,it.isDone?'Updating...':'Marking...');const ok=await setDone(it.uid,!it.isDone);if(!ok)notice(s,'Unable','error')}
+    $('uniInspectorEditBtn').onclick=()=>{editing=true;render()}
+    $('uniInspectorDeleteBtn').onclick=async()=>{await deleteItem(it.uid)}
+    $('uniInspectorLogForm').onsubmit=async e=>{e.preventDefault();const m=String(e.currentTarget.message.value||'').trim();if(!m)return;await addLog(it.uid,m)}
+  }
+  render()
   const r=anchor?.getBoundingClientRect()
-  pop.style.left=`${Math.max(12,Math.min(window.innerWidth-500,(r?.right||window.innerWidth*0.5)+10))}px`
-  pop.style.top=`${Math.max(12,Math.min(window.innerHeight-560,(r?.top||80)-10))}px`
+  pop.style.left=`${Math.max(10,Math.min(window.innerWidth-440,(r?.right||window.innerWidth*0.5)+10))}px`
+  pop.style.top=`${Math.max(10,Math.min(window.innerHeight-520,(r?.top||80)-10))}px`
   pop.classList.add('open')
-  $('uniInspectorClose').onclick=()=>pop.classList.remove('open')
-  $('uniInspectorDoneBtn').onclick=async()=>{const s=$('uniInspectorStatus');notice(s,it.isDone?'Updating...':'Marking...');const ok=await setDone(it.uid,!it.isDone);if(!ok)notice(s,'Unable','error')}
-  $('uniInspectorEditBtn').onclick=async()=>{await editItem(it.uid);pop.classList.remove('open')}
-  $('uniInspectorDeleteBtn').onclick=async()=>{await deleteItem(it.uid)}
-  $('uniInspectorLogForm').onsubmit=async e=>{e.preventDefault();const m=String(e.currentTarget.message.value||'').trim();if(!m)return;await addLog(it.uid,m)}
 }
 
 function bindHost(items){const h=$('uniViewHost');h.querySelectorAll('[data-role="inspect"]').forEach(n=>n.onclick=()=>{const uid=n.getAttribute('data-uid')||n.closest('[data-uid]')?.getAttribute('data-uid')||'';inspect(uid,n)});h.querySelectorAll('[data-role="toggle"]').forEach(n=>n.onchange=async e=>{const uid=e.target.closest('[data-uid]')?.getAttribute('data-uid')||'';const ok=await setDone(uid,Boolean(e.target.checked));if(!ok)e.target.checked=!e.target.checked});h.querySelectorAll('[data-role="edit"]').forEach(n=>n.onclick=async()=>{const uid=n.closest('[data-uid]')?.getAttribute('data-uid')||'';await editItem(uid)});h.querySelectorAll('[data-role="delete"]').forEach(n=>n.onclick=async()=>{const uid=n.closest('[data-uid]')?.getAttribute('data-uid')||'';await deleteItem(uid)});h.querySelectorAll('[data-role="log"]').forEach(n=>n.onclick=()=>{const uid=n.closest('[data-uid]')?.getAttribute('data-uid')||'';st.log=st.log===uid?'':uid;render()});h.querySelectorAll('[data-role="log-form"]').forEach(f=>f.onsubmit=async e=>{e.preventDefault();const uid=f.closest('[data-uid]')?.getAttribute('data-uid')||'',m=String(f.message.value||'').trim();if(!uid||!m)return;await addLog(uid,m)})}
