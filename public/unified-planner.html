@@ -12,18 +12,38 @@
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/app.css?v=20260415f" />
   <style>
+    .uni-page { display:grid; gap:14px; padding:18px; }
+    .uni-page .panel { padding:14px; }
     .uni-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:14px; }
     .uni-toolbar { display:grid; gap:12px; }
-    .uni-toolbar-top { display:grid; grid-template-columns:minmax(260px,1fr) auto auto; gap:10px; align-items:center; }
+    .uni-toolbar-top { display:grid; grid-template-columns:minmax(260px,1fr) auto; gap:10px; align-items:center; }
     .uni-toolbar-foot { display:grid; gap:10px; }
+    .uni-work-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: nowrap;
+    }
+    #uniMonthWrap {
+      margin-left: auto;
+      display: flex;
+      justify-content: flex-end;
+    }
+    .uni-work-month {
+      min-width: 180px;
+      max-width: 220px;
+    }
     .uni-controls { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .uni-controls .todo-sort-select { width:auto; min-width:170px; max-width:220px; }
+    .uni-controls .btn { min-width:96px; }
     .uni-filters { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
     .uni-filter-box { border:1px solid #d8e2f2; border-radius:12px; padding:10px; background:#f7faff; display:grid; gap:8px; }
     .uni-filter-box h3 { margin:0; font-size:12px; color:#3f608f; letter-spacing:.02em; text-transform:uppercase; }
     .uni-check-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
     .uni-check-grid label { font-size:12px; color:#31517f; display:flex; align-items:center; gap:6px; }
 
-    .uni-main { display:grid; grid-template-columns:minmax(0,2fr) minmax(320px,1fr); gap:14px; align-items:start; }
+    .uni-main { display:grid; grid-template-columns:minmax(0,1fr); gap:14px; align-items:start; }
     .uni-view-host { min-height:360px; }
     .uni-card-list { display:grid; gap:10px; }
     .uni-table-wrap { overflow:auto; border:1px solid #d8e2f2; border-radius:12px; background:#fff; }
@@ -34,52 +54,222 @@
     .uni-action-text { border:none; background:none; color:#225ea6; font-weight:700; cursor:pointer; padding:0; }
     .uni-log-row td { background:#f8fbff; }
 
-    .uni-inspector-card { position:sticky; top:10px; }
     .uni-inspector-pop { position:fixed; z-index:90; width:min(480px,calc(100vw - 24px)); max-height:calc(100vh - 24px); overflow:auto; display:none; }
     .uni-inspector-pop.open { display:block; }
+    .uni-pop-card {
+      --uni-accent: #3d67a9;
+      --uni-accent-soft: rgba(61, 103, 169, 0.12);
+      --uni-accent-border: rgba(61, 103, 169, 0.42);
+      background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+      border: 1px solid var(--uni-accent-border);
+      border-radius: 18px;
+      box-shadow: 0 18px 36px rgba(14, 42, 84, 0.16), inset 0 0 0 1px var(--uni-accent-soft);
+      padding: 14px;
+      display: grid;
+      gap: 12px;
+    }
+    .uni-pop-head {
+      display: flex;
+      gap: 10px;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    .uni-pop-title {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.1;
+      color: var(--uni-accent);
+      letter-spacing: -0.02em;
+      font-weight: 800;
+    }
+    .uni-pop-key {
+      margin-top: 2px;
+      font-size: 14px;
+      font-weight: 700;
+      color: color-mix(in srgb, var(--uni-accent) 72%, #2f5da2 28%);
+    }
+    .uni-pop-meta-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .uni-pop-meta {
+      margin: 0;
+      padding: 10px 12px;
+      border: 1px solid var(--uni-accent-border);
+      border-radius: 13px;
+      background: linear-gradient(180deg, #f7fbff 0%, #f0f7ff 100%);
+      color: color-mix(in srgb, var(--uni-accent) 70%, #365e95 30%);
+      font-size: 14px;
+      font-weight: 700;
+      min-height: 52px;
+      display: flex;
+      align-items: center;
+    }
+    .uni-pop-meta-card {
+      border: 1px solid var(--uni-accent-border);
+      border-radius: 12px;
+      background: linear-gradient(180deg, #f8fbff 0%, #f2f8ff 100%);
+      padding: 10px;
+      display: grid;
+      gap: 4px;
+      margin: 0;
+    }
+    .uni-pop-meta-card span {
+      font-size: 11px;
+      font-weight: 800;
+      color: color-mix(in srgb, var(--uni-accent) 68%, #5f7fa8 32%);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .uni-pop-meta-card strong {
+      font-size: 18px;
+      color: color-mix(in srgb, var(--uni-accent) 52%, #2b435f 48%);
+      font-weight: 700;
+    }
+    .uni-pop-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .uni-pop-grid article {
+      border: 1px solid var(--uni-accent-border);
+      border-radius: 12px;
+      background: linear-gradient(180deg, #f8fbff 0%, #f2f8ff 100%);
+      padding: 10px;
+      display: grid;
+      gap: 4px;
+    }
+    .uni-pop-grid span {
+      font-size: 11px;
+      font-weight: 800;
+      color: color-mix(in srgb, var(--uni-accent) 68%, #5f7fa8 32%);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .uni-pop-grid strong {
+      font-size: 16px;
+      color: color-mix(in srgb, var(--uni-accent) 50%, #2b435f 50%);
+      font-weight: 700;
+    }
+    .uni-pop-note {
+      margin: 0;
+      border: 1px solid var(--uni-accent-border);
+      border-radius: 12px;
+      background: linear-gradient(180deg, #f6fbff 0%, #eef6ff 100%);
+      padding: 12px;
+      color: color-mix(in srgb, var(--uni-accent) 44%, #2b4d7e 56%);
+      font-size: 15px;
+      line-height: 1.4;
+    }
+    .uni-pop-done {
+      margin: 0;
+      border: 1px solid var(--uni-accent-border);
+      border-radius: 12px;
+      background: linear-gradient(180deg, #f9fcff 0%, #f4f9ff 100%);
+      padding: 8px 10px;
+      display: grid;
+      gap: 3px;
+    }
+    .uni-pop-done span {
+      font-size: 11px;
+      font-weight: 800;
+      color: color-mix(in srgb, var(--uni-accent) 68%, #5f7fa8 32%);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .uni-pop-done strong {
+      font-size: 13px;
+      color: color-mix(in srgb, var(--uni-accent) 56%, #2b435f 44%);
+      line-height: 1.35;
+    }
+    .uni-pop-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .uni-pop-actions .btn {
+      min-height: 42px;
+      border-radius: 14px;
+    }
+    .uni-pop-log textarea {
+      min-height: 96px;
+      width: 100%;
+      border: 1px solid var(--uni-accent-border);
+      border-radius: 14px;
+      padding: 12px;
+      font: inherit;
+      resize: vertical;
+      background: #fff;
+    }
 
     .uni-create-mode { display:inline-flex; border:1px solid rgba(128,151,190,.36); border-radius:999px; overflow:hidden; background:rgba(244,248,255,.88); }
     .uni-create-mode label { padding:6px 12px; font-size:12px; font-weight:700; color:#2d4f7f; cursor:pointer; }
     .uni-create-mode input { margin-right:6px; }
 
     .uni-timeline { border:1px solid #d8e2f2; border-radius:12px; overflow:auto; background:#fff; }
-    .uni-tl-head { min-width:1080px; display:grid; grid-template-columns:220px repeat(var(--days), minmax(26px, 1fr)); border-bottom:1px solid #dfe8f7; position:sticky; top:0; background:#f7faff; z-index:2; }
+    .uni-tl-head { min-width:100%; display:grid; grid-template-columns:220px repeat(var(--days), minmax(18px, 1fr)); border-bottom:1px solid #dfe8f7; position:sticky; top:0; background:#f7faff; z-index:2; }
     .uni-tl-head .label { padding:8px; font-size:12px; font-weight:800; color:#335482; border-right:1px solid #e6edf9; }
     .uni-tl-head .day { padding:6px 2px; font-size:10px; font-weight:700; color:#54719a; text-align:center; border-right:1px solid #edf2fb; }
     .uni-tl-head .day.wk { background:#f2f6ff; }
-    .uni-tl-row { min-width:1080px; display:grid; grid-template-columns:220px 1fr; border-bottom:1px solid #edf2fb; }
+    .uni-tl-row { min-width:100%; display:grid; grid-template-columns:220px 1fr; border-bottom:1px solid #edf2fb; }
     .uni-tl-meta { padding:8px; border-right:1px solid #e6edf9; display:grid; gap:2px; }
     .uni-tl-meta strong { font-size:12px; color:#173a70; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .uni-tl-meta span { font-size:11px; color:#567397; }
-    .uni-tl-track { display:grid; grid-template-columns:repeat(var(--days), minmax(26px, 1fr)); align-items:center; min-height:42px; position:relative; }
+    .uni-tl-track { display:grid; grid-template-columns:repeat(var(--days), minmax(18px, 1fr)); align-items:center; min-height:42px; position:relative; }
     .uni-tl-track::before { content:''; position:absolute; inset:0; background-image:linear-gradient(to right,#edf2fb 1px, transparent 1px); background-size:calc(100% / var(--days)) 100%; pointer-events:none; }
     .uni-tl-bar { position:relative; border:none; border-radius:999px; height:24px; color:#fff; font-weight:700; font-size:11px; text-align:left; padding:0 10px; cursor:pointer; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; box-shadow:0 6px 12px rgba(19,52,95,.22); }
 
     .uni-calendar { border:1px solid #d8e2f2; border-radius:12px; overflow:hidden; background:#fff; }
     .uni-cal-head { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); background:#f5f8ff; border-bottom:1px solid #dfe8f7; }
     .uni-cal-head div { padding:8px; text-align:center; font-size:12px; font-weight:800; color:#3f608f; }
-    .uni-cal-week { border-bottom:1px solid #e9eff9; }
+    .uni-cal-week { position:relative; border-bottom:1px solid #e9eff9; background:#fff; }
     .uni-cal-week:last-child { border-bottom:none; }
-    .uni-cal-bars { position:relative; border-bottom:1px solid #edf2fb; background:#fbfdff; }
-    .uni-cal-bar { position:absolute; height:20px; border:none; border-radius:999px; color:#fff; font-size:11px; font-weight:700; padding:0 8px; text-align:left; cursor:pointer; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+    .uni-cal-bars {
+      position:absolute;
+      left:0;
+      right:0;
+      top:0;
+      height:var(--bar-zone, 30px);
+      overflow:hidden;
+      background:transparent;
+      pointer-events:auto;
+      z-index:2;
+    }
+    .uni-cal-bar { position:absolute; height:20px; border:none; border-radius:999px; color:#fff; font-size:11px; font-weight:700; padding:0 8px; text-align:left; cursor:pointer; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; pointer-events:auto; }
     .uni-cal-days { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); }
-    .uni-cal-day { min-height:86px; border-right:1px solid #edf2fb; padding:6px; }
+    .uni-cal-day { min-height:86px; border-right:1px solid #edf2fb; padding:6px; padding-top:calc(var(--bar-zone, 30px) + 6px); }
     .uni-cal-day:last-child { border-right:none; }
     .uni-cal-day strong { font-size:11px; color:#405f8e; }
     .uni-cal-day.off strong { opacity:.42; }
+    .uni-cal-day.current {
+      background: linear-gradient(180deg, #eef5ff 0%, #f7fbff 100%);
+      box-shadow: inset 0 0 0 2px rgba(44, 103, 196, 0.25);
+    }
+    .uni-cal-day.current strong {
+      color: #0d4ea2;
+      font-weight: 900;
+    }
     .uni-cal-count { margin-top:4px; font-size:10px; color:#6f88aa; }
 
     @media (max-width:1180px) {
-      .uni-main { grid-template-columns:1fr; }
-      .uni-inspector-card { position:relative; top:auto; }
+      .uni-page { padding:12px; gap:12px; }
+      .uni-page .panel { padding:12px; }
       .uni-toolbar-top { grid-template-columns:1fr; }
+      .uni-work-head { flex-wrap: wrap; align-items: flex-start; }
+      .uni-work-month { min-width: 150px; max-width: none; width: 100%; }
       .uni-filters { grid-template-columns:1fr; }
       .uni-check-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .uni-controls .todo-sort-select { min-width:150px; }
+      .uni-cal-day { min-height:72px; }
+      .uni-pop-meta-grid { grid-template-columns: 1fr; }
+      .uni-pop-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
-  <div class="page">
+  <div class="page uni-page">
     <section class="header">
       <div class="header-top">
         <div>
@@ -106,7 +296,6 @@
       <div class="uni-toolbar-top">
         <input id="uniSearch" class="search" placeholder="Search title, key, owner, note" />
         <div id="uniViewSwitch" class="list-view-mode-switch todo-switch"></div>
-        <input id="uniMonthPicker" class="search" type="month" />
       </div>
       <div class="uni-toolbar-foot">
         <div id="uniSummary" class="notice">Preparing unified planner...</div>
@@ -143,9 +332,14 @@
       <div class="uni-grid">
         <section class="panel">
           <div class="todo-panel-head">
-            <div>
-              <div class="section-label">Workspace</div>
-              <h2 class="todo-panel-title">Main View</h2>
+            <div class="uni-work-head">
+              <div>
+                <div class="section-label">Workspace</div>
+                <h2 class="todo-panel-title">Main View</h2>
+              </div>
+              <div id="uniMonthWrap" hidden>
+                <input id="uniMonthPicker" class="search uni-work-month" type="month" />
+              </div>
             </div>
           </div>
           <div id="uniViewHost" class="uni-view-host"></div>
@@ -187,15 +381,6 @@
         </section>
       </div>
 
-      <aside class="panel uni-inspector-card">
-        <div class="todo-panel-head">
-          <div>
-            <div class="section-label">Inspector</div>
-            <h2 class="todo-panel-title">Popup Display</h2>
-          </div>
-        </div>
-        <div class="notice">Click Inspector or click on Timeline/Calendar bar to open popup.</div>
-      </aside>
     </section>
   </div>
 
@@ -224,6 +409,6 @@
     </section>
   </div>
 
-  <script src="/unified-planner.js?v=20260415g"></script>
+  <script src="/unified-planner.js?v=20260415j"></script>
 </body>
 </html>

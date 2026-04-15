@@ -21,9 +21,10 @@ const validateJiraEmail=e=>api(`/api/jira?action=validate_email&email=${encodeUR
 const closeAuthModal=()=>{$('uniAuthModal').hidden=true}
 const cancelAuthModal=(m='Authentication cancelled')=>{const p=st.auth;st.auth=null;closeAuthModal();if(p?.rej)p.rej(new Error(m))}
 const monthRange=()=>{let y,m;if(/^\d{4}-\d{2}$/.test(st.month)){const x=st.month.split('-').map(Number);y=x[0];m=x[1]-1}else{const d=new Date();y=d.getUTCFullYear();m=d.getUTCMonth()}return{start:new Date(Date.UTC(y,m,1)),end:new Date(Date.UTC(y,m+1,0))}}
-const twoMonth=()=>{const r=monthRange();return{start:iso(r.start),end:iso(new Date(Date.UTC(r.start.getUTCFullYear(),r.start.getUTCMonth()+2,0)))}}
 const durationDays=(s,e)=>{const a=Date.parse(`${s||''}T00:00:00Z`),b=Date.parse(`${e||''}T00:00:00Z`);if(Number.isNaN(a)||Number.isNaN(b))return 0;return Math.floor((b-a)/86400000)+1}
 const cmp=(a,b,t='s')=>{if(t==='d'){const x=Date.parse(a||''),y=Date.parse(b||'');if(Number.isNaN(x)&&Number.isNaN(y))return 0;if(Number.isNaN(x))return 1;if(Number.isNaN(y))return -1;return x-y}return String(a||'').localeCompare(String(b||''),'th',{sensitivity:'base'})}
+const hexToRgba=(hex,a=.12)=>{const m=String(hex||'').trim().match(/^#?([0-9a-fA-F]{6})$/);if(!m)return `rgba(61,103,169,${a})`;const n=parseInt(m[1],16),r=(n>>16)&255,g=(n>>8)&255,b=n&255;return `rgba(${r},${g},${b},${a})`}
+const doneInfo=i=>i.isDone&&i.doneAt?`Done ${thaiDT(i.doneAt)}${i.doneByEmail?` - ${i.doneByEmail}`:''}`:'-'
 
 function mergeItems(){
   return st.tasks
@@ -69,7 +70,7 @@ function list(){
 function renderSwitch(){
   const o=[['card','Card View'],['table','Table View'],['timeline','Timeline View'],['calendar','Calendar View']]
   $('uniViewSwitch').innerHTML=o.map(([v,l])=>`<button type="button" class="todo-segment-btn ${st.view===v?'active':''}" data-v="${v}">${l}</button>`).join('')
-  $('uniViewSwitch').querySelectorAll('button').forEach(b=>b.onclick=()=>{st.view=b.dataset.v;renderSwitch();render()})
+  $('uniViewSwitch').querySelectorAll('button').forEach(b=>b.onclick=()=>{st.view=b.dataset.v;renderSwitch();toggleMonthFilter();render()})
 }
 function renderFilters(){
   const t=$('uniTypeFilterGrid')
@@ -89,17 +90,36 @@ function tableHTML(items){
   return `<div class="uni-table-wrap"><table class="uni-table"><thead><tr><th>Done</th><th>Task</th><th>Context</th><th>Status</th><th>Owner</th><th>Note</th><th>Start</th><th>End</th><th>Updated</th><th>Done info</th><th>Logs</th><th>Actions</th></tr></thead><tbody>${items.map(i=>{const ex=st.log===i.uid,done=i.isDone&&i.doneAt?`Done ${thaiDT(i.doneAt)}${i.doneByEmail?` - ${i.doneByEmail}`:''}`:'-';return `<tr data-uid="${esc(i.uid)}"><td><label class="todo-check todo-check-inline"><input type="checkbox" data-role="toggle" ${i.isDone?'checked':''}/><span></span></label></td><td><span class="badge ${i.source==='Planner'?'status-manual':'badge-checklist'}">${esc(i.source)}</span> <strong>${esc(i.title)}</strong></td><td>${i.key?`<span class="todo-context-inlinebar"><span class="todo-context-bartext">${esc(i.key)}</span></span>`:'-'}</td><td>${esc(i.status||'-')}</td><td>${esc(i.owner||'-')}</td><td>${esc(i.note||'-')}</td><td>${esc(thai(i.start))}</td><td>${esc(thai(i.end))}</td><td>${esc(thaiDT(i.updatedAt))}${i.updatedByEmail?`<br/><small>${esc(i.updatedByEmail)}</small>`:''}</td><td>${esc(done)}</td><td>${esc(String((i.logs||[]).length))}</td><td><div class="uni-table-actions"><button class="uni-action-text" type="button" data-role="inspect">Inspector</button><button class="uni-action-text" type="button" data-role="log">${ex?'Hide logs':'View logs'}</button><button class="uni-action-text" type="button" data-role="edit">Edit</button><button class="uni-action-text" type="button" data-role="delete">Delete</button></div></td></tr>${ex?`<tr class="uni-log-row" data-uid="${esc(i.uid)}"><td colspan="12"><section class="todo-log-panel"><div class="todo-log-list">${(i.logs||[]).length?(i.logs||[]).map(e=>`<article class="todo-log-entry"><div class="todo-log-time">${esc(thaiDT(e.createdAt))}${e.actorEmail?` | ${esc(e.actorEmail)}`:''}</div><div class="todo-log-message">${esc(e.message)}</div></article>`).join(''):'<div class="mini-empty">No update log yet</div>'}</div><form class="todo-log-form" data-role="log-form"><textarea name="message" placeholder="Add update log"></textarea><div class="todo-log-actions"><button class="btn primary" type="submit">Add update log</button></div></form></section></td></tr>`:''}`}).join('')}</tbody></table></div>`
 }
 function timelineHTML(items){
-  const x=items.filter(i=>i.start&&i.end);if(!x.length)return '<div class="empty">No timeline item</div>'
-  const r=twoMonth(),a=new Date(`${r.start}T00:00:00Z`),b=new Date(`${r.end}T00:00:00Z`),days=Math.floor((b-a)/86400000)+1
-  const head=Array.from({length:days},(_,k)=>{const d=new Date(a.getTime());d.setUTCDate(d.getUTCDate()+k);const w=d.getUTCDay()===0||d.getUTCDay()===6;const l=d.toLocaleDateString('en-US',{weekday:'short',timeZone:'UTC'}).slice(0,2);return `<div class="planner-lab-day ${w?'is-weekend':''}" style="grid-column:${k+1}"><span>${l}</span><strong>${d.getUTCDate()}</strong></div>`}).join('')
-  const rows=x.map(i=>{const s=new Date(`${i.start}T00:00:00Z`),e=new Date(`${i.end}T00:00:00Z`),cs=s<a?a:s,ce=e>b?b:e,so=Math.floor((cs-a)/86400000),eo=Math.floor((ce-a)/86400000),sp=Math.max(1,eo-so+1);return `<div class="planner-lab-row"><div class="planner-lab-track">${Array.from({length:days},()=>'<div class="planner-lab-track-day"></div>').join('')}<button class="planner-lab-bar manual" type="button" data-role="inspect" data-uid="${esc(i.uid)}" style="grid-column:${so+1} / span ${sp};--lab-bar:${esc(i.color)}"><span>${esc(i.key?`${i.key} : ${i.title}`:i.title)}</span></button></div></div>`}).join('')
-  return `<div class="planner-lab-timeline-shell" style="--lab-days:${days}"><div class="planner-lab-head">${head}</div><div class="planner-lab-body">${rows}</div></div>`
+  const x=items.filter(i=>i.start&&i.end)
+  if(!x.length)return '<div class="empty">No timeline item</div>'
+  const r=monthRange(),a=new Date(r.start.getTime()),b=new Date(r.end.getTime()),days=Math.floor((b-a)/86400000)+1
+  const head=Array.from({length:days},(_,k)=>{
+    const d=new Date(a.getTime())
+    d.setUTCDate(d.getUTCDate()+k)
+    const w=d.getUTCDay()===0||d.getUTCDay()===6
+    const l=d.toLocaleDateString('en-US',{weekday:'short',timeZone:'UTC'}).slice(0,2)
+    return `<div class="day ${w?'wk':''}"><span>${l}</span><strong>${d.getUTCDate()}</strong></div>`
+  }).join('')
+  const rows=x
+    .map(i=>{
+      const s=new Date(`${i.start}T00:00:00Z`)
+      const e=new Date(`${i.end}T00:00:00Z`)
+      if(e<a||s>b)return ''
+      const cs=s<a?a:s,ce=e>b?b:e,so=Math.floor((cs-a)/86400000),eo=Math.floor((ce-a)/86400000),sp=Math.max(1,eo-so+1)
+      const range=`${thai(i.start)} - ${thai(i.end)} | ${durationDays(i.start,i.end)} days`
+      return `<div class="uni-tl-row"><div class="uni-tl-meta"><strong>${esc(i.key?`${i.title} : ${i.key}`:i.title)}</strong><span>${esc(range)}</span></div><div class="uni-tl-track"><button class="uni-tl-bar" type="button" data-role="inspect" data-uid="${esc(i.uid)}" style="grid-column:${so+1} / span ${sp};background:${esc(i.color)};" title="${esc(i.key?`${i.title} : ${i.key}`:i.title)}">${esc(i.key?`${i.title} : ${i.key}`:i.title)}</button></div></div>`
+    })
+    .filter(Boolean)
+    .join('')
+  if(!rows)return '<div class="empty">No timeline item in this month</div>'
+  return `<div class="uni-timeline" style="--days:${days}"><div class="uni-tl-head"><div class="label">Task</div>${head}</div><div class="uni-tl-body">${rows}</div></div>`
 }
 function calendarHTML(items){
   const x=items.filter(i=>i.start&&i.end),mr=monthRange(),nm=['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
   const start=new Date(mr.start.getTime());start.setUTCDate(start.getUTCDate()-start.getUTCDay())
   const end=new Date(mr.end.getTime());end.setUTCDate(end.getUTCDate()+(6-end.getUTCDay()))
   const monthStartIso=iso(mr.start),monthEndIso=iso(mr.end)
+  const todayIso=iso(new Date())
   const weeks=[]
   let c=new Date(start.getTime())
   while(c<=end){
@@ -109,9 +129,9 @@ function calendarHTML(items){
     const laneEnd=[]
     segs.forEach(seg=>{let lane=0;while(lane<laneEnd.length&&laneEnd[lane]>=seg.si)lane+=1;seg.lane=lane;laneEnd[lane]=seg.ei})
     const lanes=Math.max(1,laneEnd.length),bh=20,g=4,h=lanes*bh+(lanes-1)*g+8
-    const bars=segs.map(seg=>{const left=(seg.si/7)*100,width=(seg.span/7)*100,top=seg.lane*(bh+g)+4;return `<button class="uni-cal-bar" type="button" data-role="inspect" data-uid="${esc(seg.i.uid)}" style="left:${left}%;width:${width}%;top:${top}px;background:${esc(seg.i.color)};" title="${esc(seg.i.title)}">${esc(seg.i.title)}</button>`}).join('')
-    const cells=days.map(d=>{const dIso=iso(d),off=dIso<monthStartIso||dIso>monthEndIso,count=x.filter(i=>i.start<=dIso&&i.end>=dIso).length;return `<div class="uni-cal-day ${off?'off':''}"><strong>${d.getUTCDate()}</strong>${count?`<div class="uni-cal-count">${count} item${count>1?'s':''}</div>`:''}</div>`}).join('')
-    weeks.push(`<div class="uni-cal-week"><div class="uni-cal-bars" style="height:${h}px">${bars}</div><div class="uni-cal-days">${cells}</div></div>`)
+    const bars=segs.map(seg=>{const left=(seg.si/7)*100,width=(seg.span/7)*100,top=seg.lane*(bh+g)+4,label=seg.i.key?`${seg.i.title} : ${seg.i.key}`:seg.i.title;return `<button class="uni-cal-bar" type="button" data-role="inspect" data-uid="${esc(seg.i.uid)}" style="left:${left}%;width:${width}%;top:${top}px;background:${esc(seg.i.color)};" title="${esc(label)}">${esc(label)}</button>`}).join('')
+    const cells=days.map(d=>{const dIso=iso(d),off=dIso<monthStartIso||dIso>monthEndIso,current=dIso===todayIso,count=x.filter(i=>i.start<=dIso&&i.end>=dIso).length;return `<div class="uni-cal-day ${off?'off':''} ${current?'current':''}"><strong>${d.getUTCDate()}</strong>${count?`<div class="uni-cal-count">${count} item${count>1?'s':''}</div>`:''}</div>`}).join('')
+    weeks.push(`<div class="uni-cal-week" style="--bar-zone:${h}px"><div class="uni-cal-days">${cells}</div><div class="uni-cal-bars">${bars}</div></div>`)
     c.setUTCDate(c.getUTCDate()+7)
   }
   return `<div class="uni-calendar"><div class="uni-cal-head">${nm.map(n=>`<div>${n}</div>`).join('')}</div>${weeks.join('')}</div>`
@@ -137,11 +157,58 @@ async function deleteItem(uid){
   const it=list().find(x=>x.uid===uid);if(!it)return
   try{const a=await askAuth('delete item'),e=em(a?.email);if(!e)throw new Error('Jira email is required');await api('/api/todo',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:it.taskId,actorEmail:e})});if(st.editingId===it.taskId)resetForm();if(st.sel===uid){const p=$('uniInspectorPop');p.classList.remove('open');p.innerHTML=''}await load();render();notice($('uniSync'),'Item deleted (soft delete)','success')}catch(err){notice($('uniSync'),err.message||'Unable to delete','error')}
 }
-function inspect(uid,anchor){const it=list().find(x=>x.uid===uid),pop=$('uniInspectorPop');if(!it){pop.classList.remove('open');pop.innerHTML='';return}st.sel=uid;pop.innerHTML=`<div class="planner-lab-inspector-card manual" style="--inspector-accent:${esc(it.color)};--inspector-accent-soft:rgba(70,119,200,.3);--inspector-surface:rgba(226,238,255,.97);--inspector-border:rgba(70,119,200,.42)"><div class="planner-lab-inspector-top"><div><div class="planner-lab-inspector-title">${esc(it.title)}</div><div class="planner-lab-inspector-key">${esc(it.key||'-')}</div></div><button class="btn uni-inspector-close" id="uniInspectorClose" type="button">Close</button></div><div class="planner-lab-inspector-note planner-lab-inspector-note-compact">${it.start&&it.end?`${esc(thai(it.start))} - ${esc(thai(it.end))} | ${durationDays(it.start,it.end)} days`:'No timeline date'}</div><div class="planner-lab-inspector-grid"><div><span>Task Type</span><strong>${esc(it.source)}</strong></div><div><span>Status</span><strong>${esc(it.status||'-')}</strong></div><div><span>Owner</span><strong>${esc(it.owner||'-')}</strong></div><div><span>Task ID</span><strong>${esc(it.taskId||'-')}</strong></div></div><div class="planner-lab-inspector-note">${esc(it.note||'No note')}</div><div class="planner-lab-inspector-actions" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><button class="btn ${it.isDone?'':'primary'}" type="button" id="uniInspectorDoneBtn">${it.isDone?'Undo Done':'Done'}</button><button class="btn" type="button" id="uniInspectorEditBtn">Edit</button><button class="btn" type="button" id="uniInspectorDeleteBtn">Delete</button><span id="uniInspectorStatus" class="notice"></span></div><form id="uniInspectorLogForm" class="todo-log-form" style="margin-top:8px;"><textarea name="message" placeholder="Add update log"></textarea><div class="todo-log-actions"><button class="btn primary" type="submit">Add update log</button></div></form></div>`;const r=anchor?.getBoundingClientRect();pop.style.left=`${Math.max(12,Math.min(window.innerWidth-500,(r?.right||window.innerWidth*0.5)+10))}px`;pop.style.top=`${Math.max(12,Math.min(window.innerHeight-460,(r?.top||80)-10))}px`;pop.classList.add('open');$('uniInspectorClose').onclick=()=>pop.classList.remove('open');$('uniInspectorDoneBtn').onclick=async()=>{const s=$('uniInspectorStatus');notice(s,it.isDone?'Updating...':'Marking...');const ok=await setDone(it.uid,!it.isDone);if(!ok)notice(s,'Unable','error')};$('uniInspectorEditBtn').onclick=async()=>{await editItem(it.uid);pop.classList.remove('open')};$('uniInspectorDeleteBtn').onclick=async()=>{await deleteItem(it.uid)};$('uniInspectorLogForm').onsubmit=async e=>{e.preventDefault();const m=String(e.currentTarget.message.value||'').trim();if(!m)return;await addLog(it.uid,m)}}
+function inspect(uid,anchor){
+  const it=list().find(x=>x.uid===uid),pop=$('uniInspectorPop')
+  if(!it){pop.classList.remove('open');pop.innerHTML='';return}
+  st.sel=uid
+  const accent=col(it.color||DEF_COLOR)
+  const accentSoft=hexToRgba(accent,.14)
+  const accentBorder=hexToRgba(accent,.42)
+  pop.innerHTML=`
+    <div class="uni-pop-card" style="--uni-accent:${esc(accent)};--uni-accent-soft:${esc(accentSoft)};--uni-accent-border:${esc(accentBorder)};">
+      <header class="uni-pop-head">
+        <div>
+          <h3 class="uni-pop-title">${esc(it.title)}</h3>
+          <div class="uni-pop-key">${esc(it.key||'-')}</div>
+        </div>
+        <button class="btn uni-inspector-close" id="uniInspectorClose" type="button">Close</button>
+      </header>
+      <section class="uni-pop-meta-grid">
+        <p class="uni-pop-meta">${it.start&&it.end?`${esc(thai(it.start))} - ${esc(thai(it.end))} | ${durationDays(it.start,it.end)} days`:'No timeline date'}</p>
+        <article class="uni-pop-meta-card"><span>Task Type</span><strong>${esc(it.source)}</strong></article>
+      </section>
+      <section class="uni-pop-grid">
+        <article><span>Status</span><strong>${esc(it.status||'-')}</strong></article>
+        <article><span>Owner</span><strong>${esc(it.owner||'-')}</strong></article>
+      </section>
+      <p class="uni-pop-note">${esc(it.note||'No note')}</p>
+      <article class="uni-pop-done"><span>Done Info</span><strong>${esc(doneInfo(it))}</strong></article>
+      <div class="uni-pop-actions">
+        <button class="btn ${it.isDone?'':'primary'}" type="button" id="uniInspectorDoneBtn">${it.isDone?'Undo Done':'Done'}</button>
+        <button class="btn" type="button" id="uniInspectorEditBtn">Edit</button>
+        <button class="btn" type="button" id="uniInspectorDeleteBtn">Delete</button>
+        <span id="uniInspectorStatus" class="notice"></span>
+      </div>
+      <form id="uniInspectorLogForm" class="uni-pop-log">
+        <textarea name="message" placeholder="Add update log"></textarea>
+        <div class="todo-log-actions"><button class="btn primary" type="submit">Add update log</button></div>
+      </form>
+    </div>`
+  const r=anchor?.getBoundingClientRect()
+  pop.style.left=`${Math.max(12,Math.min(window.innerWidth-500,(r?.right||window.innerWidth*0.5)+10))}px`
+  pop.style.top=`${Math.max(12,Math.min(window.innerHeight-560,(r?.top||80)-10))}px`
+  pop.classList.add('open')
+  $('uniInspectorClose').onclick=()=>pop.classList.remove('open')
+  $('uniInspectorDoneBtn').onclick=async()=>{const s=$('uniInspectorStatus');notice(s,it.isDone?'Updating...':'Marking...');const ok=await setDone(it.uid,!it.isDone);if(!ok)notice(s,'Unable','error')}
+  $('uniInspectorEditBtn').onclick=async()=>{await editItem(it.uid);pop.classList.remove('open')}
+  $('uniInspectorDeleteBtn').onclick=async()=>{await deleteItem(it.uid)}
+  $('uniInspectorLogForm').onsubmit=async e=>{e.preventDefault();const m=String(e.currentTarget.message.value||'').trim();if(!m)return;await addLog(it.uid,m)}
+}
 
 function bindHost(items){const h=$('uniViewHost');h.querySelectorAll('[data-role="inspect"]').forEach(n=>n.onclick=()=>{const uid=n.getAttribute('data-uid')||n.closest('[data-uid]')?.getAttribute('data-uid')||'';inspect(uid,n)});h.querySelectorAll('[data-role="toggle"]').forEach(n=>n.onchange=async e=>{const uid=e.target.closest('[data-uid]')?.getAttribute('data-uid')||'';const ok=await setDone(uid,Boolean(e.target.checked));if(!ok)e.target.checked=!e.target.checked});h.querySelectorAll('[data-role="edit"]').forEach(n=>n.onclick=async()=>{const uid=n.closest('[data-uid]')?.getAttribute('data-uid')||'';await editItem(uid)});h.querySelectorAll('[data-role="delete"]').forEach(n=>n.onclick=async()=>{const uid=n.closest('[data-uid]')?.getAttribute('data-uid')||'';await deleteItem(uid)});h.querySelectorAll('[data-role="log"]').forEach(n=>n.onclick=()=>{const uid=n.closest('[data-uid]')?.getAttribute('data-uid')||'';st.log=st.log===uid?'':uid;render()});h.querySelectorAll('[data-role="log-form"]').forEach(f=>f.onsubmit=async e=>{e.preventDefault();const uid=f.closest('[data-uid]')?.getAttribute('data-uid')||'',m=String(f.message.value||'').trim();if(!uid||!m)return;await addLog(uid,m)})}
 
 function render(){const items=list(),done=items.filter(i=>i.isDone).length,planner=items.filter(i=>i.source==='Planner').length,checklist=items.filter(i=>i.source==='Checklist').length;notice($('uniSummary'),`${items.length} items | done ${done} | planner ${planner} | checklist ${checklist} | view ${st.view.toUpperCase()}`);let html='';if(st.view==='table')html=tableHTML(items);else if(st.view==='timeline')html=timelineHTML(items);else if(st.view==='calendar')html=calendarHTML(items);else html=cardHTML(items);$('uniViewHost').innerHTML=html;bindHost(items)}
+function toggleMonthFilter(){const w=$('uniMonthWrap');if(!w)return;w.hidden=!(st.view==='timeline'||st.view==='calendar')}
 
 function resetForm(){st.editingId='';st.editingActorEmail='';const f=$('uniCreateForm');f.reset();f.color.value=DEF_COLOR;f.createMode.value='plan_only';syncColor();$('uniSaveBtn').textContent='Create item';$('uniCancelEditBtn').style.display='none';notice($('uniCreateStatus'),'')}
 async function createFromForm(f){const p={title:String(f.title.value||'').trim(),key:String(f.key.value||'').trim(),start:dt(f.start.value||''),end:dt(f.end.value||''),owner:String(f.owner.value||'').trim(),note:String(f.note.value||'').trim(),color:col(f.color.value||DEF_COLOR),mode:String(f.createMode.value||'plan_only')};if(!p.title)throw new Error('Task title is required');if(!p.start||!p.end)throw new Error('Start and End are required');if(p.end<p.start)throw new Error('End date must be on or after Start date');const a=st.editingId&&st.editingActorEmail?{email:st.editingActorEmail}:await askAuth(st.editingId?'update item':'create item'),e=em(a?.email);if(!e)throw new Error('Jira email is required');const payload={sourceType:p.mode==='checklist_and_plan'?'todo':'planner',taskType:p.mode==='checklist_and_plan'?'planner_and_checklist':'planner_only',title:p.title,key:p.key,owner:p.owner,note:p.note,color:p.color,start:p.start,end:p.end,actorEmail:e};if(st.editingId)await api('/api/todo',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({...payload,id:st.editingId})});else await api('/api/todo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})}
@@ -155,6 +222,6 @@ async function load(){
   notice($('uniSync'),`Loaded ${st.tasks.length} items from ${st.sheetName}`,'success')
 }
 
-function bind(){const d=new Date();st.month=`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`;$('uniMonthPicker').value=st.month;renderSwitch();renderFilters();$('uniMonthPicker').onchange=e=>{st.month=e.target.value||st.month;render()};$('uniSearch').oninput=e=>{st.search=String(e.target.value||'');render()};$('uniSortField').onchange=e=>{st.sort=e.target.value||'updatedAt';render()};$('uniSortDir').onchange=e=>{st.dir=e.target.value||'desc';render()};$('uniRefreshBtn').onclick=async()=>{await load();render()};$('uniColorPreview').onclick=()=>$('uniColorInput').click();$('uniColorInput').oninput=syncColor;syncColor();$('uniCreateForm').onsubmit=async e=>{e.preventDefault();const s=$('uniCreateStatus');notice(s,st.editingId?'Updating item...':'Creating item...');try{await createFromForm(e.currentTarget);await load();render();resetForm();notice(s,'Saved successfully','success')}catch(err){notice(s,err.message||'Unable to save item','error')}};$('uniCancelEditBtn').onclick=resetForm;$('uniAuthCancel').onclick=()=>cancelAuthModal();$('uniAuthBackdrop').onclick=()=>cancelAuthModal();$('uniAuthForm').onsubmit=async e=>{e.preventDefault();const p=st.auth;if(!p)return;const email=em($('uniAuthEmail').value),remember=Boolean($('uniAuthRemember').checked),s=$('uniAuthStatus'),b=$('uniAuthConfirm');if(!email){notice(s,'Jira email is required','error');return}try{b.disabled=true;notice(s,'Validating Jira email...');const r=await validateJiraEmail(email);if(!r?.valid)throw new Error(r?.reason||'Jira email not found');const actor={email:em(r?.user?.email||email),displayName:String(r?.user?.displayName||''),accountId:String(r?.user?.accountId||'')};if(remember)setActor(actor);else sessionStorage.removeItem(AUTH_KEY);st.auth=null;closeAuthModal();p.res(actor)}catch(err){notice(s,err.message||'Auth failed','error')}finally{b.disabled=false}};document.addEventListener('click',e=>{const pop=$('uniInspectorPop');if(!pop.classList.contains('open'))return;if(e.target.closest('#uniInspectorPop'))return;if(e.target.closest('[data-role="inspect"]'))return;pop.classList.remove('open')})}
+function bind(){const d=new Date();st.month=`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`;$('uniMonthPicker').value=st.month;renderSwitch();renderFilters();toggleMonthFilter();$('uniMonthPicker').onchange=e=>{st.month=e.target.value||st.month;render()};$('uniSearch').oninput=e=>{st.search=String(e.target.value||'');render()};$('uniSortField').onchange=e=>{st.sort=e.target.value||'updatedAt';render()};$('uniSortDir').onchange=e=>{st.dir=e.target.value||'desc';render()};$('uniRefreshBtn').onclick=async()=>{await load();render()};$('uniColorPreview').onclick=()=>$('uniColorInput').click();$('uniColorInput').oninput=syncColor;syncColor();$('uniCreateForm').onsubmit=async e=>{e.preventDefault();const s=$('uniCreateStatus');notice(s,st.editingId?'Updating item...':'Creating item...');try{await createFromForm(e.currentTarget);await load();render();resetForm();notice(s,'Saved successfully','success')}catch(err){notice(s,err.message||'Unable to save item','error')}};$('uniCancelEditBtn').onclick=resetForm;$('uniAuthCancel').onclick=()=>cancelAuthModal();$('uniAuthBackdrop').onclick=()=>cancelAuthModal();$('uniAuthForm').onsubmit=async e=>{e.preventDefault();const p=st.auth;if(!p)return;const email=em($('uniAuthEmail').value),remember=Boolean($('uniAuthRemember').checked),s=$('uniAuthStatus'),b=$('uniAuthConfirm');if(!email){notice(s,'Jira email is required','error');return}try{b.disabled=true;notice(s,'Validating Jira email...');const r=await validateJiraEmail(email);if(!r?.valid)throw new Error(r?.reason||'Jira email not found');const actor={email:em(r?.user?.email||email),displayName:String(r?.user?.displayName||''),accountId:String(r?.user?.accountId||'')};if(remember)setActor(actor);else sessionStorage.removeItem(AUTH_KEY);st.auth=null;closeAuthModal();p.res(actor)}catch(err){notice(s,err.message||'Auth failed','error')}finally{b.disabled=false}};document.addEventListener('click',e=>{const pop=$('uniInspectorPop');if(!pop.classList.contains('open'))return;if(e.target.closest('#uniInspectorPop'))return;if(e.target.closest('[data-role="inspect"]'))return;pop.classList.remove('open')})}
 
 bind();load().then(()=>render()).catch(err=>notice($('uniSync'),err.message||'Unable to load unified planner','error'))
