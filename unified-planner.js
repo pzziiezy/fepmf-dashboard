@@ -593,8 +593,6 @@ function bind(){
     if(statusClose)statusClose.onclick=()=>closeStatus()
     document.addEventListener('click',e=>{if(e.target.closest('#uniStatusFilterWrap'))return;closeStatus()})
     document.addEventListener('keydown',e=>{if(e.key==='Escape')closeStatus()})
-    window.addEventListener('blur',closeStatus)
-    window.addEventListener('scroll',closeStatus,true)
   }
   syncStatusFilter()
 
