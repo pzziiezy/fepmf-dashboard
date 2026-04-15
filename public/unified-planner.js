@@ -178,6 +178,27 @@ function inspect(uid,anchor){
     pop.style.left=`${left}px`
     pop.style.top=`${top}px`
   }
+  const applyLocalPatch=payload=>{
+    const targetId=String(it.taskId||uid.replace(/^todo:/,'')||'')
+    const idx=st.tasks.findIndex(t=>String(t.id||'')===targetId)
+    if(idx<0)return false
+    st.tasks[idx]={
+      ...st.tasks[idx],
+      sourceType:payload.taskType==='planner_only'?'planner':'todo',
+      taskType:payload.taskType,
+      title:payload.title,
+      key:payload.key,
+      owner:payload.owner,
+      note:payload.note,
+      color:payload.color,
+      start:payload.start,
+      end:payload.end,
+      status:payload.status,
+      updatedAt:new Date().toISOString(),
+      updatedByEmail:payload.actorEmail
+    }
+    return true
+  }
   const render=()=>{
     pop.innerHTML=editing?`
     <div class="uni-pop-card" style="--uni-accent:${esc(accent)};--uni-accent-soft:${esc(accentSoft)};--uni-accent-border:${esc(accentBorder)};">
@@ -285,24 +306,7 @@ function inspect(uid,anchor){
             status:payload.status,
             actorEmail:eMail
           })})
-          const idx=st.tasks.findIndex(t=>String(t.id||'')===String(it.taskId))
-          if(idx>=0){
-            st.tasks[idx]={
-              ...st.tasks[idx],
-              sourceType:payload.taskType==='planner_only'?'planner':'todo',
-              taskType:payload.taskType,
-              title:payload.title,
-              key:payload.key,
-              owner:payload.owner,
-              note:payload.note,
-              color:payload.color,
-              start:payload.start,
-              end:payload.end,
-              status:payload.status,
-              updatedAt:new Date().toISOString(),
-              updatedByEmail:eMail
-            }
-          }
+          applyLocalPatch({...payload,actorEmail:eMail})
           render()
           inspect(uid,anchor)
           let synced=false

@@ -206,7 +206,7 @@
     }
     .uni-pop-edit-grid {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       gap: 8px;
     }
     .uni-pop-edit-grid .full {
@@ -215,6 +215,7 @@
     .uni-pop-field {
       display: grid;
       gap: 4px;
+      min-width: 0;
     }
     .uni-pop-field span {
       font-size: 11px;
@@ -226,6 +227,8 @@
     .uni-pop-field input,
     .uni-pop-field select,
     .uni-pop-field textarea {
+      width: 100%;
+      min-width: 0;
       border: 1px solid #c9d7ec;
       border-radius: 10px;
       padding: 8px 10px;
@@ -253,6 +256,7 @@
     .uni-pop-field input[type="color"]::-moz-color-swatch { border: none; border-radius: 8px; }
     .uni-pop-color-field {
       min-width: 0;
+      overflow: hidden;
     }
     .uni-pop-color-field input[type="color"] {
       max-width: 100%;
@@ -522,6 +526,6 @@
     </section>
   </div>
 
-  <script src="/unified-planner.js?v=20260415t"></script>
+  <script src="/unified-planner.js?v=20260415u"></script>
 </body>
 </html>
