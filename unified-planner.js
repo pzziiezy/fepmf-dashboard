@@ -1,7 +1,7 @@
 ﻿const AUTH_KEY='unified_actor_session_v1'
 const DEF_COLOR='#2c6e91'
 const FILTERS=['S0','S1','S2','S3','S4','S5','S6','S7']
-const st={tasks:[],month:'',search:'',view:'card',sort:'updatedAt',dir:'desc',statusFilters:[...FILTERS],typeFilters:['Planner','Checklist'],sel:'',log:'',auth:null,busy:'',editingId:'',editingActorEmail:'',sheetName:'PlannerTasks'}
+const st={tasks:[],month:'',search:'',view:'card',sort:'updatedAt',dir:'desc',statusFilters:[...FILTERS],typeFilters:['Planner','Checklist'],sel:'',log:'',auth:null,busy:'',editingId:'',editingActorEmail:'',sheetName:'PlannerTasks',liveEdits:{}}
 const $=id=>document.getElementById(id)
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))
 const notice=(el,m,t='info')=>{if(!el)return;el.textContent=m||'';el.classList.remove('notice-success','notice-error');if(t==='success')el.classList.add('notice-success');if(t==='error')el.classList.add('notice-error')}
@@ -42,7 +42,8 @@ function mergeItems(){
       const inferredStatus=((`${t.title||''} ${t.note||''} ${key}`.toUpperCase().match(/\bS[0-7]\b/)||[])[0]||'')
       const jiraStatus=hasJiraStatus(statusDirect)?statusDirect:(hasJiraStatus(inferredStatus)?inferredStatus:'')
       const isJiraStatus=isJiraTask({sourceType,taskType})||Boolean(jiraStatus)
-      return {
+      const uid=`todo:${t.id}`
+      const base={
         uid:`todo:${t.id}`,
         taskId:String(t.id||''),
         source,
@@ -63,6 +64,17 @@ function mergeItems(){
         updatedByEmail:String(t.updatedByEmail||t.createdByEmail||''),
         status:jiraStatus,
         isJiraStatus
+      }
+      const ov=st.liveEdits[uid]
+      if(!ov)return base
+      return {
+        ...base,
+        ...ov,
+        uid,
+        taskId:base.taskId,
+        sourceType:String(ov.sourceType||base.sourceType||'').toLowerCase(),
+        taskType:String(ov.taskType||base.taskType||'').toLowerCase(),
+        color:col(ov.color||base.color||DEF_COLOR)
       }
     })
 }
@@ -313,6 +325,21 @@ function inspect(uid,anchor){
             status:payload.status,
             actorEmail:eMail
           })})
+          const livePatch={
+            sourceType:payload.taskType==='planner_only'?'planner':'todo',
+            taskType:payload.taskType,
+            title:payload.title,
+            key:payload.key,
+            owner:payload.owner,
+            note:payload.note,
+            color:payload.color,
+            start:payload.start,
+            end:payload.end,
+            status:payload.status,
+            updatedAt:new Date().toISOString(),
+            updatedByEmail:eMail
+          }
+          st.liveEdits[uid]=livePatch
           const patched=applyLocalPatch({...payload,actorEmail:eMail})
           if(!patched){
             notice(s,'Saved, but local item not found. Reloading...','info')
@@ -329,7 +356,7 @@ function inspect(uid,anchor){
             await wait(700)
           }
           if(!synced)notice($('uniSync'),'Saved locally. Source still syncing...','info')
-          else notice($('uniSync'),'Saved and synced','success')
+          else{delete st.liveEdits[uid];notice($('uniSync'),'Saved and synced','success')}
           render()
           inspect(uid,anchor)
         }catch(err){notice(s,err.message||'Unable to save item','error')}
