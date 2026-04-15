@@ -218,69 +218,6 @@ function inspect(uid,anchor){
     }
     return true
   }
-  const applyLocalPatchToTask=(task,payload)=>{
-    const tuid=`todo:${String(task.id||'')}`
-    st.liveEdits[tuid]={
-      sourceType:payload.taskType==='planner_only'?'planner':'todo',
-      taskType:payload.taskType,
-      title:payload.title,
-      key:payload.key,
-      owner:payload.owner,
-      note:payload.note,
-      color:payload.color,
-      start:payload.start,
-      end:payload.end,
-      status:payload.status,
-      updatedAt:new Date().toISOString(),
-      updatedByEmail:payload.actorEmail
-    }
-    const idx=st.tasks.findIndex(t=>String(t.id||'')===String(task.id||''))
-    if(idx>=0){
-      st.tasks[idx]={
-        ...st.tasks[idx],
-        sourceType:payload.taskType==='planner_only'?'planner':'todo',
-        taskType:payload.taskType,
-        title:payload.title,
-        key:payload.key,
-        owner:payload.owner,
-        note:payload.note,
-        color:col(payload.color||DEF_COLOR),
-        start:payload.start,
-        end:payload.end,
-        status:payload.status,
-        updatedAt:new Date().toISOString(),
-        updatedByEmail:payload.actorEmail
-      }
-    }
-  }
-  const updateSiblingColor=async(payload,eMail)=>{
-    const siblings=st.tasks.filter(t=>
-      String(t.id||'')!==String(it.taskId||'') &&
-      String(t.title||'')===String(it.title||'') &&
-      String(t.key||'')===String(it.key||'') &&
-      String(t.start||'')===String(it.start||'') &&
-      String(t.end||'')===String(it.end||'')
-    )
-    for(const sItem of siblings){
-      const sTaskType=String(sItem.taskType||'').toLowerCase()||'planner_and_checklist'
-      const sPayload={
-        id:String(sItem.id||''),
-        sourceType:sTaskType==='planner_only'?'planner':'todo',
-        taskType:sTaskType,
-        title:String(sItem.title||''),
-        key:String(sItem.key||''),
-        owner:String(sItem.owner||''),
-        note:String(sItem.note||''),
-        color:payload.color,
-        start:String(sItem.start||''),
-        end:String(sItem.end||''),
-        status:String(sItem.status||''),
-        actorEmail:eMail
-      }
-      applyLocalPatchToTask(sItem,{...sPayload,actorEmail:eMail})
-      try{await api('/api/todo',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(sPayload)})}catch{}
-    }
-  }
   const render=()=>{
     pop.innerHTML=editing?`
     <div class="uni-pop-card" style="--uni-accent:${esc(accent)};--uni-accent-soft:${esc(accentSoft)};--uni-accent-border:${esc(accentBorder)};">
@@ -404,7 +341,6 @@ function inspect(uid,anchor){
           }
           st.liveEdits[uid]=livePatch
           const patched=applyLocalPatch({...payload,actorEmail:eMail})
-          await updateSiblingColor({...payload,actorEmail:eMail},eMail)
           if(!patched){
             notice(s,'Saved, but local item not found. Reloading...','info')
             await load()
@@ -469,6 +405,7 @@ async function load(apply=true){
   const t=await api(`/api/todo?_ts=${Date.now()}`)
   if(apply){
     st.tasks=Array.isArray(t.items)?t.items:[]
+    st.liveEdits={}
     st.sheetName=String(t.sheetName||'PlannerTasks')
     if($('uniSheetTag'))$('uniSheetTag').textContent=`Sheet: ${st.sheetName}`
     notice($('uniSync'),`Loaded ${st.tasks.length} items from ${st.sheetName}`,'success')
