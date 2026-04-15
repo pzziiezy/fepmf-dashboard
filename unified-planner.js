@@ -25,6 +25,10 @@ const durationDays=(s,e)=>{const a=Date.parse(`${s||''}T00:00:00Z`),b=Date.parse
 const cmp=(a,b,t='s')=>{if(t==='d'){const x=Date.parse(a||''),y=Date.parse(b||'');if(Number.isNaN(x)&&Number.isNaN(y))return 0;if(Number.isNaN(x))return 1;if(Number.isNaN(y))return -1;return x-y}return String(a||'').localeCompare(String(b||''),'th',{sensitivity:'base'})}
 const hexToRgba=(hex,a=.12)=>{const m=String(hex||'').trim().match(/^#?([0-9a-fA-F]{6})$/);if(!m)return `rgba(61,103,169,${a})`;const n=parseInt(m[1],16),r=(n>>16)&255,g=(n>>8)&255,b=n&255;return `rgba(${r},${g},${b},${a})`}
 const doneInfo=i=>i.isDone&&i.doneAt?`Done ${thaiDT(i.doneAt)}${i.doneByEmail?` - ${i.doneByEmail}`:''}`:'-'
+const hasJiraStatus=s=>FILTERS.includes(String(s||'').toUpperCase().trim())
+const isJiraTask=t=>{const src=String(t.sourceType||'').toLowerCase(),typ=String(t.taskType||'').toLowerCase();return src==='jira'||typ==='jira'}
+const viewStatus=i=>i.isJiraStatus?(i.status||'-'):(i.isDone?'Done':'Pending')
+const timelineText=i=>i.start&&i.end?`${thai(i.start)} - ${thai(i.end)}<br/>${durationDays(i.start,i.end)} days`:'No timeline date'
 
 function mergeItems(){
   return st.tasks
@@ -35,7 +39,9 @@ function mergeItems(){
       const taskType=String(t.taskType||'').toLowerCase()|| (sourceType==='planner'?'planner_only':'planner_and_checklist')
       const source=taskType==='planner_only'?'Planner':'Checklist'
       const statusDirect=String(t.status||'').toUpperCase().trim()
-      const status=statusDirect&&FILTERS.includes(statusDirect)?statusDirect:((`${t.title||''} ${t.note||''} ${key}`.toUpperCase().match(/\bS[0-7]\b/)||[])[0]||'')
+      const inferredStatus=((`${t.title||''} ${t.note||''} ${key}`.toUpperCase().match(/\bS[0-7]\b/)||[])[0]||'')
+      const jiraStatus=hasJiraStatus(statusDirect)?statusDirect:(hasJiraStatus(inferredStatus)?inferredStatus:'')
+      const isJiraStatus=isJiraTask({sourceType,taskType})||Boolean(jiraStatus)
       return {
         uid:`todo:${t.id}`,
         taskId:String(t.id||''),
@@ -55,14 +61,18 @@ function mergeItems(){
         doneByEmail:String(t.doneByEmail||''),
         updatedAt:String(t.updatedAt||t.createdAt||''),
         updatedByEmail:String(t.updatedByEmail||t.createdByEmail||''),
-        status
+        status:jiraStatus,
+        isJiraStatus
       }
     })
 }
 
 function list(){
   const q=st.search.trim().toLowerCase(),typeAct=new Set(st.typeFilters),statusAct=new Set(st.statusFilters)
-  let it=mergeItems().filter(i=>typeAct.has(i.source)).filter(i=>!i.status||statusAct.has(i.status)).filter(i=>!q||`${i.title} ${i.key} ${i.owner} ${i.note} ${i.source} ${i.status}`.toLowerCase().includes(q))
+  let it=mergeItems()
+    .filter(i=>typeAct.has(i.source))
+    .filter(i=>!i.isJiraStatus||!i.status||statusAct.has(i.status))
+    .filter(i=>!q||`${i.title} ${i.key} ${i.owner} ${i.note} ${i.source} ${viewStatus(i)}`.toLowerCase().includes(q))
   it.sort((a,b)=>{let r=0;if(st.sort==='title')r=cmp(a.title,b.title);else if(st.sort==='owner')r=cmp(a.owner,b.owner);else if(st.sort==='start')r=cmp(a.start,b.start,'d');else if(st.sort==='end')r=cmp(a.end,b.end,'d');else r=cmp(a.updatedAt,b.updatedAt,'d');return st.dir==='asc'?r:-r})
   return it
 }
@@ -83,36 +93,20 @@ function renderFilters(){
 
 function cardHTML(items){
   if(!items.length)return '<div class="empty">No items</div>'
-  return `<div class="uni-card-list">${items.map(i=>{const ex=st.log===i.uid,logs=Array.isArray(i.logs)?i.logs:[],tt=i.start&&i.end?`${thai(i.start)} - ${thai(i.end)}`:'No timeline date',stTag=i.status||'-';return `<article class="todo-card ${i.isDone?'is-done':''} todo-card-checklist" data-uid="${esc(i.uid)}" style="--todo-accent:${esc(i.color)}"><div class="todo-card-main"><label class="todo-check"><input type="checkbox" data-role="toggle" ${i.isDone?'checked':''}/><span></span></label><div class="todo-copy"><div class="todo-title-row"><span class="badge ${i.source==='Planner'?'status-manual':'badge-checklist'}">${esc(i.source)}</span><span class="badge status-default">${esc(stTag)}</span><strong>${esc(i.title)}</strong>${i.key?`<span class="todo-context-inlinebar"><span class="todo-context-bartext">${esc(i.key)}</span></span>`:''}</div><div class="todo-meta-line">${esc(tt)}</div><div class="todo-meta-line">Updated ${esc(thaiDT(i.updatedAt))}${i.updatedByEmail?` | By ${esc(i.updatedByEmail)}`:''}</div><div class="todo-note">${esc(i.note||'No note')}</div><div class="todo-log-summary">${logs.length} update logs</div>${ex?`<section class="todo-log-panel"><div class="todo-log-list">${logs.length?logs.map(e=>`<article class="todo-log-entry"><div class="todo-log-time">${esc(thaiDT(e.createdAt))}${e.actorEmail?` | ${esc(e.actorEmail)}`:''}</div><div class="todo-log-message">${esc(e.message)}</div></article>`).join(''):'<div class="mini-empty">No update log yet</div>'}</div><form class="todo-log-form" data-role="log-form"><textarea name="message" placeholder="Add update log"></textarea><div class="todo-log-actions"><button class="btn primary" type="submit">Add update log</button></div></form></section>`:''}</div></div><div class="todo-card-actions"><button class="btn" type="button" data-role="inspect">Inspector</button><button class="btn" type="button" data-role="edit">Edit</button><button class="btn" type="button" data-role="delete">Delete</button><button class="btn" type="button" data-role="log">${ex?'Hide logs':'View logs'}</button></div></article>`}).join('')}</div>`
+  return `<div class="uni-card-list">${items.map(i=>{const ex=st.log===i.uid,logs=Array.isArray(i.logs)?i.logs:[],tt=i.start&&i.end?`${thai(i.start)} - ${thai(i.end)}`:'No timeline date',stTag=viewStatus(i);return `<article class="todo-card ${i.isDone?'is-done':''} todo-card-checklist" data-uid="${esc(i.uid)}" style="--todo-accent:${esc(i.color)}"><div class="todo-card-main"><label class="todo-check"><input type="checkbox" data-role="toggle" ${i.isDone?'checked':''}/><span></span></label><div class="todo-copy"><div class="todo-title-row"><span class="badge ${i.source==='Planner'?'status-manual':'badge-checklist'}">${esc(i.source)}</span><span class="badge status-default">${esc(stTag)}</span><strong>${esc(i.title)}</strong>${i.key?`<span class="todo-context-inlinebar"><span class="todo-context-bartext">${esc(i.key)}</span></span>`:''}</div><div class="todo-meta-line">${esc(tt)}</div><div class="todo-meta-line">Updated ${esc(thaiDT(i.updatedAt))}${i.updatedByEmail?` | By ${esc(i.updatedByEmail)}`:''}</div><div class="todo-note">${esc(i.note||'No note')}</div><div class="todo-log-summary">${logs.length} update logs</div>${ex?`<section class="todo-log-panel"><div class="todo-log-list">${logs.length?logs.map(e=>`<article class="todo-log-entry"><div class="todo-log-time">${esc(thaiDT(e.createdAt))}${e.actorEmail?` | ${esc(e.actorEmail)}`:''}</div><div class="todo-log-message">${esc(e.message)}</div></article>`).join(''):'<div class="mini-empty">No update log yet</div>'}</div><form class="todo-log-form" data-role="log-form"><textarea name="message" placeholder="Add update log"></textarea><div class="todo-log-actions"><button class="btn primary" type="submit">Add update log</button></div></form></section>`:''}</div></div><div class="todo-card-actions"><button class="btn" type="button" data-role="inspect">Inspector</button><button class="btn" type="button" data-role="edit">Edit</button><button class="btn" type="button" data-role="delete">Delete</button><button class="btn" type="button" data-role="log">${ex?'Hide logs':'View logs'}</button></div></article>`}).join('')}</div>`
 }
 function tableHTML(items){
   if(!items.length)return '<div class="empty">No rows</div>'
-  return `<div class="uni-table-wrap"><table class="uni-table"><thead><tr><th>Done</th><th>Task</th><th>Context</th><th>Status</th><th>Owner</th><th>Note</th><th>Start</th><th>End</th><th>Updated</th><th>Done info</th><th>Logs</th><th>Actions</th></tr></thead><tbody>${items.map(i=>{const ex=st.log===i.uid,done=i.isDone&&i.doneAt?`Done ${thaiDT(i.doneAt)}${i.doneByEmail?` - ${i.doneByEmail}`:''}`:'-';return `<tr data-uid="${esc(i.uid)}"><td><label class="todo-check todo-check-inline"><input type="checkbox" data-role="toggle" ${i.isDone?'checked':''}/><span></span></label></td><td><span class="badge ${i.source==='Planner'?'status-manual':'badge-checklist'}">${esc(i.source)}</span> <strong>${esc(i.title)}</strong></td><td>${i.key?`<span class="todo-context-inlinebar"><span class="todo-context-bartext">${esc(i.key)}</span></span>`:'-'}</td><td>${esc(i.status||'-')}</td><td>${esc(i.owner||'-')}</td><td>${esc(i.note||'-')}</td><td>${esc(thai(i.start))}</td><td>${esc(thai(i.end))}</td><td>${esc(thaiDT(i.updatedAt))}${i.updatedByEmail?`<br/><small>${esc(i.updatedByEmail)}</small>`:''}</td><td>${esc(done)}</td><td>${esc(String((i.logs||[]).length))}</td><td><div class="uni-table-actions"><button class="uni-action-text" type="button" data-role="inspect">Inspector</button><button class="uni-action-text" type="button" data-role="log">${ex?'Hide logs':'View logs'}</button><button class="uni-action-text" type="button" data-role="edit">Edit</button><button class="uni-action-text" type="button" data-role="delete">Delete</button></div></td></tr>${ex?`<tr class="uni-log-row" data-uid="${esc(i.uid)}"><td colspan="12"><section class="todo-log-panel"><div class="todo-log-list">${(i.logs||[]).length?(i.logs||[]).map(e=>`<article class="todo-log-entry"><div class="todo-log-time">${esc(thaiDT(e.createdAt))}${e.actorEmail?` | ${esc(e.actorEmail)}`:''}</div><div class="todo-log-message">${esc(e.message)}</div></article>`).join(''):'<div class="mini-empty">No update log yet</div>'}</div><form class="todo-log-form" data-role="log-form"><textarea name="message" placeholder="Add update log"></textarea><div class="todo-log-actions"><button class="btn primary" type="submit">Add update log</button></div></form></section></td></tr>`:''}`}).join('')}</tbody></table></div>`
+  return `<div class="uni-table-wrap"><table class="uni-table"><thead><tr><th>Done</th><th>Task</th><th>Context</th><th>Status</th><th>Owner</th><th>Note</th><th>Start</th><th>End</th><th>Updated</th><th>Done info</th><th>Logs</th><th>Actions</th></tr></thead><tbody>${items.map(i=>{const ex=st.log===i.uid,done=i.isDone&&i.doneAt?`Done ${thaiDT(i.doneAt)}${i.doneByEmail?` - ${i.doneByEmail}`:''}`:'-';return `<tr data-uid="${esc(i.uid)}"><td><label class="todo-check todo-check-inline"><input type="checkbox" data-role="toggle" ${i.isDone?'checked':''}/><span></span></label></td><td><span class="badge ${i.source==='Planner'?'status-manual':'badge-checklist'}">${esc(i.source)}</span> <strong>${esc(i.title)}</strong></td><td>${i.key?`<span class="todo-context-inlinebar"><span class="todo-context-bartext">${esc(i.key)}</span></span>`:'-'}</td><td>${esc(viewStatus(i))}</td><td>${esc(i.owner||'-')}</td><td>${esc(i.note||'-')}</td><td>${esc(thai(i.start))}</td><td>${esc(thai(i.end))}</td><td>${esc(thaiDT(i.updatedAt))}${i.updatedByEmail?`<br/><small>${esc(i.updatedByEmail)}</small>`:''}</td><td>${esc(done)}</td><td>${esc(String((i.logs||[]).length))}</td><td><div class="uni-table-actions"><button class="uni-action-text" type="button" data-role="inspect">Inspector</button><button class="uni-action-text" type="button" data-role="log">${ex?'Hide logs':'View logs'}</button><button class="uni-action-text" type="button" data-role="edit">Edit</button><button class="uni-action-text" type="button" data-role="delete">Delete</button></div></td></tr>${ex?`<tr class="uni-log-row" data-uid="${esc(i.uid)}"><td colspan="12"><section class="todo-log-panel"><div class="todo-log-list">${(i.logs||[]).length?(i.logs||[]).map(e=>`<article class="todo-log-entry"><div class="todo-log-time">${esc(thaiDT(e.createdAt))}${e.actorEmail?` | ${esc(e.actorEmail)}`:''}</div><div class="todo-log-message">${esc(e.message)}</div></article>`).join(''):'<div class="mini-empty">No update log yet</div>'}</div><form class="todo-log-form" data-role="log-form"><textarea name="message" placeholder="Add update log"></textarea><div class="todo-log-actions"><button class="btn primary" type="submit">Add update log</button></div></form></section></td></tr>`:''}`}).join('')}</tbody></table></div>`
 }
 function timelineHTML(items){
-  const x=items.filter(i=>i.start&&i.end)
-  if(!x.length)return '<div class="empty">No timeline item</div>'
-  const r=monthRange(),a=new Date(r.start.getTime()),b=new Date(r.end.getTime()),days=Math.floor((b-a)/86400000)+1
-  const head=Array.from({length:days},(_,k)=>{
-    const d=new Date(a.getTime())
-    d.setUTCDate(d.getUTCDate()+k)
-    const w=d.getUTCDay()===0||d.getUTCDay()===6
-    const l=d.toLocaleDateString('en-US',{weekday:'short',timeZone:'UTC'}).slice(0,2)
-    return `<div class="day ${w?'wk':''}"><span>${l}</span><strong>${d.getUTCDate()}</strong></div>`
-  }).join('')
-  const rows=x
-    .map(i=>{
-      const s=new Date(`${i.start}T00:00:00Z`)
-      const e=new Date(`${i.end}T00:00:00Z`)
-      if(e<a||s>b)return ''
-      const cs=s<a?a:s,ce=e>b?b:e,so=Math.floor((cs-a)/86400000),eo=Math.floor((ce-a)/86400000),sp=Math.max(1,eo-so+1)
-      const range=`${thai(i.start)} - ${thai(i.end)} | ${durationDays(i.start,i.end)} days`
-      return `<div class="uni-tl-row"><div class="uni-tl-meta"><strong>${esc(i.key?`${i.title} : ${i.key}`:i.title)}</strong><span>${esc(range)}</span></div><div class="uni-tl-track"><button class="uni-tl-bar" type="button" data-role="inspect" data-uid="${esc(i.uid)}" style="grid-column:${so+1} / span ${sp};background:${esc(i.color)};" title="${esc(i.key?`${i.title} : ${i.key}`:i.title)}">${esc(i.key?`${i.title} : ${i.key}`:i.title)}</button></div></div>`
-    })
-    .filter(Boolean)
-    .join('')
-  if(!rows)return '<div class="empty">No timeline item in this month</div>'
-  return `<div class="uni-timeline" style="--days:${days}"><div class="uni-tl-head"><div class="label">Task</div>${head}</div><div class="uni-tl-body">${rows}</div></div>`
+  const x=items.filter(i=>i.start&&i.end);if(!x.length)return '<div class="empty">No timeline item</div>'
+  let y,m;if(/^\d{4}-\d{2}$/.test(st.month)){const p=st.month.split('-').map(Number);y=p[0];m=p[1]-1}else{const d=new Date();y=d.getUTCFullYear();m=d.getUTCMonth()}
+  const a=new Date(Date.UTC(y,m,1)),b=new Date(Date.UTC(y,m+2,0)),days=Math.floor((b-a)/86400000)+1
+  const head=Array.from({length:days},(_,k)=>{const d=new Date(a.getTime());d.setUTCDate(d.getUTCDate()+k);const w=d.getUTCDay()===0||d.getUTCDay()===6;const l=d.toLocaleDateString('en-US',{weekday:'short',timeZone:'UTC'}).slice(0,2);return `<div class="planner-lab-day ${w?'is-weekend':''}" style="grid-column:${k+1}"><span>${l}</span><strong>${d.getUTCDate()}</strong></div>`}).join('')
+  const rows=x.map(i=>{const s=new Date(`${i.start}T00:00:00Z`),e=new Date(`${i.end}T00:00:00Z`),cs=s<a?a:s,ce=e>b?b:e;if(ce<cs)return'';const so=Math.floor((cs-a)/86400000),eo=Math.floor((ce-a)/86400000),sp=Math.max(1,eo-so+1);return `<div class="planner-lab-row"><div class="planner-lab-track">${Array.from({length:days},()=>'<div class="planner-lab-track-day"></div>').join('')}<button class="planner-lab-bar manual" type="button" data-role="inspect" data-uid="${esc(i.uid)}" style="grid-column:${so+1} / span ${sp};--lab-bar:${esc(i.color)}"><span>${esc(i.key?`${i.title} : ${i.key}`:i.title)}</span></button></div></div>`}).filter(Boolean).join('')
+  if(!rows)return '<div class="empty">No timeline item in this range</div>'
+  return `<div class="planner-lab-timeline-shell" style="--lab-days:${days}"><div class="planner-lab-head">${head}</div><div class="planner-lab-body">${rows}</div></div>`
 }
 function calendarHTML(items){
   const x=items.filter(i=>i.start&&i.end),mr=monthRange(),nm=['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
@@ -174,11 +168,11 @@ function inspect(uid,anchor){
         <button class="btn uni-inspector-close" id="uniInspectorClose" type="button">Close</button>
       </header>
       <section class="uni-pop-meta-grid">
-        <p class="uni-pop-meta">${it.start&&it.end?`${esc(thai(it.start))} - ${esc(thai(it.end))} | ${durationDays(it.start,it.end)} days`:'No timeline date'}</p>
+        <p class="uni-pop-meta">${timelineText(it)}</p>
         <article class="uni-pop-meta-card"><span>Task Type</span><strong>${esc(it.source)}</strong></article>
       </section>
       <section class="uni-pop-grid">
-        <article><span>Status</span><strong>${esc(it.status||'-')}</strong></article>
+        <article><span>Status</span><strong>${esc(viewStatus(it))}</strong></article>
         <article><span>Owner</span><strong>${esc(it.owner||'-')}</strong></article>
       </section>
       <p class="uni-pop-note">${esc(it.note||'No note')}</p>
