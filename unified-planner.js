@@ -274,15 +274,18 @@ function inspect(uid,anchor){
     $('uniInspectorEditBtn').onclick=async e=>{
       e.preventDefault()
       e.stopPropagation()
+      editing=true
+      pop.classList.add('open')
+      render()
       try{
         const a=await askAuth('open edit mode')
         editActorEmail=em(a?.email)
-        if(!editActorEmail)throw new Error('Jira email is required')
-        editing=true
-        render()
+        const s=$('uniInspectorStatus')
+        if(!editActorEmail){notice(s,'Jira email is required','error');return}
+        notice(s,`Authenticated as ${editActorEmail}`,'success')
       }catch(err){
         const s=$('uniInspectorStatus')
-        notice(s,err.message||'Unable to enter edit mode','error')
+        notice(s,err.message||'Auth is required before save','error')
       }
     }
     $('uniInspectorDeleteBtn').onclick=async e=>{e.preventDefault();e.stopPropagation();await deleteItem(it.uid)}
@@ -312,6 +315,6 @@ async function load(){
   notice($('uniSync'),`Loaded ${st.tasks.length} items from ${st.sheetName}`,'success')
 }
 
-function bind(){const d=new Date();st.month=`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`;$('uniMonthPicker').value=st.month;renderSwitch();renderFilters();toggleMonthFilter();$('uniMonthPicker').onchange=e=>{st.month=e.target.value||st.month;render()};$('uniSearch').oninput=e=>{st.search=String(e.target.value||'');render()};$('uniSortField').onchange=e=>{st.sort=e.target.value||'updatedAt';render()};$('uniSortDir').onchange=e=>{st.dir=e.target.value||'desc';render()};$('uniRefreshBtn').onclick=async()=>{await load();render()};$('uniColorPreview').onclick=()=>$('uniColorInput').click();$('uniColorInput').oninput=syncColor;syncColor();$('uniCreateForm').onsubmit=async e=>{e.preventDefault();const s=$('uniCreateStatus');notice(s,st.editingId?'Updating item...':'Creating item...');try{await createFromForm(e.currentTarget);await load();render();resetForm();notice(s,'Saved successfully','success')}catch(err){notice(s,err.message||'Unable to save item','error')}};$('uniCancelEditBtn').onclick=resetForm;$('uniAuthCancel').onclick=()=>cancelAuthModal();$('uniAuthBackdrop').onclick=()=>cancelAuthModal();$('uniAuthForm').onsubmit=async e=>{e.preventDefault();const p=st.auth;if(!p)return;const email=em($('uniAuthEmail').value),remember=Boolean($('uniAuthRemember').checked),s=$('uniAuthStatus'),b=$('uniAuthConfirm');if(!email){notice(s,'Jira email is required','error');return}try{b.disabled=true;notice(s,'Validating Jira email...');const r=await validateJiraEmail(email);if(!r?.valid)throw new Error(r?.reason||'Jira email not found');const actor={email:em(r?.user?.email||email),displayName:String(r?.user?.displayName||''),accountId:String(r?.user?.accountId||'')};if(remember)setActor(actor);else sessionStorage.removeItem(AUTH_KEY);st.auth=null;closeAuthModal();p.res(actor)}catch(err){notice(s,err.message||'Auth failed','error')}finally{b.disabled=false}};document.addEventListener('click',e=>{const pop=$('uniInspectorPop');if(!pop.classList.contains('open'))return;if(e.target.closest('#uniInspectorPop'))return;if(e.target.closest('[data-role="inspect"]'))return;pop.classList.remove('open')})}
+function bind(){const d=new Date();st.month=`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`;$('uniMonthPicker').value=st.month;renderSwitch();renderFilters();toggleMonthFilter();$('uniMonthPicker').onchange=e=>{st.month=e.target.value||st.month;render()};$('uniSearch').oninput=e=>{st.search=String(e.target.value||'');render()};$('uniSortField').onchange=e=>{st.sort=e.target.value||'updatedAt';render()};$('uniSortDir').onchange=e=>{st.dir=e.target.value||'desc';render()};$('uniRefreshBtn').onclick=async()=>{await load();render()};$('uniColorPreview').onclick=()=>$('uniColorInput').click();$('uniColorInput').oninput=syncColor;syncColor();$('uniCreateForm').onsubmit=async e=>{e.preventDefault();const s=$('uniCreateStatus');notice(s,st.editingId?'Updating item...':'Creating item...');try{await createFromForm(e.currentTarget);await load();render();resetForm();notice(s,'Saved successfully','success')}catch(err){notice(s,err.message||'Unable to save item','error')}};$('uniCancelEditBtn').onclick=resetForm;$('uniAuthCancel').onclick=()=>cancelAuthModal();$('uniAuthBackdrop').onclick=()=>cancelAuthModal();$('uniAuthForm').onsubmit=async e=>{e.preventDefault();const p=st.auth;if(!p)return;const email=em($('uniAuthEmail').value),remember=Boolean($('uniAuthRemember').checked),s=$('uniAuthStatus'),b=$('uniAuthConfirm');if(!email){notice(s,'Jira email is required','error');return}try{b.disabled=true;notice(s,'Validating Jira email...');const r=await validateJiraEmail(email);if(!r?.valid)throw new Error(r?.reason||'Jira email not found');const actor={email:em(r?.user?.email||email),displayName:String(r?.user?.displayName||''),accountId:String(r?.user?.accountId||'')};if(remember)setActor(actor);else sessionStorage.removeItem(AUTH_KEY);st.auth=null;closeAuthModal();p.res(actor)}catch(err){notice(s,err.message||'Auth failed','error')}finally{b.disabled=false}};document.addEventListener('click',e=>{if(!$('uniAuthModal').hidden)return;const pop=$('uniInspectorPop');if(!pop.classList.contains('open'))return;if(e.target.closest('#uniInspectorPop'))return;if(e.target.closest('[data-role="inspect"]'))return;pop.classList.remove('open')})}
 
 bind();load().then(()=>render()).catch(err=>notice($('uniSync'),err.message||'Unable to load unified planner','error'))
