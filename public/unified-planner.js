@@ -196,7 +196,7 @@ function inspect(uid,anchor){
         <label class="uni-pop-field"><span>Task Type</span><select name="taskType"><option value="planner_only" ${it.taskType==='planner_only'?'selected':''}>Planner</option><option value="planner_and_checklist" ${it.taskType==='planner_and_checklist'?'selected':''}>Checklist</option></select></label>
         <label class="uni-pop-field"><span>Status (Jira)</span><select name="status" ${isJiraEditable?'':'disabled'}><option value="">-</option>${FILTERS.map(s=>`<option value="${s}" ${it.status===s?'selected':''}>${s}</option>`).join('')}</select></label>
         <label class="uni-pop-field"><span>Owner</span><input name="owner" value="${esc(it.owner||'')}" /></label>
-        <label class="uni-pop-field full"><span>Color</span><input type="color" name="color" value="${esc(col(it.color||DEF_COLOR))}" /></label>
+        <label class="uni-pop-field uni-pop-color-field"><span>Color</span><input type="color" name="color" value="${esc(col(it.color||DEF_COLOR))}" /></label>
         <label class="uni-pop-field full"><span>Note</span><textarea name="note">${esc(it.note||'')}</textarea></label>
         <div class="uni-pop-edit-actions full">
           <button class="btn primary" type="submit">Save</button>
@@ -285,14 +285,35 @@ function inspect(uid,anchor){
             status:payload.status,
             actorEmail:eMail
           })})
+          const idx=st.tasks.findIndex(t=>String(t.id||'')===String(it.taskId))
+          if(idx>=0){
+            st.tasks[idx]={
+              ...st.tasks[idx],
+              sourceType:payload.taskType==='planner_only'?'planner':'todo',
+              taskType:payload.taskType,
+              title:payload.title,
+              key:payload.key,
+              owner:payload.owner,
+              note:payload.note,
+              color:payload.color,
+              start:payload.start,
+              end:payload.end,
+              status:payload.status,
+              updatedAt:new Date().toISOString(),
+              updatedByEmail:eMail
+            }
+          }
+          render()
+          inspect(uid,anchor)
           let synced=false
           for(let i=0;i<6;i+=1){
-            await load()
-            const fresh=list().find(x=>x.uid===uid)
-            if(fresh&&fresh.title===payload.title&&fresh.key===payload.key&&fresh.owner===payload.owner&&fresh.note===payload.note&&fresh.start===payload.start&&fresh.end===payload.end&&fresh.color===payload.color&&fresh.taskType===payload.taskType){synced=true;break}
+            const remote=await load(false)
+            const fresh=(remote.items||[]).find(x=>String(x.id||'')===String(it.taskId))
+            if(fresh&&String(fresh.color||'').toLowerCase()===String(payload.color||'').toLowerCase()&&String(fresh.title||'')===payload.title&&String(fresh.key||'')===payload.key){synced=true;st.tasks=remote.items;st.sheetName=String(remote.sheetName||st.sheetName||'PlannerTasks');break}
             await wait(700)
           }
-          if(!synced)notice(s,'Saved, waiting data sync...','info')
+          if(!synced)notice($('uniSync'),'Saved locally. Source still syncing...','info')
+          else notice($('uniSync'),'Saved and synced','success')
           render()
           inspect(uid,anchor)
         }catch(err){notice(s,err.message||'Unable to save item','error')}
@@ -336,13 +357,16 @@ function toggleMonthFilter(){const w=$('uniMonthWrap');if(!w)return;w.hidden=!(s
 function resetForm(){st.editingId='';st.editingActorEmail='';const f=$('uniCreateForm');f.reset();f.color.value=DEF_COLOR;f.createMode.value='plan_only';syncColor();$('uniSaveBtn').textContent='Create item';$('uniCancelEditBtn').style.display='none';notice($('uniCreateStatus'),'')}
 async function createFromForm(f){const p={title:String(f.title.value||'').trim(),key:String(f.key.value||'').trim(),start:dt(f.start.value||''),end:dt(f.end.value||''),owner:String(f.owner.value||'').trim(),note:String(f.note.value||'').trim(),color:col(f.color.value||DEF_COLOR),mode:String(f.createMode.value||'plan_only')};if(!p.title)throw new Error('Task title is required');if(!p.start||!p.end)throw new Error('Start and End are required');if(p.end<p.start)throw new Error('End date must be on or after Start date');const a=st.editingId&&st.editingActorEmail?{email:st.editingActorEmail}:await askAuth(st.editingId?'update item':'create item'),e=em(a?.email);if(!e)throw new Error('Jira email is required');const payload={sourceType:p.mode==='checklist_and_plan'?'todo':'planner',taskType:p.mode==='checklist_and_plan'?'planner_and_checklist':'planner_only',title:p.title,key:p.key,owner:p.owner,note:p.note,color:p.color,start:p.start,end:p.end,actorEmail:e};if(st.editingId)await api('/api/todo',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({...payload,id:st.editingId})});else await api('/api/todo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})}
 
-async function load(){
-  notice($('uniSync'),'Loading unified planner from PlannerTasks...')
+async function load(apply=true){
+  if(apply)notice($('uniSync'),'Loading unified planner from PlannerTasks...')
   const t=await api(`/api/todo?_ts=${Date.now()}`)
-  st.tasks=Array.isArray(t.items)?t.items:[]
-  st.sheetName=String(t.sheetName||'PlannerTasks')
-  if($('uniSheetTag'))$('uniSheetTag').textContent=`Sheet: ${st.sheetName}`
-  notice($('uniSync'),`Loaded ${st.tasks.length} items from ${st.sheetName}`,'success')
+  if(apply){
+    st.tasks=Array.isArray(t.items)?t.items:[]
+    st.sheetName=String(t.sheetName||'PlannerTasks')
+    if($('uniSheetTag'))$('uniSheetTag').textContent=`Sheet: ${st.sheetName}`
+    notice($('uniSync'),`Loaded ${st.tasks.length} items from ${st.sheetName}`,'success')
+  }
+  return {items:Array.isArray(t.items)?t.items:[],sheetName:String(t.sheetName||'PlannerTasks')}
 }
 
 function bind(){const d=new Date();st.month=`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`;$('uniMonthPicker').value=st.month;renderSwitch();renderFilters();toggleMonthFilter();$('uniMonthPicker').onchange=e=>{st.month=e.target.value||st.month;render()};$('uniSearch').oninput=e=>{st.search=String(e.target.value||'');render()};$('uniSortField').onchange=e=>{st.sort=e.target.value||'updatedAt';render()};$('uniSortDir').onchange=e=>{st.dir=e.target.value||'desc';render()};$('uniRefreshBtn').onclick=async()=>{await load();render()};$('uniColorPreview').onclick=()=>$('uniColorInput').click();$('uniColorInput').oninput=syncColor;syncColor();$('uniCreateForm').onsubmit=async e=>{e.preventDefault();const s=$('uniCreateStatus');notice(s,st.editingId?'Updating item...':'Creating item...');try{await createFromForm(e.currentTarget);await load();render();resetForm();notice(s,'Saved successfully','success')}catch(err){notice(s,err.message||'Unable to save item','error')}};$('uniCancelEditBtn').onclick=resetForm;$('uniAuthCancel').onclick=()=>cancelAuthModal();$('uniAuthBackdrop').onclick=()=>cancelAuthModal();$('uniAuthForm').onsubmit=async e=>{e.preventDefault();const p=st.auth;if(!p)return;const email=em($('uniAuthEmail').value),remember=Boolean($('uniAuthRemember').checked),s=$('uniAuthStatus'),b=$('uniAuthConfirm');if(!email){notice(s,'Jira email is required','error');return}try{b.disabled=true;notice(s,'Validating Jira email...');const r=await validateJiraEmail(email);if(!r?.valid)throw new Error(r?.reason||'Jira email not found');const actor={email:em(r?.user?.email||email),displayName:String(r?.user?.displayName||''),accountId:String(r?.user?.accountId||'')};if(remember)setActor(actor);else sessionStorage.removeItem(AUTH_KEY);st.auth=null;closeAuthModal();p.res(actor)}catch(err){notice(s,err.message||'Auth failed','error')}finally{b.disabled=false}};document.addEventListener('click',e=>{if(!$('uniAuthModal').hidden)return;const pop=$('uniInspectorPop');if(!pop.classList.contains('open'))return;if(e.target.closest('#uniInspectorPop'))return;if(e.target.closest('[data-role="inspect"]'))return;pop.classList.remove('open')})}
