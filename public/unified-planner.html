@@ -232,6 +232,24 @@
       color: #1b3f72;
       background: #fff;
     }
+    .uni-pop-field select:disabled {
+      background: #f1f5fb;
+      color: #6b7f9f;
+      cursor: not-allowed;
+    }
+    .uni-pop-field input[type="color"] {
+      width: 100%;
+      min-height: 36px;
+      padding: 0;
+      border-radius: 10px;
+      cursor: pointer;
+      -webkit-appearance: none;
+      appearance: none;
+      overflow: hidden;
+    }
+    .uni-pop-field input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+    .uni-pop-field input[type="color"]::-webkit-color-swatch { border: none; border-radius: 8px; }
+    .uni-pop-field input[type="color"]::-moz-color-swatch { border: none; border-radius: 8px; }
     .uni-pop-field textarea {
       min-height: 70px;
       resize: vertical;
@@ -479,6 +497,6 @@
     </section>
   </div>
 
-  <script src="/unified-planner.js?v=20260415q"></script>
+  <script src="/unified-planner.js?v=20260415r"></script>
 </body>
 </html>
