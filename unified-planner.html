@@ -16,7 +16,8 @@
     .uni-page .panel { padding:14px; }
     .uni-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:14px; }
     .uni-toolbar { display:grid; gap:12px; }
-    .uni-toolbar-top { display:grid; grid-template-columns:minmax(260px,1fr) auto auto; gap:10px; align-items:center; }
+    .uni-toolbar-top { display:grid; grid-template-columns:minmax(260px,1fr) auto auto auto; gap:10px; align-items:center; }
+    .uni-search-actions { display:flex; gap:8px; align-items:center; }
     .uni-toolbar-foot { display:grid; gap:10px; }
     .uni-work-head {
       display: grid;
@@ -599,6 +600,7 @@
       .uni-page { padding:12px; gap:12px; }
       .uni-page .panel { padding:12px; }
       .uni-toolbar-top { grid-template-columns:1fr; }
+      .uni-search-actions { justify-content:flex-start; }
       .uni-work-head { grid-template-columns: 1fr; align-items: flex-start; }
       .uni-work-month { min-width: 150px; max-width: none; width: 100%; }
       .uni-filters { grid-template-columns:1fr; }
@@ -635,6 +637,10 @@
     <section class="panel uni-toolbar">
       <div class="uni-toolbar-top">
         <input id="uniSearch" class="search" placeholder="Search title, key, owner, note" />
+        <div class="uni-search-actions">
+          <button id="uniClearSearchBtn" class="btn" type="button">ล้างค้นหา</button>
+          <button id="uniRefreshBtn" class="btn primary" type="button">Refresh</button>
+        </div>
         <div id="uniStatusFilterWrap" class="uni-work-quick uni-status-wrap">
           <button id="uniStatusFilterBtn" class="search uni-work-month uni-filter-trigger" type="button" aria-expanded="false">Status: Pending, S4, S5, S6</button>
           <div id="uniStatusFilterBox" class="uni-quick-box uni-status-box" hidden>
@@ -651,9 +657,7 @@
         <div id="uniViewSwitch" class="list-view-mode-switch todo-switch"></div>
       </div>
       <div class="uni-toolbar-foot">
-        <div class="uni-controls">
-          <button id="uniRefreshBtn" class="btn" type="button">Refresh</button>
-        </div>
+        <div class="uni-controls"></div>
       </div>
     </section>
 
@@ -762,6 +766,6 @@
     </section>
   </div>
 
-  <script src="/unified-planner.js?v=20260416ao"></script>
+  <script src="/unified-planner.js?v=20260416ap"></script>
 </body>
 </html>

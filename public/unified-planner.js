@@ -555,6 +555,8 @@ function bind(){
 
   $('uniMonthPicker').onchange=e=>{st.month=e.target.value||st.month;render()}
   $('uniSearch').oninput=e=>{st.search=String(e.target.value||'');render()}
+  const clearBtn=$('uniClearSearchBtn')
+  if(clearBtn)clearBtn.onclick=()=>{st.search='';$('uniSearch').value='';render()}
   $('uniSortField').onchange=e=>{st.sort=e.target.value||'updatedAt';render()}
   $('uniSortDir').onchange=e=>{st.dir=e.target.value||'desc';render()}
   $('uniRefreshBtn').onclick=async()=>{await load();render()}
