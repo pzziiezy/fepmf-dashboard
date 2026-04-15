@@ -25,6 +25,19 @@
       gap: 10px;
       width: 100%;
     }
+    .uni-title-row {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .uni-create-btn {
+      min-height: 36px;
+      border-radius: 999px;
+      padding: 0 14px;
+      font-size: 13px;
+      font-weight: 800;
+    }
     #uniMonthWrap {
       display: flex;
       justify-content: flex-end;
@@ -386,6 +399,18 @@
     .uni-pop-card.is-saving .uni-pop-loader {
       display: flex;
     }
+    .uni-create-dialog {
+      width: min(720px, calc(100vw - 24px));
+      max-height: calc(100vh - 24px);
+      overflow: auto;
+    }
+    .uni-create-form {
+      display: grid;
+      grid-template-columns: repeat(2,minmax(0,1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .uni-create-form .full { grid-column: 1 / -1; }
 
     .uni-create-mode { display:inline-flex; border:1px solid rgba(128,151,190,.36); border-radius:999px; overflow:hidden; background:rgba(244,248,255,.88); }
     .uni-create-mode label { padding:6px 12px; font-size:12px; font-weight:700; color:#2d4f7f; cursor:pointer; }
@@ -549,7 +574,10 @@
             <div class="uni-work-head">
               <div>
                 <div class="section-label">Workspace</div>
-                <h2 class="todo-panel-title">Main View</h2>
+                <div class="uni-title-row">
+                  <h2 class="todo-panel-title">Main View</h2>
+                  <button id="uniOpenCreateBtn" class="btn primary uni-create-btn" type="button">Create New Task</button>
+                </div>
               </div>
               <div class="uni-work-tools">
                 <div id="uniMonthWrap" hidden>
@@ -570,46 +598,46 @@
           <div id="uniViewHost" class="uni-view-host"></div>
         </section>
 
-        <section class="panel">
-          <div class="todo-panel-head">
-            <div>
-              <div class="section-label">Add Task / Item</div>
-              <h2 class="todo-panel-title">Create Plan Only or Checklist + Plan</h2>
-            </div>
-          </div>
-          <form id="uniCreateForm" class="form-grid todo-form">
-            <label class="field full"><span>Task Title *</span><input name="title" required /></label>
-            <label class="field full"><span>Key</span><input name="key" /></label>
-            <label class="field"><span>Start Date</span><input type="date" name="start" required /></label>
-            <label class="field"><span>End Date</span><input type="date" name="end" required /></label>
-            <label class="field"><span>Owner</span><input name="owner" /></label>
-            <label class="field todo-color-field">
-              <span>Color</span>
-              <div class="todo-color-shell">
-                <input id="uniColorInput" class="todo-color-input" type="color" name="color" value="#2c6e91" />
-                <button id="uniColorPreview" class="todo-color-preview" type="button" aria-label="Choose color"></button>
-              </div>
-            </label>
-            <label class="field full"><span>Note</span><textarea name="note"></textarea></label>
-            <div class="full">
-              <div class="uni-create-mode">
-                <label><input type="radio" name="createMode" value="plan_only" checked />Plan Only</label>
-                <label><input type="radio" name="createMode" value="checklist_and_plan" />Checklist + Plan</label>
-              </div>
-            </div>
-            <div class="full planner-lab-form-actions">
-              <button id="uniSaveBtn" class="btn primary" type="submit">Create item</button>
-              <button id="uniCancelEditBtn" class="btn" type="button" style="display:none">Cancel edit</button>
-              <span id="uniCreateStatus" class="notice"></span>
-            </div>
-          </form>
-        </section>
       </div>
 
     </section>
   </div>
 
   <div id="uniInspectorPop" class="uni-inspector-pop"></div>
+
+  <div id="uniCreateModal" class="todo-auth-modal" hidden>
+    <div id="uniCreateBackdrop" class="todo-auth-backdrop"></div>
+    <section class="todo-auth-dialog uni-create-dialog" role="dialog" aria-modal="true" aria-labelledby="uniCreateTitle">
+      <h3 id="uniCreateTitle">Create Plan Only or Checklist + Plan</h3>
+      <form id="uniCreateForm" class="uni-create-form">
+        <label class="field full"><span>Task Title *</span><input name="title" required /></label>
+        <label class="field full"><span>Key</span><input name="key" /></label>
+        <label class="field"><span>Start Date</span><input type="date" name="start" required /></label>
+        <label class="field"><span>End Date</span><input type="date" name="end" required /></label>
+        <label class="field"><span>Owner</span><input name="owner" /></label>
+        <label class="field todo-color-field">
+          <span>Color</span>
+          <div class="todo-color-shell">
+            <input id="uniColorInput" class="todo-color-input" type="color" name="color" value="#2c6e91" />
+            <button id="uniColorPreview" class="todo-color-preview" type="button" aria-label="Choose color"></button>
+          </div>
+        </label>
+        <label class="field full"><span>Note</span><textarea name="note"></textarea></label>
+        <div class="full">
+          <div class="uni-create-mode">
+            <label><input type="radio" name="createMode" value="plan_only" checked />Plan Only</label>
+            <label><input type="radio" name="createMode" value="checklist_and_plan" />Checklist + Plan</label>
+          </div>
+        </div>
+        <div class="full planner-lab-form-actions">
+          <button id="uniSaveBtn" class="btn primary" type="submit">Create item</button>
+          <button id="uniCancelEditBtn" class="btn" type="button" style="display:none">Cancel edit</button>
+          <button id="uniCloseCreateBtn" class="btn" type="button">Close</button>
+          <span id="uniCreateStatus" class="notice"></span>
+        </div>
+      </form>
+    </section>
+  </div>
 
   <div id="uniAuthModal" class="todo-auth-modal" hidden>
     <div id="uniAuthBackdrop" class="todo-auth-backdrop"></div>
@@ -634,6 +662,6 @@
     </section>
   </div>
 
-  <script src="/unified-planner.js?v=20260416ab"></script>
+  <script src="/unified-planner.js?v=20260416ac"></script>
 </body>
 </html>
