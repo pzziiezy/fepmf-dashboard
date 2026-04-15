@@ -252,6 +252,15 @@
       font-weight: 900;
     }
     .uni-cal-count { margin-top:4px; font-size:10px; color:#6f88aa; }
+    .planner-lab-timeline-shell {
+      width: 100%;
+      min-width: 0;
+      --lab-col-width: minmax(18px, 1fr);
+    }
+    .planner-lab-head,
+    .planner-lab-track {
+      grid-template-columns: repeat(var(--lab-days, 61), minmax(18px, 1fr));
+    }
 
     @media (max-width:1180px) {
       .uni-page { padding:12px; gap:12px; }
@@ -409,6 +418,6 @@
     </section>
   </div>
 
-  <script src="/unified-planner.js?v=20260415k"></script>
+  <script src="/unified-planner.js?v=20260415l"></script>
 </body>
 </html>

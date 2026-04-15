@@ -106,7 +106,7 @@ function timelineHTML(items){
   const head=Array.from({length:days},(_,k)=>{const d=new Date(a.getTime());d.setUTCDate(d.getUTCDate()+k);const w=d.getUTCDay()===0||d.getUTCDay()===6;const l=d.toLocaleDateString('en-US',{weekday:'short',timeZone:'UTC'}).slice(0,2);return `<div class="planner-lab-day ${w?'is-weekend':''}" style="grid-column:${k+1}"><span>${l}</span><strong>${d.getUTCDate()}</strong></div>`}).join('')
   const rows=x.map(i=>{const s=new Date(`${i.start}T00:00:00Z`),e=new Date(`${i.end}T00:00:00Z`),cs=s<a?a:s,ce=e>b?b:e;if(ce<cs)return'';const so=Math.floor((cs-a)/86400000),eo=Math.floor((ce-a)/86400000),sp=Math.max(1,eo-so+1);return `<div class="planner-lab-row"><div class="planner-lab-track">${Array.from({length:days},()=>'<div class="planner-lab-track-day"></div>').join('')}<button class="planner-lab-bar manual" type="button" data-role="inspect" data-uid="${esc(i.uid)}" style="grid-column:${so+1} / span ${sp};--lab-bar:${esc(i.color)}"><span>${esc(i.key?`${i.title} : ${i.key}`:i.title)}</span></button></div></div>`}).filter(Boolean).join('')
   if(!rows)return '<div class="empty">No timeline item in this range</div>'
-  return `<div class="planner-lab-timeline-shell" style="--lab-days:${days}"><div class="planner-lab-head">${head}</div><div class="planner-lab-body">${rows}</div></div>`
+  return `<div class="planner-lab-timeline"><div class="planner-lab-timeline-shell" style="--lab-days:${days}"><div class="planner-lab-head">${head}</div><div class="planner-lab-body">${rows}</div></div></div>`
 }
 function calendarHTML(items){
   const x=items.filter(i=>i.start&&i.end),mr=monthRange(),nm=['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
