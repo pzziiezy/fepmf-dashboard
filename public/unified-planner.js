@@ -1,8 +1,8 @@
 ﻿const AUTH_KEY='unified_actor_session_v1'
 const DEF_COLOR='#2c6e91'
 const FILTERS=['Pending','Done','S0','S1','S2','S3','S4','S5','S6','S7']
-const DEFAULT_STATUS_FILTERS=['Pending','S0','S1','S2','S3','S4','S5','S6','S7']
-const st={tasks:[],jiraRows:[],month:'',search:'',view:'card',sort:'updatedAt',dir:'desc',statusFilters:[...DEFAULT_STATUS_FILTERS],typeFilters:['Checklist','Jira'],sel:'',log:'',auth:null,busy:'',editingId:'',editingActorEmail:'',sheetName:'PlannerTasks',liveEdits:{}}
+const DEFAULT_STATUS_FILTERS=['Pending','S4','S5','S6']
+const st={tasks:[],jiraRows:[],month:'',search:'',view:'card',sort:'updatedAt',dir:'desc',statusFilters:[...DEFAULT_STATUS_FILTERS],statusSearch:'',typeFilters:['Checklist','Jira'],sel:'',log:'',auth:null,busy:'',editingId:'',editingActorEmail:'',sheetName:'PlannerTasks',liveEdits:{}}
 const $=id=>document.getElementById(id)
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))
 const notice=(el,m,t='info')=>{if(!el)return;el.textContent=m||'';el.classList.remove('notice-success','notice-error');if(t==='success')el.classList.add('notice-success');if(t==='error')el.classList.add('notice-error')}
@@ -169,9 +169,7 @@ function renderFilters(){
       render()
     })
   }
-  const s=$('uniStatusFilterGrid')
-  s.innerHTML=FILTERS.map(f=>`<label><input type="checkbox" value="${f}" ${st.statusFilters.includes(f)?'checked':''}/><span>${f}</span></label>`).join('')
-  s.querySelectorAll('input').forEach(i=>i.onchange=()=>{const vals=[...s.querySelectorAll('input:checked')].map(x=>x.value);st.statusFilters=vals.length?vals:[...DEFAULT_STATUS_FILTERS];render()})
+  syncStatusFilter()
 }
 function quickTypeLabel(){return st.typeFilters.length===2?'All Task Types':st.typeFilters.join(', ')}
 function syncQuickType(){
@@ -181,6 +179,39 @@ function syncQuickType(){
   if(box){
     box.querySelectorAll('input').forEach(i=>{i.checked=st.typeFilters.includes(i.value)})
   }
+}
+function statusFilterLabel(){
+  const vals=st.statusFilters.filter(v=>FILTERS.includes(v))
+  if(!vals.length)return 'Status: Default'
+  if(vals.length===FILTERS.length)return 'Status: All'
+  if(vals.length<=3)return `Status: ${vals.join(', ')}`
+  return `Status: ${vals.slice(0,3).join(', ')} +${vals.length-3}`
+}
+function renderStatusFilterOptions(){
+  const host=$('uniStatusFilterOptions')
+  if(!host)return
+  const q=String(st.statusSearch||'').trim().toLowerCase()
+  const options=FILTERS.filter(v=>String(v).toLowerCase().includes(q))
+  host.innerHTML=options.length
+    ? options.map(v=>`<label><input type="checkbox" value="${v}" ${st.statusFilters.includes(v)?'checked':''}/><span>${v}</span></label>`).join('')
+    : '<div class="mini-empty">No status found</div>'
+  host.querySelectorAll('input').forEach(i=>i.onchange=()=>{
+    const checked=[...host.querySelectorAll('input:checked')].map(x=>x.value)
+    const preservedHidden=st.statusFilters.filter(v=>!options.includes(v))
+    const merged=[...new Set([...checked,...preservedHidden])]
+    st.statusFilters=merged.length?merged:[...DEFAULT_STATUS_FILTERS]
+    syncStatusFilter(true)
+    render()
+  })
+}
+function syncStatusFilter(keepOpen=false){
+  const btn=$('uniStatusFilterBtn')
+  const box=$('uniStatusFilterBox')
+  const search=$('uniStatusSearch')
+  if(btn)btn.textContent=statusFilterLabel()
+  if(search&&search.value!==st.statusSearch)search.value=st.statusSearch
+  renderStatusFilterOptions()
+  if(!keepOpen&&box?.hidden===false)box.hidden=false
 }
 
 function cardHTML(items){
@@ -514,6 +545,106 @@ async function load(apply=true){
   return {items:Array.isArray(t.items)?t.items:[],sheetName:String(t.sheetName||'PlannerTasks'),jiraRows}
 }
 
-function bind(){const d=new Date();st.month=`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`;$('uniMonthPicker').value=st.month;renderSwitch();renderFilters();toggleMonthFilter();$('uniMonthPicker').onchange=e=>{st.month=e.target.value||st.month;render()};$('uniSearch').oninput=e=>{st.search=String(e.target.value||'');render()};$('uniSortField').onchange=e=>{st.sort=e.target.value||'updatedAt';render()};$('uniSortDir').onchange=e=>{st.dir=e.target.value||'desc';render()};$('uniRefreshBtn').onclick=async()=>{await load();render()};$('uniOpenCreateBtn').onclick=()=>{resetForm();openCreateModal()};$('uniCloseCreateBtn').onclick=()=>{closeCreateModal();resetForm()};$('uniCreateBackdrop').onclick=()=>{closeCreateModal();resetForm()};const quickBtn=$('uniQuickTypeBtn'),quickBox=$('uniQuickTypeBox');if(quickBtn&&quickBox){const closeQuick=()=>{quickBox.hidden=true;quickBtn.setAttribute('aria-expanded','false')};quickBtn.onclick=e=>{e.stopPropagation();const show=quickBox.hidden;quickBox.hidden=!show;quickBtn.setAttribute('aria-expanded',show?'true':'false')};quickBox.onclick=e=>e.stopPropagation();quickBox.querySelectorAll('input').forEach(i=>i.onchange=()=>{let vals=[...quickBox.querySelectorAll('input:checked')].map(x=>x.value);if(!vals.length)vals=['Checklist','Jira'];st.typeFilters=vals;syncQuickType();renderFilters();render();setTimeout(closeQuick,0)});document.addEventListener('click',e=>{if(e.target.closest('#uniQuickTypeWrap'))return;closeQuick()});document.addEventListener('keydown',e=>{if(e.key==='Escape')closeQuick()});window.addEventListener('blur',closeQuick);window.addEventListener('scroll',closeQuick,true)}syncQuickType();$('uniColorPreview').onclick=()=>$('uniColorInput').click();$('uniColorInput').oninput=syncColor;syncColor();$('uniCreateForm').onsubmit=async e=>{e.preventDefault();const s=$('uniCreateStatus');notice(s,st.editingId?'Updating item...':'Creating item...');try{await createFromForm(e.currentTarget);await load();render();resetForm();closeCreateModal();notice($('uniSync'),'Saved successfully','success')}catch(err){notice(s,err.message||'Unable to save item','error')}};$('uniCancelEditBtn').onclick=resetForm;$('uniAuthCancel').onclick=()=>cancelAuthModal();$('uniAuthBackdrop').onclick=()=>cancelAuthModal();$('uniAuthForm').onsubmit=async e=>{e.preventDefault();const p=st.auth;if(!p)return;const email=em($('uniAuthEmail').value),remember=Boolean($('uniAuthRemember').checked),s=$('uniAuthStatus'),b=$('uniAuthConfirm');if(!email){notice(s,'Jira email is required','error');return}try{b.disabled=true;notice(s,'Validating Jira email...');const r=await validateJiraEmail(email);if(!r?.valid)throw new Error(r?.reason||'Jira email not found');const actor={email:em(r?.user?.email||email),displayName:String(r?.user?.displayName||''),accountId:String(r?.user?.accountId||'')};if(remember)setActor(actor);else sessionStorage.removeItem(AUTH_KEY);st.auth=null;closeAuthModal();p.res(actor)}catch(err){notice(s,err.message||'Auth failed','error')}finally{b.disabled=false}};document.addEventListener('click',e=>{if(!$('uniAuthModal').hidden)return;const pop=$('uniInspectorPop');if(!pop.classList.contains('open'))return;if(e.target.closest('#uniInspectorPop'))return;if(e.target.closest('[data-role="inspect"]'))return;pop.classList.remove('open')})}
+function bind(){
+  const d=new Date()
+  st.month=`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`
+  $('uniMonthPicker').value=st.month
+  renderSwitch()
+  renderFilters()
+  toggleMonthFilter()
+
+  $('uniMonthPicker').onchange=e=>{st.month=e.target.value||st.month;render()}
+  $('uniSearch').oninput=e=>{st.search=String(e.target.value||'');render()}
+  $('uniSortField').onchange=e=>{st.sort=e.target.value||'updatedAt';render()}
+  $('uniSortDir').onchange=e=>{st.dir=e.target.value||'desc';render()}
+  $('uniRefreshBtn').onclick=async()=>{await load();render()}
+  $('uniOpenCreateBtn').onclick=()=>{resetForm();openCreateModal()}
+  $('uniCloseCreateBtn').onclick=()=>{closeCreateModal();resetForm()}
+  $('uniCreateBackdrop').onclick=()=>{closeCreateModal();resetForm()}
+
+  const quickBtn=$('uniQuickTypeBtn'),quickBox=$('uniQuickTypeBox')
+  if(quickBtn&&quickBox){
+    const closeQuick=()=>{quickBox.hidden=true;quickBtn.setAttribute('aria-expanded','false')}
+    quickBtn.onclick=e=>{e.stopPropagation();const show=quickBox.hidden;quickBox.hidden=!show;quickBtn.setAttribute('aria-expanded',show?'true':'false')}
+    quickBox.onclick=e=>e.stopPropagation()
+    quickBox.querySelectorAll('input').forEach(i=>i.onchange=()=>{
+      let vals=[...quickBox.querySelectorAll('input:checked')].map(x=>x.value)
+      if(!vals.length)vals=['Checklist','Jira']
+      st.typeFilters=vals
+      syncQuickType()
+      renderFilters()
+      render()
+      setTimeout(closeQuick,0)
+    })
+    document.addEventListener('click',e=>{if(e.target.closest('#uniQuickTypeWrap'))return;closeQuick()})
+    document.addEventListener('keydown',e=>{if(e.key==='Escape')closeQuick()})
+    window.addEventListener('blur',closeQuick)
+    window.addEventListener('scroll',closeQuick,true)
+  }
+  syncQuickType()
+
+  const statusBtn=$('uniStatusFilterBtn'),statusBox=$('uniStatusFilterBox'),statusSearch=$('uniStatusSearch'),statusClose=$('uniStatusCloseBtn'),statusDefault=$('uniStatusDefaultBtn')
+  if(statusBtn&&statusBox){
+    const closeStatus=()=>{statusBox.hidden=true;statusBtn.setAttribute('aria-expanded','false')}
+    statusBtn.onclick=e=>{e.stopPropagation();const show=statusBox.hidden;statusBox.hidden=!show;statusBtn.setAttribute('aria-expanded',show?'true':'false');if(show)setTimeout(()=>statusSearch?.focus(),0)}
+    statusBox.onclick=e=>e.stopPropagation()
+    if(statusSearch)statusSearch.oninput=e=>{st.statusSearch=String(e.target.value||'');renderStatusFilterOptions()}
+    if(statusDefault)statusDefault.onclick=()=>{st.statusFilters=[...DEFAULT_STATUS_FILTERS];st.statusSearch='';syncStatusFilter(true);render()}
+    if(statusClose)statusClose.onclick=()=>closeStatus()
+    document.addEventListener('click',e=>{if(e.target.closest('#uniStatusFilterWrap'))return;closeStatus()})
+    document.addEventListener('keydown',e=>{if(e.key==='Escape')closeStatus()})
+    window.addEventListener('blur',closeStatus)
+    window.addEventListener('scroll',closeStatus,true)
+  }
+  syncStatusFilter()
+
+  $('uniColorPreview').onclick=()=>$('uniColorInput').click()
+  $('uniColorInput').oninput=syncColor
+  syncColor()
+
+  $('uniCreateForm').onsubmit=async e=>{
+    e.preventDefault()
+    const s=$('uniCreateStatus')
+    notice(s,st.editingId?'Updating item...':'Creating item...')
+    try{
+      await createFromForm(e.currentTarget)
+      await load()
+      render()
+      resetForm()
+      closeCreateModal()
+      notice($('uniSync'),'Saved successfully','success')
+    }catch(err){notice(s,err.message||'Unable to save item','error')}
+  }
+  $('uniCancelEditBtn').onclick=resetForm
+  $('uniAuthCancel').onclick=()=>cancelAuthModal()
+  $('uniAuthBackdrop').onclick=()=>cancelAuthModal()
+  $('uniAuthForm').onsubmit=async e=>{
+    e.preventDefault()
+    const p=st.auth
+    if(!p)return
+    const email=em($('uniAuthEmail').value),remember=Boolean($('uniAuthRemember').checked),s=$('uniAuthStatus'),b=$('uniAuthConfirm')
+    if(!email){notice(s,'Jira email is required','error');return}
+    try{
+      b.disabled=true
+      notice(s,'Validating Jira email...')
+      const r=await validateJiraEmail(email)
+      if(!r?.valid)throw new Error(r?.reason||'Jira email not found')
+      const actor={email:em(r?.user?.email||email),displayName:String(r?.user?.displayName||''),accountId:String(r?.user?.accountId||'')}
+      if(remember)setActor(actor);else sessionStorage.removeItem(AUTH_KEY)
+      st.auth=null
+      closeAuthModal()
+      p.res(actor)
+    }catch(err){notice(s,err.message||'Auth failed','error')}
+    finally{b.disabled=false}
+  }
+  document.addEventListener('click',e=>{
+    if(!$('uniAuthModal').hidden)return
+    const pop=$('uniInspectorPop')
+    if(!pop.classList.contains('open'))return
+    if(e.target.closest('#uniInspectorPop'))return
+    if(e.target.closest('[data-role="inspect"]'))return
+    pop.classList.remove('open')
+  })
+}
 
 bind();load().then(()=>render()).catch(err=>notice($('uniSync'),err.message||'Unable to load unified planner','error'))
