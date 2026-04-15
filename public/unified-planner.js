@@ -158,6 +158,7 @@ function inspect(uid,anchor){
   if(!it){pop.classList.remove('open');pop.innerHTML='';return}
   st.sel=uid
   let editing=false
+  let editActorEmail=''
   const accent=col(it.color||DEF_COLOR)
   const accentSoft=hexToRgba(accent,.14)
   const accentBorder=hexToRgba(accent,.42)
@@ -219,9 +220,10 @@ function inspect(uid,anchor){
     </div>`
     $('uniInspectorClose').onclick=()=>pop.classList.remove('open')
     if(editing){
-      $('uniInspectorCancelEdit').onclick=()=>{editing=false;render()}
+      $('uniInspectorCancelEdit').onclick=e=>{e.preventDefault();e.stopPropagation();editing=false;render()}
       $('uniInspectorEditForm').onsubmit=async e=>{
         e.preventDefault()
+        e.stopPropagation()
         const s=$('uniInspectorStatus')
         const f=e.currentTarget
         const payload={
@@ -241,8 +243,7 @@ function inspect(uid,anchor){
         if(payload.status&&!FILTERS.includes(payload.status)){notice(s,'Invalid Jira status','error');return}
         try{
           notice(s,'Saving...')
-          const a=await askAuth('update item')
-          const eMail=em(a?.email)
+          const eMail=editActorEmail||em((await askAuth('update item'))?.email)
           if(!eMail)throw new Error('Jira email is required')
           await api('/api/todo',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({
             id:it.taskId,
@@ -266,10 +267,23 @@ function inspect(uid,anchor){
       }
       return
     }
-    $('uniInspectorDoneBtn').onclick=async()=>{const s=$('uniInspectorStatus');notice(s,it.isDone?'Updating...':'Marking...');const ok=await setDone(it.uid,!it.isDone);if(!ok)notice(s,'Unable','error')}
-    $('uniInspectorEditBtn').onclick=()=>{editing=true;render()}
-    $('uniInspectorDeleteBtn').onclick=async()=>{await deleteItem(it.uid)}
-    $('uniInspectorLogForm').onsubmit=async e=>{e.preventDefault();const m=String(e.currentTarget.message.value||'').trim();if(!m)return;await addLog(it.uid,m)}
+    $('uniInspectorDoneBtn').onclick=async e=>{e.preventDefault();e.stopPropagation();const s=$('uniInspectorStatus');notice(s,it.isDone?'Updating...':'Marking...');const ok=await setDone(it.uid,!it.isDone);if(!ok)notice(s,'Unable','error')}
+    $('uniInspectorEditBtn').onclick=async e=>{
+      e.preventDefault()
+      e.stopPropagation()
+      try{
+        const a=await askAuth('open edit mode')
+        editActorEmail=em(a?.email)
+        if(!editActorEmail)throw new Error('Jira email is required')
+        editing=true
+        render()
+      }catch(err){
+        const s=$('uniInspectorStatus')
+        notice(s,err.message||'Unable to enter edit mode','error')
+      }
+    }
+    $('uniInspectorDeleteBtn').onclick=async e=>{e.preventDefault();e.stopPropagation();await deleteItem(it.uid)}
+    $('uniInspectorLogForm').onsubmit=async e=>{e.preventDefault();e.stopPropagation();const m=String(e.currentTarget.message.value||'').trim();if(!m)return;await addLog(it.uid,m)}
   }
   render()
   const r=anchor?.getBoundingClientRect()
