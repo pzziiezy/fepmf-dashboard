@@ -1,7 +1,7 @@
 ﻿# Unified Planner Analysis (Preview Phase)
 
 ## 1) Problem Statement
-- Current split menus (`Calendar Planner` and `To Do Checklist`) create context switching and inconsistent `Done` behavior for tasks that originate in checklist but render in calendar timeline.
+- Legacy split menus created context switching and inconsistent `Done` behavior for tasks that originate in checklist but render in calendar timeline.
 - The immediate defect is identity resolution: calendar-side done action favored `sourceType=planner` tasks and could create a new planner task record instead of updating the original checklist task (`sourceType=todo`) linked by `plannerRefId`.
 
 ## 2) Current-State Model
@@ -23,7 +23,6 @@
   3. Only if no linked task exists and action is `Done`, create a planner-linked todo record.
 
 ## 4) Non-Goals in Preview Phase
-- Do not remove existing pages (`calendar.html`, `todo.html`) yet.
 - Do not migrate all advanced edit workflows into unified page in first preview.
 
 ## 5) Acceptance Criteria for Preview

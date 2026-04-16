@@ -1,4 +1,7 @@
 {
+  "redirects": [
+    { "source": "/", "destination": "/unified-planner.html", "permanent": false }
+  ],
   "rewrites": [
     { "source": "/api/jira", "destination": "/api/jira.js" },
     { "source": "/api/dashboard", "destination": "/api/dashboard.js" },
