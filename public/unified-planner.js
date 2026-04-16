@@ -2,11 +2,12 @@
 const DEF_COLOR='#2c6e91'
 const FILTERS=['Pending','Done','S0','S1','S2','S3','S4','S5','S6','S7']
 const DEFAULT_STATUS_FILTERS=['Pending','S4','S5','S6']
-const st={tasks:[],jiraRows:[],month:'',search:'',view:'card',sort:'updatedAt',dir:'desc',statusFilters:[...DEFAULT_STATUS_FILTERS],statusSearch:'',typeFilters:['Checklist','Jira'],sel:'',log:'',auth:null,busy:'',editingId:'',editingActorEmail:'',sheetName:'PlannerTasks',liveEdits:{}}
+const JIRA_CACHE_MS=2*60*1000
+const st={tasks:[],jiraRows:[],month:'',search:'',view:'card',sort:'updatedAt',dir:'desc',statusFilters:[...DEFAULT_STATUS_FILTERS],statusSearch:'',typeFilters:['Checklist','Jira'],sel:'',log:'',auth:null,busy:'',editingId:'',editingActorEmail:'',sheetName:'PlannerTasks',liveEdits:{},jiraFetchedAt:0}
 const $=id=>document.getElementById(id)
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))
 const notice=(el,m,t='info')=>{if(!el)return;el.textContent=m||'';el.classList.remove('notice-success','notice-error');if(t==='success')el.classList.add('notice-success');if(t==='error')el.classList.add('notice-error')}
-const api=(u,o={})=>fetch(u,{cache:'no-store',...o}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok||d?.error)throw new Error(d?.error||'Request failed');return d})
+const api=(u,o={})=>{const m=String(o?.method||'GET').toUpperCase(),opts={...o};if(m!=='GET'&&!('cache' in opts))opts.cache='no-store';return fetch(u,opts).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok||d?.error)throw new Error(d?.error||'Request failed');return d})}
 const em=v=>String(v||'').trim().toLowerCase()
 const col=(v,f=DEF_COLOR)=>/^#[0-9a-fA-F]{6}$/.test(String(v||'').trim())?String(v).trim():f
 const dt=v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||'').trim())?String(v).trim():''
@@ -516,30 +517,40 @@ function toggleMonthFilter(){const w=$('uniMonthWrap'),q=$('uniQuickTypeWrap'),q
 function resetForm(){st.editingId='';st.editingActorEmail='';const f=$('uniCreateForm');if(!f)return;f.reset();f.color.value=DEF_COLOR;syncColor();$('uniSaveBtn').textContent='Create item';$('uniCancelEditBtn').style.display='none';notice($('uniCreateStatus'),'')}
 async function createFromForm(f){const p={title:String(f.title.value||'').trim(),key:String(f.key.value||'').trim(),start:dt(f.start.value||''),end:dt(f.end.value||''),owner:String(f.owner.value||'').trim(),note:String(f.note.value||'').trim(),color:col(f.color.value||DEF_COLOR)};if(!p.title)throw new Error('Task title is required');if(!p.start||!p.end)throw new Error('Start and End are required');if(p.end<p.start)throw new Error('End date must be on or after Start date');const a=st.editingId&&st.editingActorEmail?{email:st.editingActorEmail}:await askAuth(st.editingId?'update item':'create item'),e=em(a?.email);if(!e)throw new Error('Jira email is required');const payload={sourceType:'todo',taskType:'planner_and_checklist',title:p.title,key:p.key,owner:p.owner,note:p.note,color:p.color,start:p.start,end:p.end,actorEmail:e};if(st.editingId)await api('/api/todo',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({...payload,id:st.editingId})});else await api('/api/todo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})}
 
-async function load(apply=true){
+async function load(apply=true,forceJiraRefresh=false){
   if(apply)notice($('uniSync'),'Loading PlannerTasks+Jira')
   const ts=Date.now()
+  const shouldFetchJira=forceJiraRefresh||!st.jiraRows.length||(Date.now()-st.jiraFetchedAt>JIRA_CACHE_MS)
   const [todoRes,dashRes]=await Promise.allSettled([
     api(`/api/todo?_ts=${ts}`),
-    api(`/api/dashboard?_ts=${ts}`)
+    shouldFetchJira?api(`/api/dashboard${forceJiraRefresh?'?refresh=true':''}`):Promise.resolve(null)
   ])
   if(todoRes.status!=='fulfilled')throw todoRes.reason||new Error('Unable to load PlannerTasks')
   const t=todoRes.value||{}
-  const dash=dashRes.status==='fulfilled'?(dashRes.value||{}):{}
-  const timelineByKey=new Map((Array.isArray(dash.timelineItems)?dash.timelineItems:[]).map(item=>[String(item.key||''),item]))
-  const jiraRows=(Array.isArray(dash.parents)?dash.parents:[]).map(row=>{
-    const parent=row?.parent||{}
-    const key=String(parent.key||'')
-    const timeline=timelineByKey.get(key)||null
-    return timeline?{parent,timeline}:null
-  }).filter(Boolean)
+  let jiraRows=st.jiraRows
+  let jiraMsg='Jira cached'
+  if(dashRes.status==='fulfilled'&&dashRes.value){
+    const dash=dashRes.value||{}
+    const timelineByKey=new Map((Array.isArray(dash.timelineItems)?dash.timelineItems:[]).map(item=>[String(item.key||''),item]))
+    jiraRows=(Array.isArray(dash.parents)?dash.parents:[]).map(row=>{
+      const parent=row?.parent||{}
+      const key=String(parent.key||'')
+      const timeline=timelineByKey.get(key)||null
+      return timeline?{parent,timeline}:null
+    }).filter(Boolean)
+    st.jiraFetchedAt=Date.now()
+    jiraMsg=`${jiraRows.length} Jira projects`
+  }else if(dashRes.status==='rejected'){
+    jiraMsg='Jira unavailable'
+  }else{
+    jiraMsg=`${jiraRows.length} Jira projects (cached)`
+  }
   if(apply){
     st.tasks=Array.isArray(t.items)?t.items:[]
     st.jiraRows=jiraRows
     st.liveEdits={}
     st.sheetName=String(t.sheetName||'PlannerTasks')
     if($('uniSheetTag'))$('uniSheetTag').textContent=`Sheet: ${st.sheetName}`
-    const jiraMsg=dashRes.status==='fulfilled'?`${jiraRows.length} Jira projects`:'Jira unavailable'
     notice($('uniSync'),`Loaded ${st.tasks.length} items from ${st.sheetName} + ${jiraMsg}`,'success')
   }
   return {items:Array.isArray(t.items)?t.items:[],sheetName:String(t.sheetName||'PlannerTasks'),jiraRows}
@@ -559,7 +570,7 @@ function bind(){
   if(clearBtn)clearBtn.onclick=()=>{st.search='';$('uniSearch').value='';render()}
   $('uniSortField').onchange=e=>{st.sort=e.target.value||'updatedAt';render()}
   $('uniSortDir').onchange=e=>{st.dir=e.target.value||'desc';render()}
-  $('uniRefreshBtn').onclick=async()=>{await load();render()}
+  $('uniRefreshBtn').onclick=async()=>{await load(true,true);render()}
   $('uniOpenCreateBtn').onclick=()=>{resetForm();openCreateModal()}
   $('uniCloseCreateBtn').onclick=()=>{closeCreateModal();resetForm()}
   $('uniCreateBackdrop').onclick=()=>{closeCreateModal();resetForm()}
