@@ -96,8 +96,8 @@ function isS7Status(status) {
 
 function compareLabel(type) {
   if (type === 'equal') return 'Equal'
-  if (type === 'early') return 'Actual เน€เธฃเนเธงเธเธงเนเธฒ'
-  if (type === 'late') return 'Actual เธเนเธฒเธเธงเนเธฒ'
+  if (type === 'early') return 'Actual เร็วกว่า'
+  if (type === 'late') return 'Actual ช้ากว่า'
   return 'N/A'
 }
 
@@ -182,6 +182,8 @@ function formatSigned(value) {
 }
 
 function renderKpis() {
+  const host = document.getElementById('dashKpis')
+  if (!host) return
   const rows = state.rows || []
   const totalLinked = rows.reduce((sum, row) => sum + (row.linkedCount || 0), 0)
   const avgProgress = rows.length ? Math.round(rows.reduce((sum, row) => sum + (row.progressPercent || 0), 0) / rows.length) : 0
@@ -198,7 +200,7 @@ function renderKpis() {
     { label: 'Actual > Estimate', value: late, sub: 'Started later than plan', cls: 'soft-red' }
   ]
 
-  document.getElementById('dashKpis').innerHTML = cards.map((card) => `
+  host.innerHTML = cards.map((card) => `
     <article class="dash-kpi ${esc(card.cls)}">
       <div class="dash-kpi-label">${esc(card.label)}</div>
       <div class="dash-kpi-value">${esc(card.value)}</div>
@@ -653,8 +655,8 @@ function renderHighlights() {
     .sort((a, b) => String(a.parent.cabDate).localeCompare(String(b.parent.cabDate)))
     .slice(0, 8)
 
-  renderList('dashRisk', riskRows, 'เนเธกเนเธเธเธฃเธฒเธขเธเธฒเธฃเธเธงเธฒเธกเน€เธชเธตเนเธขเธเนเธเน€เธเธทเนเธญเธเนเธเธ—เธตเนเน€เธฅเธทเธญเธ')
-  renderList('dashCab', cabRows, 'เนเธกเนเธเธเธฃเธฒเธขเธเธฒเธฃ CAB เนเธเน€เธเธทเนเธญเธเนเธเธ—เธตเนเน€เธฅเธทเธญเธ')
+  renderList('dashRisk', riskRows, 'ไม่พบรายการความเสี่ยงในเงื่อนไขที่เลือก')
+  renderList('dashCab', cabRows, 'ไม่พบรายการ CAB ในเงื่อนไขที่เลือก')
 }
 
 function renderResultSummary() {
@@ -696,8 +698,8 @@ function renderCompareOptions() {
   select.innerHTML = [
     '<option value="all">All Compare</option>',
     '<option value="equal">Actual = Estimate</option>',
-    '<option value="early">Actual เน€เธฃเนเธงเธเธงเนเธฒ Estimate</option>',
-    '<option value="late">Actual เธเนเธฒเธเธงเนเธฒ Estimate</option>',
+    '<option value="early">Actual เร็วกว่า Estimate</option>',
+    '<option value="late">Actual ช้ากว่า Estimate</option>',
     '<option value="na">Compare N/A</option>'
   ].join('')
   select.value = state.compare
