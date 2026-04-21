@@ -416,7 +416,7 @@ function renderCompareAnalysis() {
   const coverage = rows.length ? Math.round((comparable / rows.length) * 100) : 0
 
   if (!comparable) {
-    host.innerHTML = '<div class="dash-empty">No comparable sprint data</div>'
+    host.innerHTML = '<div class="dash-empty">ไม่พบข้อมูลที่มีทั้ง Estimate และ Actual Sprint</div>'
     if (compareMeta) compareMeta.textContent = 'Comparable Items: 0'
     const compareValue = document.getElementById('dashCompareValue')
     const coverageValue = document.getElementById('dashCoverageValue')
@@ -455,6 +455,7 @@ function renderCompareAnalysis() {
     if (!squadMap.has(squad)) squadMap.set(squad, [])
     squadMap.get(squad).push(delta)
   }
+
   const squadStats = [...squadMap.entries()].map(([squad, vals]) => {
     const sorted = [...vals].sort((a, b) => a - b)
     const lateCount = vals.filter((x) => x > 0).length
@@ -474,6 +475,7 @@ function renderCompareAnalysis() {
     if (!sprintMap.has(key)) sprintMap.set(key, [])
     sprintMap.get(key).push(delta)
   }
+
   const trendRows = [...sprintMap.entries()]
     .map(([sprint, vals]) => {
       const lateCount = vals.filter((x) => x > 0).length
@@ -489,22 +491,22 @@ function renderCompareAnalysis() {
   const maxTrendLate = Math.max(...trendRows.map((x) => x.lateRate), 1)
 
   const metricCards = [
-    { key: 'เธ•เธฃเธเนเธเธ (On-time)', value: `${onTimeRate}%`, detail: `${onTime}/${comparable}`, meaning: 'เธชเธฑเธ”เธชเนเธงเธเธเธฒเธเธ—เธตเนเน€เธฃเธดเนเธกเนเธ”เนเธ•เธฃเธ sprint เธ•เธฒเธกเนเธเธ', help: 'เธขเธดเนเธเธชเธนเธเธขเธดเนเธเธ”เธต' },
-    { key: 'เน€เธฃเธดเนเธกเน€เธฃเนเธงเธเธงเนเธฒเนเธเธ', value: `${earlyRate}%`, detail: `${early}/${comparable}`, meaning: 'เธชเธฑเธ”เธชเนเธงเธเธเธฒเธเธ—เธตเนเน€เธฃเธดเนเธกเธเนเธญเธ sprint เธ—เธตเน estimate', help: 'เธ”เธตเน€เธกเธทเนเธญเนเธกเนเธเธฃเธฐเธ—เธ dependency' },
-    { key: 'เน€เธฃเธดเนเธกเธเนเธฒเธเธงเนเธฒเนเธเธ', value: `${lateRate}%`, detail: `${late}/${comparable}`, meaning: 'เธชเธฑเธ”เธชเนเธงเธเธเธฒเธเธ—เธตเนเน€เธฃเธดเนเธกเธเนเธฒเธเธงเนเธฒ sprint เธ—เธตเน estimate', help: 'เธ•เธฑเธงเธเธตเนเธงเธฑเธ”เธเธงเธฒเธกเน€เธชเธตเนเธขเธเธซเธฅเธฑเธ', risk: true },
-    { key: 'เธเนเธฒเธเธฅเธฒเธเธเธงเธฒเธกเธเธฅเธฒเธ”เน€เธเธฅเธทเนเธญเธ', value: formatSigned(Math.round(medianDelta * 10) / 10), detail: 'Actual - Estimate', meaning: 'เธเนเธฒเธเธฅเธฒเธเธเธญเธเธเธฒเธฃเธเธฅเธฒเธ”เน€เธเธฅเธทเนเธญเธเธ—เธฑเนเธเธเธญเธฃเนเธ•', help: 'เธเนเธฒเน€เธเนเธเธเธงเธ = เธกเธตเนเธเธงเนเธเนเธกเน€เธฃเธดเนเธกเธเนเธฒ' },
-    { key: 'เธเธงเธฒเธกเน€เธชเธตเนเธขเธเธเธฅเธฒเธขเธซเธฒเธ (P90)', value: `+${Math.round(p90Late * 10) / 10}`, detail: 'Tail risk', meaning: '90% เธเธญเธเธเธฒเธเธ—เธตเนเธเนเธฒเธเธฐเธเนเธฒเนเธกเนเน€เธเธดเธเธเนเธฒเธเธตเน', help: 'เนเธเนเน€เธเนเธ buffer เธ•เธญเธเธงเธฒเธเนเธเธ', risk: true },
-    { key: 'เธเธงเธฒเธกเธเธฃเธเธเธญเธเธเนเธญเธกเธนเธฅ', value: `${coverage}%`, detail: `${comparable}/${rows.length}`, meaning: 'เธชเธฑเธ”เธชเนเธงเธเธฃเธฒเธขเธเธฒเธฃเธ—เธตเนเธกเธตเธ—เธฑเนเธ Estimate เนเธฅเธฐ Actual', help: 'เธ•เนเธณเธเธงเนเธฒ 70% เนเธซเนเธฃเธฐเธงเธฑเธเธเธฒเธฃเธ•เธตเธเธงเธฒเธก' }
+    { key: 'ตรงแผน', value: `${onTimeRate}%`, detail: `${onTime}/${comparable}`, meaning: 'เริ่มงานตรงกับ Estimate Sprint', help: 'ค่ายิ่งสูงยิ่งดี' },
+    { key: 'เริ่มก่อนแผน', value: `${earlyRate}%`, detail: `${early}/${comparable}`, meaning: 'เริ่มงานเร็วกว่าที่ประเมินไว้', help: 'ดีเมื่อไม่กระทบ dependency' },
+    { key: 'เริ่มช้ากว่าแผน', value: `${lateRate}%`, detail: `${late}/${comparable}`, meaning: 'สัดส่วนงานที่เริ่มช้ากว่า Estimate Sprint', help: 'ตัวชี้วัดความเสี่ยงหลัก', risk: true },
+    { key: 'Median Delta', value: formatSigned(Math.round(medianDelta * 10) / 10), detail: 'Actual - Estimate', meaning: 'ค่ากลางของความคลาดเคลื่อนทั้งพอร์ต', help: 'ค่าบวกแปลว่ามีแนวโน้มเริ่มช้า' },
+    { key: 'P90 Late Delta', value: `+${Math.round(p90Late * 10) / 10}`, detail: 'Tail risk', meaning: '90% ของงานที่ช้าจะช้าไม่เกินค่านี้', help: 'ใช้เป็น buffer ตอนวางแผน', risk: true },
+    { key: 'Coverage', value: `${coverage}%`, detail: `${comparable}/${rows.length}`, meaning: 'รายการที่มีข้อมูลทั้ง Estimate และ Actual', help: 'Coverage ต่ำทำให้วิเคราะห์ไม่แม่น' }
   ]
 
   host.innerHTML = `
     <div class="exec-analytics">
       <div class="exec-readme">
-        <div class="exec-readme-title">เธงเธดเธเธตเธญเนเธฒเธเธเธฅเนเธญเธเธเธตเน</div>
+        <div class="exec-readme-title">วิธีอ่านผลวิเคราะห์</div>
         <div class="exec-readme-grid">
-          <div><strong>เธงเธฑเธ”เธญเธฐเนเธฃ:</strong> เธเธงเธฒเธกเนเธกเนเธเธขเธณเธเธญเธ Estimate Sprint เน€เธ—เธตเธขเธเธเธฑเธ Actual Start Sprint</div>
-          <div><strong>เนเธเนเธ•เธฑเธ”เธชเธดเธเนเธเธญเธฐเนเธฃ:</strong> เธซเธฒ squad/sprint เธ—เธตเนเธเธงเธฃเน€เธเนเธฒเนเธเนเธเนเธเนเธญเธเธเธงเธฒเธกเธฅเนเธฒเธเนเธฒเธเธฐเธเธขเธฒเธข</div>
-          <div><strong>เธเธณเธเธงเธ“เธเธฒเธเธญเธฐเนเธฃ:</strong> เนเธเนเน€เธเธเธฒเธฐเธฃเธฒเธขเธเธฒเธฃเธ—เธตเนเธกเธตเธ—เธฑเนเธ Estimate เนเธฅเธฐ Actual (Comparable)</div>
+          <div><strong>วัดอะไร:</strong> ความแม่นยำของ Estimate Sprint เทียบ Actual Start Sprint</div>
+          <div><strong>ใช้ตัดสินใจอะไร:</strong> หา Squad/Sprint ที่ควรเร่งแก้ก่อนความล่าช้าขยายวง</div>
+          <div><strong>ฐานข้อมูล:</strong> ใช้เฉพาะรายการที่มีทั้ง Estimate และ Actual (Comparable)</div>
         </div>
       </div>
 
@@ -522,8 +524,8 @@ function renderCompareAnalysis() {
 
       <div class="exec-viz-grid">
         <article class="exec-viz-card hist-card">
-          <h4>1) เธเธฒเธฃเธเธฃเธฐเธเธฒเธขเธ•เธฑเธงเธเธญเธเธเธงเธฒเธกเธเธฅเธฒเธ”เน€เธเธฅเธทเนเธญเธ (Actual - Estimate)</h4>
-          <p class="viz-desc">เธ”เธนเธงเนเธฒเธเธฅเธเธฒเธเธชเนเธงเธเนเธซเธเนเธเธฃเธฐเธเธธเธเธ—เธตเนเธ•เธฃเธเนเธเธ, เน€เธฃเนเธงเธเธงเนเธฒเนเธเธ เธซเธฃเธทเธญเธกเธตเธซเธฒเธเธ”เนเธฒเธเธเนเธฒ</p>
+          <h4>1) การกระจายของ Delta (Actual - Estimate)</h4>
+          <p class="viz-desc">ดูว่าผลงานส่วนใหญ่กระจุกที่ตรงแผน เร็วกว่าแผน หรือช้ากว่าแผน</p>
           <div class="exec-hist">
             ${histogram.map((b) => `
               <div class="bar">
@@ -536,8 +538,8 @@ function renderCompareAnalysis() {
         </article>
 
         <article class="exec-viz-card benchmark-card">
-          <h4>2) เน€เธ—เธตเธขเธ Squad เธ•เธฒเธกเธเธงเธฒเธกเน€เธชเธตเนเธขเธเธเธฒเธฃเน€เธฃเธดเนเธกเธเนเธฒ</h4>
-          <p class="viz-desc">เธเธฑเธ”เธญเธฑเธเธ”เธฑเธเธ”เนเธงเธข late rate เนเธฅเธฐเธเธงเธฒเธกเธเธฑเธเธเธงเธ (median + IQR)</p>
+          <h4>2) Squad Benchmark: ความเสี่ยงเริ่มช้า</h4>
+          <p class="viz-desc">จัดอันดับ Squad ตาม Late Rate และความผันผวน (Median + IQR)</p>
           <div class="exec-squad-list">
             ${squadStats.map((s) => `
               <div class="sq-row">
@@ -553,8 +555,8 @@ function renderCompareAnalysis() {
         </article>
 
         <article class="exec-viz-card trend-card">
-          <h4>3) เนเธเธงเนเธเนเธกเธฃเธฒเธข Sprint</h4>
-          <p class="viz-desc">เธ”เธนเธงเนเธฒ late rate เนเธฅเธฐ median delta เธ”เธตเธเธถเนเธเธซเธฃเธทเธญเนเธขเนเธฅเธเธ•เธฒเธกเน€เธงเธฅเธฒ</p>
+          <h4>3) Trend by Estimate Sprint</h4>
+          <p class="viz-desc">ติดตามแนวโน้ม Late Rate และ Median Delta ราย Sprint</p>
           <div class="exec-trend">
             ${trendRows.map((t) => `
               <div class="tr-col">
@@ -575,7 +577,6 @@ function renderCompareAnalysis() {
   if (compareValue) compareValue.textContent = `${comparable}`
   if (coverageValue) coverageValue.textContent = `(${coverage}% coverage)`
 }
-
 function renderList(hostId, rows, emptyText) {
   const host = document.getElementById(hostId)
   if (!rows.length) {
@@ -785,6 +786,7 @@ async function load(refresh = false) {
 
 bindEvents()
 load()
+
 
 
 
