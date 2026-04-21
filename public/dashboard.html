@@ -1,0 +1,735 @@
+﻿<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FEPMF Executive Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/app.css" />
+  <style>
+    :root {
+      --dash-bg: linear-gradient(180deg, #eef2f8 0%, #f6f8fc 100%);
+      --dash-panel: #ffffff;
+      --dash-border: #e4e9f1;
+      --dash-text: #111827;
+      --dash-muted: #667085;
+      --dash-primary: #1f6fdb;
+      --dash-soft-shadow: 0 14px 36px rgba(15, 23, 42, 0.1);
+      --dash-radius: 18px;
+    }
+
+    body { background: var(--dash-bg); }
+
+    .dash-page {
+      display: grid;
+      gap: 16px;
+      padding: 18px;
+      width: 100%;
+    }
+
+    .dash-command {
+      border-radius: 22px;
+      padding: 22px;
+      border: 1px solid #d9e3f4;
+      background: linear-gradient(122deg, #f9fbff 0%, #f5f8ff 38%, #fff7fb 100%);
+      box-shadow: var(--dash-soft-shadow);
+      display: grid;
+      gap: 14px;
+    }
+
+    .dash-command-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(250px, 0.8fr);
+      gap: 12px;
+      align-items: start;
+    }
+
+    .dash-command-title {
+      margin: 0;
+      font-size: 32px;
+      line-height: 1.08;
+      color: var(--dash-text);
+      letter-spacing: -0.02em;
+    }
+
+    .dash-command-copy {
+      margin: 8px 0 0;
+      color: #445168;
+      font-size: 14px;
+    }
+
+    .dash-command-meta {
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid #d8e1ef;
+      border-radius: 14px;
+      padding: 10px 12px;
+      color: #243750;
+      font-weight: 700;
+      font-size: 13px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .dash-kpis {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .dash-kpi {
+      border: 1px solid #3d79c7;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #2b67b6 0%, #1f5398 52%, #1a447f 100%);
+      padding: 12px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 10px 22px rgba(24, 66, 128, .34);
+    }
+
+    .dash-kpi.gradient {
+      background: linear-gradient(135deg, #3477d3 0%, #275fb3 54%, #1f4d95 100%);
+      border-color: #4e89d9;
+    }
+
+    .dash-kpi.soft-red {
+      background: linear-gradient(135deg, #8b2e73 0%, #6b255c 56%, #531d49 100%);
+      border-color: #ab4a8f;
+    }
+
+    .dash-kpi.soft-green {
+      background: linear-gradient(135deg, #0f8c74 0%, #0d705f 56%, #0b5a4d 100%);
+      border-color: #2db097;
+    }
+
+    .dash-kpi-label {
+      font-size: 11px;
+      color: #c6ddfb;
+      text-transform: uppercase;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+    }
+
+    .dash-kpi-value {
+      margin-top: 6px;
+      font-size: 30px;
+      line-height: 1;
+      color: #ffffff;
+      font-weight: 800;
+    }
+
+    .dash-kpi-sub {
+      margin-top: 4px;
+      font-size: 12px;
+      color: #e7f0ff;
+    }
+
+    .dash-toolbar {
+      border: 1px solid var(--dash-border);
+      border-radius: 20px;
+      background: var(--dash-panel);
+      box-shadow: var(--dash-soft-shadow);
+      padding: 14px;
+      display: grid;
+      grid-template-columns: minmax(280px, 1fr) 180px 170px auto auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .dash-status-panel { padding: 16px; }
+    .dash-status-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 280px;
+      gap: 14px;
+      align-items: stretch;
+    }
+    .dash-bars {
+      border: 1px solid #e1e7f3;
+      border-radius: 16px;
+      background: linear-gradient(180deg, #fff 0%, #f9fbff 100%);
+      padding: 14px 12px 12px;
+      min-height: 320px;
+      display: grid;
+      gap: 10px;
+    }
+    .dash-bars-grid {
+      min-height: 240px;
+    }
+    .dash-vbar-layout {
+      display: grid;
+      grid-template-columns: 44px minmax(0, 1fr);
+      gap: 10px;
+      min-height: 240px;
+    }
+    .dash-y-axis {
+      display: grid;
+      grid-template-rows: repeat(5, 1fr);
+      align-items: end;
+      justify-items: end;
+      color: #6f84a4;
+      font-size: 11px;
+      font-weight: 700;
+      padding-top: 6px;
+    }
+    .dash-y-axis span {
+      transform: translateY(6px);
+    }
+    .dash-vbar-grid {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(68px, 1fr));
+      align-items: end;
+      gap: 10px;
+      padding: 4px 4px 0;
+      border-left: 1px solid #dce6f4;
+      border-bottom: 1px solid #dce6f4;
+      background-image: repeating-linear-gradient(
+        to top,
+        rgba(189, 208, 234, .26) 0,
+        rgba(189, 208, 234, .26) 1px,
+        transparent 1px,
+        transparent calc(25% - 1px),
+        rgba(189, 208, 234, .2) calc(25% - 1px),
+        rgba(189, 208, 234, .2) 25%
+      );
+      border-radius: 8px 8px 0 0;
+    }
+    .dash-bar-col {
+      display: grid;
+      justify-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+    .dash-bar-canvas {
+      height: 184px;
+      width: 100%;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .dash-bar-fill {
+      width: 42px;
+      border-radius: 12px 12px 7px 7px;
+      min-height: 4px;
+      box-shadow: 0 8px 16px rgba(44, 84, 153, .28);
+      transition: height .24s ease;
+    }
+    .dash-bar-val {
+      font-size: 12px;
+      font-weight: 800;
+      color: #203a5d;
+      line-height: 1;
+    }
+    .dash-bar-label {
+      width: 100%;
+      text-align: center;
+      font-size: 11px;
+      font-weight: 800;
+      color: #425c80;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+    .dash-bar-share {
+      font-size: 10px;
+      color: #6a819f;
+      font-weight: 700;
+    }
+    .dash-bars-meta {
+      margin-top: 10px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .dash-bars-note {
+      border: 1px solid #dde6f4;
+      border-radius: 16px;
+      background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+      padding: 12px;
+      display: grid;
+      gap: 8px;
+    }
+    .dash-bars-note h4 {
+      margin: 0;
+      font-size: 15px;
+      color: #1f334f;
+      letter-spacing: -.01em;
+    }
+    .dash-bars-note p {
+      margin: 0;
+      font-size: 12px;
+      color: #5a6d89;
+      line-height: 1.45;
+    }
+    .dash-smart-list {
+      margin: 0;
+      padding-left: 16px;
+      max-height: 180px;
+      overflow: auto;
+      display: grid;
+      gap: 6px;
+    }
+    .dash-smart-list li {
+      color: #2b4261;
+      font-size: 12px;
+      line-height: 1.35;
+      font-weight: 700;
+    }
+    .dash-smart-list a {
+      color: #1d58aa;
+      text-decoration: none;
+      font-weight: 800;
+    }
+
+    .dash-main-grid {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+
+    .dash-panel {
+      border: 1px solid var(--dash-border);
+      border-radius: var(--dash-radius);
+      background: var(--dash-panel);
+      box-shadow: var(--dash-soft-shadow);
+      padding: 14px;
+      min-width: 0;
+    }
+
+    .dash-panel-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .dash-panel-title {
+      margin: 0;
+      font-size: 20px;
+      color: #111827;
+      letter-spacing: -0.01em;
+    }
+
+    .dash-panel-sub {
+      margin: 2px 0 0;
+      font-size: 12px;
+      color: #6a7a92;
+    }
+
+    .dash-chip-list {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .dash-chip {
+      border: 1px solid #dbe3f1;
+      border-radius: 999px;
+      background: #f7f9fc;
+      color: #34445d;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 5px 10px;
+      white-space: nowrap;
+    }
+
+    .dash-analysis-grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      margin-bottom: 12px;
+    }
+
+    .dash-analysis-card {
+      border: 1px solid #d8e2f1;
+      border-radius: 16px;
+      background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+      padding: 12px 12px 10px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .dash-analysis-title {
+      font-size: 12px;
+      color: #4a6590;
+      font-weight: 800;
+      letter-spacing: .02em;
+      text-transform: uppercase;
+    }
+    .dash-analysis-main {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .dash-analysis-main strong {
+      font-size: 34px;
+      color: #0f1728;
+      line-height: 1;
+    }
+    .dash-analysis-main span {
+      font-size: 12px;
+      color: #506887;
+      font-weight: 700;
+    }
+    .dash-analysis-rate {
+      border: 1px solid #dbe6f4;
+      border-radius: 999px;
+      background: #fff;
+      padding: 4px 10px;
+      width: fit-content;
+      font-size: 11px;
+      color: #304a72;
+      font-weight: 800;
+    }
+    .dash-analysis-squads {
+      display: grid;
+      gap: 6px;
+      max-height: 120px;
+      overflow: auto;
+      padding-right: 2px;
+    }
+    .dash-analysis-pill {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 5px;
+      border: 1px solid #dfe7f4;
+      border-radius: 10px;
+      background: #fff;
+      padding: 6px 8px;
+      margin: 0;
+      color: #334760;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .dash-analysis-pill-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+    .dash-analysis-pill-bar {
+      height: 6px;
+      border-radius: 999px;
+      background: #eaf0fa;
+      overflow: hidden;
+    }
+    .dash-analysis-pill-bar > div {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #4f8ee8 0%, #2d6bd7 100%);
+    }
+    .dash-analysis-pill strong {
+      font-size: 12px;
+      color: #173459;
+      font-weight: 800;
+    }
+    .dash-analysis-empty {
+      color: #7b8ba3;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .dash-card-list {
+      display: grid;
+      gap: 8px;
+      max-height: 360px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .dash-item {
+      border: 1px solid #e1e8f4;
+      border-radius: 12px;
+      background: #fff;
+      padding: 10px;
+      display: grid;
+      gap: 5px;
+    }
+
+    .dash-item-top {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .dash-item-key {
+      color: #1f5db3;
+      text-decoration: none;
+      font-weight: 800;
+    }
+
+    .dash-item-summary {
+      color: #243a58;
+      font-size: 13px;
+      line-height: 1.35;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .dash-item-meta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      color: #5f728f;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .dash-item-bar {
+      height: 7px;
+      border-radius: 999px;
+      background: #edf2fa;
+      overflow: hidden;
+    }
+
+    .dash-item-bar > div {
+      height: 100%;
+      background: linear-gradient(90deg, #2d6cdf 0%, #4ba4ff 100%);
+    }
+
+    .dash-table-panel { padding: 14px; }
+
+    .dash-table-wrap {
+      border: 1px solid #dee6f2;
+      border-radius: 14px;
+      overflow: auto;
+      background: #fff;
+    }
+
+    .dash-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1500px;
+    }
+
+    .dash-table th,
+    .dash-table td {
+      padding: 10px;
+      border-bottom: 1px solid #ecf1f8;
+      text-align: left;
+      vertical-align: top;
+      font-size: 12px;
+    }
+
+    .dash-table th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #f7f9fc;
+      color: #405575;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .dash-table td { color: #253b58; }
+
+    .dash-col-summary {
+      min-width: 360px;
+      max-width: 420px;
+      line-height: 1.35;
+    }
+
+    .dash-status-pill {
+      border-radius: 999px;
+      padding: 3px 9px;
+      font-size: 11px;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid transparent;
+    }
+
+    .dash-compare {
+      font-weight: 800;
+      font-size: 11px;
+      border-radius: 999px;
+      padding: 3px 8px;
+      border: 1px solid transparent;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .cmp-equal { color: #145f3f; background: #e9faef; border-color: #bdebc9; }
+    .cmp-early { color: #1f4f9f; background: #edf4ff; border-color: #c8dcff; }
+    .cmp-late { color: #9e1c3a; background: #fff1f4; border-color: #ffc7d5; }
+    .cmp-na { color: #6c7482; background: #f4f5f7; border-color: #dce0e7; }
+
+    .dash-itcm-cell {
+      min-width: 140px;
+      max-width: 180px;
+      display: grid;
+      gap: 4px;
+    }
+
+    .dash-itcm-line {
+      font-size: 11px;
+      color: #2e4667;
+      font-weight: 700;
+      line-height: 1.35;
+      word-break: break-word;
+    }
+
+    .dash-empty {
+      padding: 18px;
+      text-align: center;
+      color: #64748b;
+    }
+
+    @media (max-width: 1260px) {
+      .dash-command-head { grid-template-columns: 1fr; }
+      .dash-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .dash-toolbar { grid-template-columns: 1fr 1fr; }
+      .dash-status-layout { grid-template-columns: 1fr; }
+      .dash-main-grid { grid-template-columns: 1fr; }
+      .dash-analysis-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 760px) {
+      .dash-page { padding: 12px; gap: 12px; }
+      .dash-command-title { font-size: 26px; }
+      .dash-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .dash-toolbar { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page dash-page">
+    <section class="header">
+      <div class="header-top">
+        <div>
+          <h1 class="title">Executive Dashboard</h1>
+          <div class="subtitle">FEPMF Portfolio วิเคราะห์พร้อมนำเสนอผู้บริหาร</div>
+        </div>
+        <nav class="nav">
+          <a class="active" href="/dashboard.html" target="_blank" rel="noopener noreferrer">Dashboard</a>
+          <a href="/list.html" target="_blank" rel="noopener noreferrer">List View</a>
+          <a href="/board.html" target="_blank" rel="noopener noreferrer">Board View</a>
+          <a href="/misqa-watch.html" target="_blank" rel="noopener noreferrer">MISQA Watchlist</a>
+          <a href="/shift-planner.html" target="_blank" rel="noopener noreferrer">Shift Planner</a>
+          <a href="/unified-planner.html" target="_blank" rel="noopener noreferrer">Checklist Planner</a>
+        </nav>
+      </div>
+      <div class="header-meta">
+        <span class="tag" id="dashSync">Loading...</span>
+        <span class="tag">Data Source: Jira Cloud</span>
+      </div>
+    </section>
+
+    <section class="dash-command">
+      <div class="dash-command-head">
+        <div>
+          <h2 class="dash-command-title">Portfolio Command Center</h2>
+          <p class="dash-command-copy">ติดตามภาพรวม FEPMF, สถานะ ITCM, และวิเคราะห์ Estimate Sprint เทียบ Actual Start Sprint แบบพร้อมสรุปตัดสินใจ</p>
+        </div>
+        <div class="dash-command-meta">
+          <div id="dashSprintMeta">Current Sprint: -</div>
+          <div id="dashDaysMeta">Working Days Left: -</div>
+          <div id="dashCompareMeta">Comparable Items: -</div>
+        </div>
+      </div>
+      <div class="dash-kpis" id="dashKpis"></div>
+    </section>
+
+    <section class="dash-toolbar">
+      <input id="dashSearch" class="search" placeholder="Search FEPMF, ITCM, Child key, Summary, Squad, Status" />
+      <select id="dashStatus" class="search"></select>
+      <select id="dashSprintCompare" class="search"></select>
+      <button id="dashClear" class="btn" type="button">Clear</button>
+      <button id="dashRefresh" class="btn primary" type="button">Refresh</button>
+    </section>
+
+    <section class="dash-panel dash-status-panel">
+      <div class="dash-panel-head">
+        <div>
+          <h3 class="dash-panel-title">FEPMF Status Distribution</h3>
+          <p class="dash-panel-sub">Vertical Bar Chart แสดงจำนวนงานแต่ละ Status</p>
+        </div>
+      </div>
+      <div class="dash-status-layout">
+        <div class="dash-bars">
+          <div id="dashStatusBars" class="dash-bars-grid"></div>
+          <div id="dashStatusBarsMeta" class="dash-bars-meta"></div>
+        </div>
+        <aside class="dash-bars-note">
+          <h4>Smart Reading</h4>
+          <p id="dashStatusSummary">-</p>
+          <ul id="dashStatusRecentList" class="dash-smart-list"></ul>
+          <p>รายการนี้แสดง FEPMF ที่มี activity เปลี่ยน status เป็น S7 - Project Deliverd ในช่วง 15 วันที่ผ่านมา</p>
+        </aside>
+      </div>
+    </section>
+
+    <section class="dash-panel">
+      <div class="dash-panel-head">
+        <div>
+          <h3 class="dash-panel-title">Estimate Sprint vs Actual Start Sprint Analysis</h3>
+          <p class="dash-panel-sub">แยกงานตามผลเปรียบเทียบ และแจกแจง Squad ที่เกี่ยวข้อง</p>
+        </div>
+      </div>
+      <div id="dashCompareAnalysis" class="dash-analysis-grid"></div>
+    </section>
+
+    <section class="dash-main-grid">
+      <article class="dash-panel">
+        <div class="dash-panel-head">
+          <div>
+            <h3 class="dash-panel-title">Risk Spotlight</h3>
+            <p class="dash-panel-sub">Progress ต่ำ + มี linked work สูง</p>
+          </div>
+        </div>
+        <div id="dashRisk" class="dash-card-list"></div>
+      </article>
+      <article class="dash-panel">
+        <div class="dash-panel-head">
+          <div>
+            <h3 class="dash-panel-title">Upcoming CAB</h3>
+            <p class="dash-panel-sub">งานที่มี CAB Date ใกล้ที่สุด</p>
+          </div>
+        </div>
+        <div id="dashCab" class="dash-card-list"></div>
+      </article>
+    </section>
+
+    <section class="dash-panel dash-table-panel">
+      <div class="dash-panel-head">
+        <div>
+          <h3 class="dash-panel-title">Portfolio Table</h3>
+          <p class="dash-panel-sub">ตารางหลักสำหรับ drill-down ราย FEPMF</p>
+        </div>
+        <div id="dashResultInfo" class="dash-chip-list"></div>
+      </div>
+      <div class="dash-table-wrap">
+        <table class="dash-table">
+          <thead>
+            <tr>
+              <th>FEPMF</th>
+              <th>Summary</th>
+              <th>Status</th>
+              <th>Squad</th>
+              <th>Estimate Sprint</th>
+              <th>Actual Start Sprint</th>
+              <th>Sprint Compare</th>
+              <th>ITCM</th>
+              <th>ITCM Status</th>
+              <th>CAB Date</th>
+              <th>Progress</th>
+              <th>Linked</th>
+            </tr>
+          </thead>
+          <tbody id="dashRows"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <script src="/dashboard.js"></script>
+</body>
+</html>

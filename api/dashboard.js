@@ -513,6 +513,26 @@ export default async function handler(req, res) {
     return output
   }
 
+  async function fetchDeliveredRecent() {
+    const fields = ['summary', 'status', 'updated']
+    const jqlCandidates = [
+      'project = FEPMF AND status CHANGED TO "S7 - Project Deliverd" AFTER -15d ORDER BY updated DESC',
+      'project = FEPMF AND status CHANGED TO "S7 - Project Delivered" AFTER -15d ORDER BY updated DESC',
+      'project = FEPMF AND status CHANGED TO S7 AFTER -15d ORDER BY updated DESC'
+    ]
+
+    for (const jql of jqlCandidates) {
+      try {
+        const issues = await fetchAllByJql(jql, fields)
+        if (issues.length) return issues
+      } catch (_) {
+        // try next JQL candidate
+      }
+    }
+
+    return []
+  }
+
   try {
     const fieldCatalog = await fetchJira('/field')
 
@@ -684,6 +704,15 @@ export default async function handler(req, res) {
       })
       .filter(Boolean)
 
+    const deliveredRecentRaw = await fetchDeliveredRecent()
+    const deliveredRecent = deliveredRecentRaw.map((issue) => ({
+      key: issue?.key || '',
+      summary: issue?.fields?.summary || '',
+      status: issue?.fields?.status?.name || '',
+      updated: issue?.fields?.updated || '',
+      browseUrl: issue?.key ? `https://dgtbigc.atlassian.net/browse/${issue.key}` : ''
+    }))
+
     const summary = {
       totalParents: parents.length,
       totalLinkedItems: uniq(parents.flatMap((x) => x.workItems.map((w) => w.key))).length,
@@ -693,7 +722,8 @@ export default async function handler(req, res) {
       currentSprintName: currentSprint ? currentSprint.name : '-',
       currentSprintStart: currentSprint ? currentSprint.start : '',
       currentSprintEnd: currentSprint ? currentSprint.end : '',
-      workingDaysRemaining: workingDaysLeft
+      workingDaysRemaining: workingDaysLeft,
+      deliveredRecentCount: deliveredRecent.length
     }
 
     const payload = {
@@ -701,6 +731,7 @@ export default async function handler(req, res) {
       summary,
       sprintCalendar,
       timelineItems,
+      deliveredRecent,
       meta: {
         statusOrder: STATUS_ORDER,
         available: {
