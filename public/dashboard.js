@@ -408,6 +408,7 @@ function renderSmartReading() {
 }
 function renderCompareAnalysis() {
   const host = document.getElementById('dashCompareAnalysis')
+  const compareMeta = document.getElementById('dashCompareMeta')
   const rows = state.rows || []
 
   const comparableRows = rows.filter((row) => row.derived.estimateNum != null && row.derived.actualNum != null)
@@ -416,7 +417,7 @@ function renderCompareAnalysis() {
 
   if (!comparable) {
     host.innerHTML = '<div class="dash-empty">No comparable sprint data</div>'
-    document.getElementById('dashCompareMeta').textContent = 'Comparable Items: 0'
+    if (compareMeta) compareMeta.textContent = 'Comparable Items: 0'
     const compareValue = document.getElementById('dashCompareValue')
     const coverageValue = document.getElementById('dashCoverageValue')
     if (compareValue) compareValue.textContent = '0'
@@ -568,7 +569,7 @@ function renderCompareAnalysis() {
     </div>
   `
 
-  document.getElementById('dashCompareMeta').textContent = `Comparable Items: ${comparable} (${coverage}% coverage)`
+  if (compareMeta) compareMeta.textContent = `Comparable Items: ${comparable} (${coverage}% coverage)`
   const compareValue = document.getElementById('dashCompareValue')
   const coverageValue = document.getElementById('dashCoverageValue')
   if (compareValue) compareValue.textContent = `${comparable}`
