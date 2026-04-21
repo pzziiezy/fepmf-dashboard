@@ -90,6 +90,10 @@ function deriveCompareType(estimate, actual) {
   return 'late'
 }
 
+function isS7Status(status) {
+  return String(status || '').trim().toUpperCase().startsWith('S7')
+}
+
 function compareLabel(type) {
   if (type === 'equal') return 'Equal'
   if (type === 'early') return 'Actual เน€เธฃเนเธงเธเธงเนเธฒ'
@@ -201,6 +205,24 @@ function renderKpis() {
       <div class="dash-kpi-sub">${esc(card.sub)}</div>
     </article>
   `).join('')
+}
+
+function renderCurrentSprintPendingMetric() {
+  const valueNode = document.getElementById('dashCompareValue')
+  const subNode = document.getElementById('dashCoverageValue')
+  if (!valueNode || !subNode) return
+
+  const rows = state.rows || []
+  const currentSprintNum = parseSprintNumber(state.data?.summary?.currentSprintName)
+  if (currentSprintNum == null) {
+    valueNode.textContent = '0'
+    subNode.textContent = '(exclude S7)'
+    return
+  }
+
+  const pendingCount = rows.filter((row) => !isS7Status(row.parent.status) && row.derived.actualNum === currentSprintNum).length
+  valueNode.textContent = String(pendingCount)
+  subNode.textContent = '(exclude S7)'
 }
 
 function renderStatusBars() {
@@ -418,10 +440,6 @@ function renderCompareAnalysis() {
   if (!comparable) {
     host.innerHTML = '<div class="dash-empty">ไม่พบข้อมูลที่มีทั้ง Estimate และ Actual Sprint</div>'
     if (compareMeta) compareMeta.textContent = 'Comparable Items: 0'
-    const compareValue = document.getElementById('dashCompareValue')
-    const coverageValue = document.getElementById('dashCoverageValue')
-    if (compareValue) compareValue.textContent = '0'
-    if (coverageValue) coverageValue.textContent = '(0% coverage)'
     return
   }
 
@@ -505,10 +523,6 @@ function renderCompareAnalysis() {
   `
 
   if (compareMeta) compareMeta.textContent = `Comparable Items: ${comparable} (${coverage}% coverage)`
-  const compareValue = document.getElementById('dashCompareValue')
-  const coverageValue = document.getElementById('dashCoverageValue')
-  if (compareValue) compareValue.textContent = `${comparable}`
-  if (coverageValue) coverageValue.textContent = `(${coverage}% coverage)`
 }
 
 function renderStatusKpiCards() {
@@ -660,6 +674,7 @@ function renderResultSummary() {
 function renderAll() {
   filterRows()
   renderKpis()
+  renderCurrentSprintPendingMetric()
   renderStatusBars()
   renderSmartReading()
   renderCompareAnalysis()
@@ -755,8 +770,12 @@ async function load(refresh = false) {
     document.getElementById('dashCompareAnalysis').innerHTML = '<div class="dash-empty">No data</div>'
     const statusCards = document.getElementById('dashStatusKpiCards')
     const statusTotal = document.getElementById('dashStatusTotal')
+    const compareValue = document.getElementById('dashCompareValue')
+    const coverageValue = document.getElementById('dashCoverageValue')
     if (statusCards) statusCards.innerHTML = '<div class="dash-empty">No data</div>'
     if (statusTotal) statusTotal.textContent = '0'
+    if (compareValue) compareValue.textContent = '0'
+    if (coverageValue) coverageValue.textContent = '(exclude S7)'
     document.getElementById('dashResultInfo').innerHTML = ''
     document.getElementById('dashSync').textContent = 'Load failed'
   }
