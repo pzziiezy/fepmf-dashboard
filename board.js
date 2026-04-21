@@ -2,6 +2,7 @@ const state = {
   data: null,
   query: '',
   rows: [],
+  timelineSprint: 'all',
   expanded: new Set(),
   filters: {
     status: ['S4', 'S5', 'S6'],
@@ -53,6 +54,126 @@ function formatDate(v) {
   const d = new Date(`${v}T00:00:00Z`)
   if (Number.isNaN(d.getTime())) return v
   return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(d)
+}
+
+function toIsoDate(v) {
+  if (!v) return ''
+  const d = new Date(`${v}T00:00:00Z`)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toISOString().slice(0, 10)
+}
+
+function addDays(iso, delta) {
+  const d = new Date(`${iso}T00:00:00Z`)
+  if (Number.isNaN(d.getTime())) return iso
+  d.setUTCDate(d.getUTCDate() + delta)
+  return d.toISOString().slice(0, 10)
+}
+
+function parseSprintNumber(v) {
+  const m = String(v || '').match(/(\d+)/)
+  return m ? Number(m[1]) : null
+}
+
+function overlapsRange(startA, endA, startB, endB) {
+  return startA <= endB && endA >= startB
+}
+
+function getSprintMap() {
+  const items = state.data?.sprintCalendar || []
+  return new Map(items.map((x) => [Number(x.sprint), x]))
+}
+
+function getTimelineModel(row, sprintMap) {
+  const estimateNum = parseSprintNumber(row.parent.estimateSprint || '')
+  const actualNum = parseSprintNumber(row.parent.sprint || '')
+  const estimateSprint = estimateNum ? sprintMap.get(estimateNum) : null
+  const actualSprint = actualNum ? sprintMap.get(actualNum) : null
+
+  let estimateStart = estimateSprint?.start || ''
+  let estimateEnd = estimateSprint?.end || ''
+  if (!estimateStart && row.parent.estimateSprint) {
+    estimateStart = row.parent.created?.slice(0, 10) || ''
+    estimateEnd = row.parent.cabDate || estimateStart
+  }
+
+  let actualStart = row.parent.sprintStart || actualSprint?.start || estimateStart || row.parent.created?.slice(0, 10) || ''
+  let actualEnd = row.parent.sprintEnd || actualSprint?.end || row.parent.cabDate || actualStart
+  if (!actualStart) actualStart = estimateStart
+  if (!actualEnd) actualEnd = actualStart
+  if (estimateStart && !estimateEnd) estimateEnd = estimateStart
+
+  return {
+    estimateStart: toIsoDate(estimateStart),
+    estimateEnd: toIsoDate(estimateEnd),
+    actualStart: toIsoDate(actualStart),
+    actualEnd: toIsoDate(actualEnd)
+  }
+}
+
+function renderSprintAnalysis(rows) {
+  const host = document.getElementById('boardSprintAnalysis')
+  if (!host) return
+
+  const normalized = (rows || []).map((row) => {
+    const estimate = parseSprintNumber(row.parent.estimateSprint || '')
+    const actual = parseSprintNumber(row.parent.sprint || '')
+    if (!Number.isFinite(estimate) || !Number.isFinite(actual)) return null
+    return {
+      row,
+      diff: actual - estimate
+    }
+  }).filter(Boolean)
+
+  const total = normalized.length || 1
+  const buckets = [
+    { key: 'ontime', title: 'ACTUAL = ESTIMATE', sub: 'เริ่มตรงตาม Estimate Sprint', pick: (x) => x.diff === 0 },
+    { key: 'ahead', title: 'ACTUAL เร็วกว่า ESTIMATE', sub: 'เริ่มก่อนแผน', pick: (x) => x.diff < 0 },
+    { key: 'delay', title: 'ACTUAL ช้ากว่า ESTIMATE', sub: 'เริ่มช้ากว่าแผน', pick: (x) => x.diff > 0 }
+  ]
+
+  const cards = buckets.map((bucket) => {
+    const items = normalized.filter(bucket.pick)
+    const squadMap = new Map()
+    for (const item of items) {
+      const squad = item.row.parent.squad || 'No Squad'
+      squadMap.set(squad, (squadMap.get(squad) || 0) + 1)
+    }
+
+    const squads = [...squadMap.entries()]
+      .sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0])))
+      .slice(0, 4)
+
+    const maxSquadCount = squads.length ? Math.max(...squads.map((x) => x[1])) : 1
+    const pct = Math.round((items.length / total) * 100)
+
+    return `
+      <article class="board-analysis-card ${bucket.key}">
+        <div class="board-analysis-key">${bucket.title}</div>
+        <div class="board-analysis-value-row">
+          <div class="board-analysis-value">${items.length}</div>
+          <div class="board-analysis-caption">${bucket.sub}</div>
+        </div>
+        <div class="board-analysis-chip">${pct}% ของรายการที่กำลังดู</div>
+        <div class="board-analysis-squads">
+          ${squads.map(([name, count]) => `
+            <div class="board-analysis-squad-row">
+              <div class="board-analysis-squad-head">
+                <span>${esc(name)}</span>
+                <span>${count} งาน</span>
+              </div>
+              <div class="board-analysis-squad-bar">
+                <span style="width:${Math.max(10, Math.round((count / maxSquadCount) * 100))}%"></span>
+              </div>
+            </div>
+          `).join('') || '<div class="board-analysis-empty">ไม่มีรายการ</div>'}
+        </div>
+        <div class="board-analysis-sparkline"></div>
+      </article>
+    `
+  }).join('')
+
+  host.innerHTML = cards
 }
 
 function statusBadgeClass(status) {
@@ -140,13 +261,21 @@ function renderBoard() {
 
   const grouped = new Map()
   for (const row of rows) {
-    const s = row.parent.status || 'Unknown'
-    if (!grouped.has(s)) grouped.set(s, [])
-    grouped.get(s).push(row)
+    const dateKey = row.parent.cabDate || 'NO_DATE'
+    if (!grouped.has(dateKey)) grouped.set(dateKey, [])
+    grouped.get(dateKey).push(row)
   }
 
-  host.innerHTML = FIXED_STATUSES.map((status) => {
-    const list = grouped.get(status) || []
+  const orderedDates = [...grouped.keys()].sort((a, b) => {
+    if (a === 'NO_DATE') return 1
+    if (b === 'NO_DATE') return -1
+    return String(a).localeCompare(String(b))
+  })
+
+  host.innerHTML = orderedDates.map((dateKey) => {
+    const list = grouped.get(dateKey) || []
+    const title = dateKey === 'NO_DATE' ? 'No CAB Date' : formatDate(dateKey)
+    const linkedTotal = list.reduce((sum, r) => sum + (r.linkedCount || 0), 0)
     const cards = list.map((row) => {
       const isOpen = state.expanded.has(row.parent.key)
       const childRows = (row.workItems || []).map((item) => {
@@ -165,7 +294,10 @@ function renderBoard() {
       return `
         <article class="panel board-card">
           <div class="board-card-head">
-            <a class="parent-key" href="${esc(row.parent.browseUrl)}" target="_blank">${esc(row.parent.key)}</a>
+            <div class="board-card-head-left">
+              <a class="parent-key" href="${esc(row.parent.browseUrl)}" target="_blank">${esc(row.parent.key)}</a>
+              <span class="${statusBadgeClass(row.parent.status)}">${esc(row.parent.status || '-')}</span>
+            </div>
             <button class="expand-btn" data-parent="${esc(row.parent.key)}" type="button" aria-expanded="${isOpen ? 'true' : 'false'}">
               <span class="expand-btn-icon">${isOpen ? '▾' : '▸'}</span>
               <span>${isOpen ? 'Less' : 'More'}</span>
@@ -190,8 +322,11 @@ function renderBoard() {
     return `
       <section class="panel board-column">
         <div class="board-column-head">
-          <span class="${statusBadgeClass(status)}">${esc(status)}</span>
-          <span class="tag" style="background:#edf5ff;color:#2f5d9b">${list.length}</span>
+          <div class="board-group-title-wrap">
+            <span class="board-group-title">${esc(title)}</span>
+            <span class="board-group-sub">Linked ${esc(linkedTotal)} items</span>
+          </div>
+          <span class="board-group-count">${list.length} งาน</span>
         </div>
         <div class="board-column-body">${cards}</div>
       </section>
@@ -203,6 +338,130 @@ function renderBoard() {
   })
 
   syncBoardScroll()
+}
+
+function renderSprintTimeline() {
+  const host = document.getElementById('boardTimelineGrid')
+  if (!host) return
+
+  const rows = state.rows || []
+  renderSprintAnalysis(rows)
+  const sprintMap = getSprintMap()
+  const sprintList = state.data?.sprintCalendar || []
+  const selectedSprint = state.timelineSprint
+  const selectedSprintItem = selectedSprint === 'all'
+    ? null
+    : sprintList.find((x) => String(x.sprint) === String(selectedSprint))
+
+  const timelineRows = rows
+    .map((row) => ({
+      row,
+      model: getTimelineModel(row, sprintMap)
+    }))
+    .filter((x) => x.model.estimateStart || x.model.actualStart)
+
+  if (!timelineRows.length) {
+    host.innerHTML = '<div class="empty">ไม่พบข้อมูล Timeline ของรายการที่เลือก</div>'
+    return
+  }
+
+  let rangeStart = selectedSprintItem?.start || ''
+  let rangeEnd = selectedSprintItem?.end || ''
+
+  if (!rangeStart || !rangeEnd) {
+    const starts = timelineRows.map((x) => [x.model.estimateStart, x.model.actualStart]).flat().filter(Boolean).sort()
+    const ends = timelineRows.map((x) => [x.model.estimateEnd, x.model.actualEnd]).flat().filter(Boolean).sort()
+    rangeStart = starts[0] || toIsoDate(new Date().toISOString().slice(0, 10))
+    rangeEnd = ends[ends.length - 1] || rangeStart
+  }
+
+  rangeStart = addDays(rangeStart, -3)
+  rangeEnd = addDays(rangeEnd, 3)
+
+  const startDate = new Date(`${rangeStart}T00:00:00Z`)
+  const endDate = new Date(`${rangeEnd}T00:00:00Z`)
+  const days = Math.floor((endDate - startDate) / 86400000) + 1
+  if (!Number.isFinite(days) || days <= 0) {
+    host.innerHTML = '<div class="empty">ไม่สามารถคำนวณช่วงวันที่ได้</div>'
+    return
+  }
+
+  const visibleRows = timelineRows
+    .filter((x) => {
+      const start = x.model.estimateStart || x.model.actualStart
+      const end = x.model.actualEnd || x.model.estimateEnd || start
+      return start && end && overlapsRange(start, end, rangeStart, rangeEnd)
+    })
+    .slice(0, 30)
+
+  if (!visibleRows.length) {
+    host.innerHTML = '<div class="empty">ไม่พบงานในช่วง Sprint ที่เลือก</div>'
+    return
+  }
+
+  const todayIso = new Date().toISOString().slice(0, 10)
+  const todayDate = new Date(`${todayIso}T00:00:00Z`)
+  const todayVisible = todayDate >= startDate && todayDate <= endDate
+  const todayOffset = todayVisible ? Math.floor((todayDate - startDate) / 86400000) : -1
+
+  function toColumn(iso) {
+    const d = new Date(`${iso}T00:00:00Z`)
+    if (Number.isNaN(d.getTime())) return null
+    return Math.floor((d - startDate) / 86400000) + 2
+  }
+
+  function makeBar(startIso, endIso, cssClass, text, tooltip, top) {
+    if (!startIso || !endIso) return ''
+    if (!overlapsRange(startIso, endIso, rangeStart, rangeEnd)) return ''
+    const clampedStart = startIso < rangeStart ? rangeStart : startIso
+    const clampedEnd = endIso > rangeEnd ? rangeEnd : endIso
+    const startCol = toColumn(clampedStart)
+    const endCol = toColumn(clampedEnd)
+    if (!startCol || !endCol) return ''
+    return `<div class="event-bar grid-bar ${cssClass}" style="grid-column:${startCol} / ${endCol + 1};grid-row:1;top:${top}px" title="${esc(tooltip)}">${esc(text)}</div>`
+  }
+
+  const dayHeaders = Array.from({ length: days }, (_, i) => {
+    const d = new Date(startDate.getTime())
+    d.setUTCDate(d.getUTCDate() + i)
+    return `<div class="day-cell ${todayVisible && i === todayOffset ? 'today-cell' : ''}" style="grid-column:${i + 2};grid-row:1;">${d.getUTCDate()}</div>`
+  }).join('')
+
+  const rowsHtml = visibleRows.map(({ row, model }) => {
+    const estimateTip = `${row.parent.key} Estimate Sprint\n${row.parent.summary}\n${model.estimateStart || '-'} - ${model.estimateEnd || '-'}`
+    const actualTip = `${row.parent.key} Actual Sprint\n${row.parent.summary}\n${model.actualStart || '-'} - ${model.actualEnd || '-'}`
+    const currentLine = todayVisible
+      ? `<div class="board-timeline-current-line" style="grid-column:${todayOffset + 2};grid-row:1;"></div>`
+      : ''
+
+    return `
+      <div class="timeline-row board-timeline-row" style="grid-template-columns:220px repeat(${days}, minmax(14px, 1fr));">
+        <div class="row-label board-timeline-label" style="grid-column:1;grid-row:1;">
+          <div><strong><a href="${esc(row.parent.browseUrl)}" target="_blank">${esc(row.parent.key)}</a></strong></div>
+          <div class="calendar-item-summary">${esc(row.parent.summary || '-')}</div>
+        </div>
+        ${Array.from({ length: days }, (_, i) => `<div class="row-day ${todayVisible && i === todayOffset ? 'today-day' : ''}" style="grid-column:${i + 2};grid-row:1;"></div>`).join('')}
+        ${currentLine}
+        ${makeBar(model.estimateStart, model.estimateEnd, 'board-bar-estimate', 'Estimate', estimateTip, 6)}
+        ${makeBar(model.actualStart, model.actualEnd, 'board-bar-actual', 'Actual', actualTip, 30)}
+      </div>
+    `
+  }).join('')
+
+  const currentLineHead = todayVisible
+    ? `<div class="board-timeline-current-line board-timeline-current-line-head" style="grid-column:${todayOffset + 2};grid-row:1;"></div>`
+    : ''
+
+  const sprintLabel = selectedSprintItem ? `${selectedSprintItem.name}: ${selectedSprintItem.start} - ${selectedSprintItem.end}` : `${rangeStart} - ${rangeEnd}`
+
+  host.innerHTML = `
+    <div class="timeline-head board-timeline-head-row" style="grid-template-columns:220px repeat(${days}, minmax(14px, 1fr));">
+      <div class="time-label" style="grid-column:1;grid-row:1;"><strong>Sprint Timeline</strong><div style="font-size:11px;color:var(--muted)">${esc(sprintLabel)}</div></div>
+      ${dayHeaders}
+      ${currentLineHead}
+    </div>
+    ${rowsHtml}
+  `
 }
 
 function selectedText(key) {
@@ -282,6 +541,7 @@ function renderFilters() {
 
 function applyAll() {
   filterRows()
+  renderSprintTimeline()
   renderBoard()
 }
 
@@ -307,6 +567,14 @@ async function load() {
     const defaults = ['S4', 'S5', 'S6'].filter((s) => state.options.status.includes(s))
     state.filters.status = defaults.length ? defaults : []
     state.filters.estimateSprint = []
+
+    const sprintSelect = document.getElementById('boardTimelineSprint')
+    if (sprintSelect) {
+      const sprintOptions = (data.sprintCalendar || []).map((x) => `<option value="${esc(x.sprint)}">${esc(x.name)} (${esc(x.start)} - ${esc(x.end)})</option>`).join('')
+      sprintSelect.innerHTML = `<option value="all">All Sprints</option>${sprintOptions}`
+      state.timelineSprint = 'all'
+      sprintSelect.value = state.timelineSprint
+    }
 
     renderFilters()
     applyAll()
@@ -341,6 +609,14 @@ function bindEvents() {
   })
 
   document.getElementById('boardRefreshBtn').addEventListener('click', load)
+
+  const sprintFilter = document.getElementById('boardTimelineSprint')
+  if (sprintFilter) {
+    sprintFilter.addEventListener('change', (e) => {
+      state.timelineSprint = e.target.value || 'all'
+      renderSprintTimeline()
+    })
+  }
 
   const content = document.getElementById('boardContent')
   const top = document.getElementById('boardTopScroll')

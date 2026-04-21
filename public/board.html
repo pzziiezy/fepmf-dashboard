@@ -53,6 +53,24 @@
       <div id="boardTopScroll" class="board-top-scroll"><div id="boardTopScrollInner"></div></div>
     </section>
     <section class="kpis" id="boardKpis"></section>
+
+    <section class="panel board-timeline-shell">
+      <div class="board-timeline-head">
+        <div class="board-analysis-intro">
+          <div class="board-timeline-title">Estimate Sprint vs Actual Start Sprint Analysis</div>
+          <div class="board-timeline-sub">แยกตามผลเปรียบเทียบ และแยกแจง Squad ที่เกี่ยวข้อง</div>
+        </div>
+        <div class="board-timeline-tools">
+          <label for="boardTimelineSprint" class="board-timeline-filter-label">Filter by Sprint</label>
+          <select id="boardTimelineSprint" class="input board-timeline-select">
+            <option value="all">All Sprints</option>
+          </select>
+        </div>
+      </div>
+      <div id="boardSprintAnalysis" class="board-analysis-grid"></div>
+      <div id="boardTimelineGrid" class="timeline-grid board-timeline-grid"></div>
+    </section>
+
     <section id="boardContent" class="board-grid"></section>
   </div>
   <script src="/board.js"></script>
