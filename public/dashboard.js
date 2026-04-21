@@ -1,9 +1,10 @@
-const state = {
+﻿const state = {
   data: null,
   rows: [],
   query: '',
   status: 'all',
-  compare: 'all'
+  compare: 'all',
+  statusView: 'bar'
 }
 
 function esc(v) {
@@ -15,6 +16,23 @@ function formatDate(value) {
   const d = new Date(`${value}T00:00:00Z`)
   if (Number.isNaN(d.getTime())) return value
   return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(d)
+}
+
+function safeDate(value) {
+  if (!value) return null
+  const d = new Date(value)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
+function dateKeyBkk(value) {
+  const d = safeDate(value)
+  if (!d) return ''
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(d)
 }
 
 function badgeClass(status) {
@@ -74,8 +92,8 @@ function deriveCompareType(estimate, actual) {
 
 function compareLabel(type) {
   if (type === 'equal') return 'Equal'
-  if (type === 'early') return 'Actual เร็วกว่า'
-  if (type === 'late') return 'Actual ช้ากว่า'
+  if (type === 'early') return 'Actual เน€เธฃเนเธงเธเธงเนเธฒ'
+  if (type === 'late') return 'Actual เธเนเธฒเธเธงเนเธฒ'
   return 'N/A'
 }
 
@@ -189,9 +207,12 @@ function renderStatusBars() {
   const rows = state.rows || []
   const host = document.getElementById('dashStatusBars')
   const meta = document.getElementById('dashStatusBarsMeta')
-  const summary = document.getElementById('dashStatusSummary')
-  const recentList = document.getElementById('dashStatusRecentList')
-  if (!host || !meta || !summary || !recentList) return
+  const barBtn = document.getElementById('dashViewBar')
+  const pieBtn = document.getElementById('dashViewPie')
+  if (!host || !meta) return
+
+  if (barBtn) barBtn.classList.toggle('active', state.statusView === 'bar')
+  if (pieBtn) pieBtn.classList.toggle('active', state.statusView === 'pie')
 
   const counts = new Map()
   for (const row of rows) {
@@ -208,31 +229,76 @@ function renderStatusBars() {
   if (!orderedStatuses.length) {
     host.innerHTML = '<div class="dash-empty">No status data</div>'
     meta.innerHTML = ''
-    summary.textContent = '-'
-    recentList.innerHTML = ''
+    return
+  }
+
+  const palette = [
+    { bar: 'linear-gradient(180deg,#6eb8ff 0%,#2b72de 100%)', pie: '#2b72de' },
+    { bar: 'linear-gradient(180deg,#79d9d1 0%,#2a93b8 100%)', pie: '#2a93b8' },
+    { bar: 'linear-gradient(180deg,#8ca8ff 0%,#4f69df 100%)', pie: '#4f69df' },
+    { bar: 'linear-gradient(180deg,#ff9cc2 0%,#e35493 100%)', pie: '#e35493' },
+    { bar: 'linear-gradient(180deg,#ffc28f 0%,#f08337 100%)', pie: '#f08337' },
+    { bar: 'linear-gradient(180deg,#b8df89 0%,#62a83b 100%)', pie: '#62a83b' },
+    { bar: 'linear-gradient(180deg,#cfb6ff 0%,#7a5ad8 100%)', pie: '#7a5ad8' },
+    { bar: 'linear-gradient(180deg,#9ec2cb 0%,#4b7987 100%)', pie: '#4b7987' }
+  ]
+
+  const rowsByCount = [...orderedStatuses]
+    .map((status) => ({ status, count: counts.get(status) || 0 }))
+    .sort((a, b) => b.count - a.count)
+
+  if (state.statusView === 'pie') {
+    const total = rowsByCount.reduce((sum, item) => sum + item.count, 0) || 1
+    let offset = 0
+    const slices = rowsByCount.map((item, index) => {
+      const pct = (item.count / total) * 100
+      const start = offset
+      offset += pct
+      return {
+        ...item,
+        pct,
+        color: palette[index % palette.length].pie,
+        start,
+        end: offset
+      }
+    })
+
+    const conic = slices
+      .map((slice) => `${slice.color} ${slice.start.toFixed(2)}% ${slice.end.toFixed(2)}%`)
+      .join(', ')
+
+    host.innerHTML = `
+      <div class="dash-pie-wrap">
+        <div class="dash-pie-chart" style="background:conic-gradient(${conic})">
+          <div class="dash-pie-hole">
+            <div class="dash-pie-total">${total}</div>
+            <div>งานทั้งหมด</div>
+          </div>
+        </div>
+        <div class="dash-pie-legend">
+          ${slices.map((slice) => `
+            <div class="dash-pie-item">
+              <span class="dash-pie-dot" style="background:${slice.color}"></span>
+              <span>${esc(slice.status)}</span>
+              <span class="dash-pie-value">${esc(slice.count)} (${Math.round(slice.pct)}%)</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `
+
+    meta.innerHTML = rowsByCount.slice(0, 4).map((item) => `
+      <span class="dash-chip">${esc(item.status)}: ${esc(item.count)}</span>
+    `).join('')
     return
   }
 
   const maxCount = Math.max(...orderedStatuses.map((status) => counts.get(status) || 0), 1)
-  const topRows = [...orderedStatuses]
-    .map((status) => ({ status, count: counts.get(status) || 0 }))
-    .sort((a, b) => b.count - a.count)
-
-  const gradientSet = [
-    'linear-gradient(180deg,#6eb8ff 0%,#2b72de 100%)',
-    'linear-gradient(180deg,#79d9d1 0%,#2a93b8 100%)',
-    'linear-gradient(180deg,#8ca8ff 0%,#4f69df 100%)',
-    'linear-gradient(180deg,#ff9cc2 0%,#e35493 100%)',
-    'linear-gradient(180deg,#ffc28f 0%,#f08337 100%)',
-    'linear-gradient(180deg,#b8df89 0%,#62a83b 100%)',
-    'linear-gradient(180deg,#cfb6ff 0%,#7a5ad8 100%)'
-  ]
-
   const barsHtml = orderedStatuses.map((status, index) => {
     const count = counts.get(status) || 0
     const pct = Math.max(0, Math.round((count / maxCount) * 100))
     const share = rows.length ? Math.round((count / rows.length) * 100) : 0
-    const gradient = gradientSet[index % gradientSet.length]
+    const gradient = palette[index % palette.length].bar
     return `
       <div class="dash-bar-col" title="${esc(status)}: ${esc(count)}">
         <div class="dash-bar-val">${esc(count)}</div>
@@ -258,62 +324,88 @@ function renderStatusBars() {
     </div>
   `
 
-  meta.innerHTML = topRows.slice(0, 4).map((item) => `
+  meta.innerHTML = rowsByCount.slice(0, 4).map((item) => `
     <span class="dash-chip">${esc(item.status)}: ${esc(item.count)}</span>
   `).join('')
-
-  const recent = (state.data?.deliveredRecent || [])
-    .filter((item) => item?.key)
-  const recentCount = Number(state.data?.summary?.deliveredRecentCount ?? recent.length)
-  summary.textContent = `จำนวนงานที่เข้าเงื่อนไข S7 - Project Deliverd (15 วันล่าสุด): ${recentCount} งาน`
-
-  if (!recent.length) {
-    recentList.innerHTML = '<li>ไม่พบรายการที่เปลี่ยนเป็น S7 ในช่วง 15 วันที่ผ่านมา</li>'
-  } else {
-    const chunks = []
-    let currentMonthKey = ''
-
-    for (const item of recent) {
-      const dt = item.updated ? new Date(item.updated) : null
-      const safeDt = dt && !Number.isNaN(dt.getTime()) ? dt : null
-      const monthKey = safeDt ? safeDt.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase() : ''
-      if (monthKey && monthKey !== currentMonthKey) {
-        chunks.push(`<li class="dash-smart-month">${esc(monthKey)}</li>`)
-        currentMonthKey = monthKey
-      }
-
-      const weekday = safeDt ? safeDt.toLocaleDateString('en-US', { weekday: 'short' }) : '-'
-      const dayNum = safeDt ? safeDt.toLocaleDateString('en-US', { day: '2-digit' }) : '-'
-      const updated = safeDt ? safeDt.toLocaleString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'
-      const url = item.browseUrl || `https://dgtbigc.atlassian.net/browse/${item.key}`
-      const squad = item.squad || '-'
-      const summaryText = item.summary || '-'
-      chunks.push(`
-        <li class="dash-smart-item">
-          <div class="dash-smart-date">
-            <div class="dash-smart-weekday">${esc(weekday)}</div>
-            <div class="dash-smart-day">${esc(dayNum)}</div>
-          </div>
-          <div class="dash-smart-body">
-            <div class="dash-smart-head">
-              <a class="dash-smart-key" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(item.key)}</a>
-              <span class="dash-smart-status">S7</span>
-            </div>
-            <div class="dash-smart-meta">
-              <span class="dash-smart-squad">${esc(squad)}</span>
-              <span class="dash-smart-updated">${esc(updated)}</span>
-            </div>
-            <div class="dash-smart-summary">${esc(summaryText)}</div>
-          </div>
-          <a class="dash-smart-open" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Open</a>
-        </li>
-      `)
-    }
-
-    recentList.innerHTML = chunks.join('')
-  }
 }
 
+function renderSmartReading() {
+  const summary = document.getElementById('dashStatusSummary')
+  const recentList = document.getElementById('dashStatusRecentList')
+  if (!summary || !recentList) return
+
+  const recent = (state.data?.deliveredRecent || []).filter((item) => item?.key)
+  if (!recent.length) {
+    summary.textContent = '15 วันล่าสุด: ไม่พบงานที่เปลี่ยนเป็น S7'
+    recentList.innerHTML = '<li>ยังไม่มีรายการ FEPMF ที่เข้าเงื่อนไขในช่วงเวลานี้</li>'
+    return
+  }
+
+  const grouped = new Map()
+  for (const item of recent) {
+    const key = dateKeyBkk(item.updated) || 'unknown'
+    if (!grouped.has(key)) grouped.set(key, [])
+    grouped.get(key).push(item)
+  }
+
+  const dateKeys = [...grouped.keys()].sort((a, b) => String(b).localeCompare(String(a)))
+  const totalRows = recent.length
+  const totalDates = dateKeys.filter((k) => k !== 'unknown').length
+  summary.textContent = `15 วันล่าสุด: ${totalRows} งาน ครอบคลุม ${totalDates} วันที่มีการเปลี่ยนสถานะเป็น S7`
+
+  const accent = ['#2f74de', '#2aa0bf', '#7b64e2', '#e15893', '#ef8b3a', '#4e9e55']
+  const groupsHtml = dateKeys.map((dateKey, groupIndex) => {
+    const items = grouped.get(dateKey) || []
+    const byKey = new Map()
+    for (const item of items) {
+      if (!byKey.has(item.key)) byKey.set(item.key, item)
+    }
+
+    const uniqueRows = [...byKey.values()]
+      .sort((a, b) => String(b.updated || '').localeCompare(String(a.updated || '')))
+
+    const label = dateKey === 'unknown'
+      ? 'ไม่ระบุวันที่'
+      : new Intl.DateTimeFormat('th-TH', {
+          timeZone: 'Asia/Bangkok',
+          weekday: 'short',
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric'
+        }).format(new Date(`${dateKey}T00:00:00+07:00`))
+
+    return `
+      <li class="dash-smart-group">
+        <div class="dash-smart-group-head">
+          <span class="dash-smart-date-chip">${esc(label)}</span>
+          <span class="dash-smart-count-chip">${uniqueRows.length} FEPMF</span>
+        </div>
+        <div class="dash-smart-items">
+          ${uniqueRows.map((item, itemIndex) => {
+            const url = item.browseUrl || `https://dgtbigc.atlassian.net/browse/${item.key}`
+            const squad = item.squad || 'No Squad'
+            const updated = safeDate(item.updated)
+            const timeText = updated
+              ? updated.toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' })
+              : '-'
+            const summaryText = item.summary || '-'
+            const color = accent[(groupIndex + itemIndex) % accent.length]
+            return `
+              <div class="dash-smart-mini" style="--smart-accent:${color}">
+                <a class="dash-smart-mini-key" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(item.key)}</a>
+                <span class="dash-smart-mini-squad">${esc(squad)}</span>
+                <span class="dash-smart-mini-summary">${esc(summaryText)}</span>
+                <span class="dash-smart-mini-time">${esc(timeText)}</span>
+              </div>
+            `
+          }).join('')}
+        </div>
+      </li>
+    `
+  }).join('')
+
+  recentList.innerHTML = groupsHtml
+}
 function renderCompareAnalysis() {
   const host = document.getElementById('dashCompareAnalysis')
   const rows = state.rows || []
@@ -325,6 +417,10 @@ function renderCompareAnalysis() {
   if (!comparable) {
     host.innerHTML = '<div class="dash-empty">No comparable sprint data</div>'
     document.getElementById('dashCompareMeta').textContent = 'Comparable Items: 0'
+    const compareValue = document.getElementById('dashCompareValue')
+    const coverageValue = document.getElementById('dashCoverageValue')
+    if (compareValue) compareValue.textContent = '0'
+    if (coverageValue) coverageValue.textContent = '(0% coverage)'
     return
   }
 
@@ -392,22 +488,22 @@ function renderCompareAnalysis() {
   const maxTrendLate = Math.max(...trendRows.map((x) => x.lateRate), 1)
 
   const metricCards = [
-    { key: 'On-time Rate', value: `${onTimeRate}%`, detail: `${onTime}/${comparable}`, meaning: 'Share of work that starts exactly on estimate sprint.', help: 'Higher is better.' },
-    { key: 'Early Rate', value: `${earlyRate}%`, detail: `${early}/${comparable}`, meaning: 'Share of work that starts before estimate sprint.', help: 'Good only when quality and dependencies are stable.' },
-    { key: 'Late Rate', value: `${lateRate}%`, detail: `${late}/${comparable}`, meaning: 'Share of work that starts after estimate sprint.', help: 'Primary execution risk indicator.', risk: true },
-    { key: 'Median Delta', value: formatSigned(Math.round(medianDelta * 10) / 10), detail: 'Actual - Estimate', meaning: 'Typical schedule slip/lead of the portfolio.', help: 'Positive means delay.' },
-    { key: 'P90 Late Delta', value: `+${Math.round(p90Late * 10) / 10}`, detail: 'Tail risk', meaning: '90% of late items delay less than or equal to this value.', help: 'Use for worst-case planning buffer.', risk: true },
-    { key: 'Coverage', value: `${coverage}%`, detail: `${comparable}/${rows.length}`, meaning: 'Share of rows with both estimate and actual sprint.', help: 'Low coverage reduces confidence.' }
+    { key: 'เธ•เธฃเธเนเธเธ (On-time)', value: `${onTimeRate}%`, detail: `${onTime}/${comparable}`, meaning: 'เธชเธฑเธ”เธชเนเธงเธเธเธฒเธเธ—เธตเนเน€เธฃเธดเนเธกเนเธ”เนเธ•เธฃเธ sprint เธ•เธฒเธกเนเธเธ', help: 'เธขเธดเนเธเธชเธนเธเธขเธดเนเธเธ”เธต' },
+    { key: 'เน€เธฃเธดเนเธกเน€เธฃเนเธงเธเธงเนเธฒเนเธเธ', value: `${earlyRate}%`, detail: `${early}/${comparable}`, meaning: 'เธชเธฑเธ”เธชเนเธงเธเธเธฒเธเธ—เธตเนเน€เธฃเธดเนเธกเธเนเธญเธ sprint เธ—เธตเน estimate', help: 'เธ”เธตเน€เธกเธทเนเธญเนเธกเนเธเธฃเธฐเธ—เธ dependency' },
+    { key: 'เน€เธฃเธดเนเธกเธเนเธฒเธเธงเนเธฒเนเธเธ', value: `${lateRate}%`, detail: `${late}/${comparable}`, meaning: 'เธชเธฑเธ”เธชเนเธงเธเธเธฒเธเธ—เธตเนเน€เธฃเธดเนเธกเธเนเธฒเธเธงเนเธฒ sprint เธ—เธตเน estimate', help: 'เธ•เธฑเธงเธเธตเนเธงเธฑเธ”เธเธงเธฒเธกเน€เธชเธตเนเธขเธเธซเธฅเธฑเธ', risk: true },
+    { key: 'เธเนเธฒเธเธฅเธฒเธเธเธงเธฒเธกเธเธฅเธฒเธ”เน€เธเธฅเธทเนเธญเธ', value: formatSigned(Math.round(medianDelta * 10) / 10), detail: 'Actual - Estimate', meaning: 'เธเนเธฒเธเธฅเธฒเธเธเธญเธเธเธฒเธฃเธเธฅเธฒเธ”เน€เธเธฅเธทเนเธญเธเธ—เธฑเนเธเธเธญเธฃเนเธ•', help: 'เธเนเธฒเน€เธเนเธเธเธงเธ = เธกเธตเนเธเธงเนเธเนเธกเน€เธฃเธดเนเธกเธเนเธฒ' },
+    { key: 'เธเธงเธฒเธกเน€เธชเธตเนเธขเธเธเธฅเธฒเธขเธซเธฒเธ (P90)', value: `+${Math.round(p90Late * 10) / 10}`, detail: 'Tail risk', meaning: '90% เธเธญเธเธเธฒเธเธ—เธตเนเธเนเธฒเธเธฐเธเนเธฒเนเธกเนเน€เธเธดเธเธเนเธฒเธเธตเน', help: 'เนเธเนเน€เธเนเธ buffer เธ•เธญเธเธงเธฒเธเนเธเธ', risk: true },
+    { key: 'เธเธงเธฒเธกเธเธฃเธเธเธญเธเธเนเธญเธกเธนเธฅ', value: `${coverage}%`, detail: `${comparable}/${rows.length}`, meaning: 'เธชเธฑเธ”เธชเนเธงเธเธฃเธฒเธขเธเธฒเธฃเธ—เธตเนเธกเธตเธ—เธฑเนเธ Estimate เนเธฅเธฐ Actual', help: 'เธ•เนเธณเธเธงเนเธฒ 70% เนเธซเนเธฃเธฐเธงเธฑเธเธเธฒเธฃเธ•เธตเธเธงเธฒเธก' }
   ]
 
   host.innerHTML = `
     <div class="exec-analytics">
       <div class="exec-readme">
-        <div class="exec-readme-title">How to read this panel</div>
+        <div class="exec-readme-title">เธงเธดเธเธตเธญเนเธฒเธเธเธฅเนเธญเธเธเธตเน</div>
         <div class="exec-readme-grid">
-          <div><strong>What this measures:</strong> Estimate Sprint accuracy against Actual Start Sprint.</div>
-          <div><strong>What decision it supports:</strong> Identify squads/sprints to intervene before delays grow.</div>
-          <div><strong>What data it uses:</strong> Only rows with both Estimate and Actual (Comparable rows).</div>
+          <div><strong>เธงเธฑเธ”เธญเธฐเนเธฃ:</strong> เธเธงเธฒเธกเนเธกเนเธเธขเธณเธเธญเธ Estimate Sprint เน€เธ—เธตเธขเธเธเธฑเธ Actual Start Sprint</div>
+          <div><strong>เนเธเนเธ•เธฑเธ”เธชเธดเธเนเธเธญเธฐเนเธฃ:</strong> เธซเธฒ squad/sprint เธ—เธตเนเธเธงเธฃเน€เธเนเธฒเนเธเนเธเนเธเนเธญเธเธเธงเธฒเธกเธฅเนเธฒเธเนเธฒเธเธฐเธเธขเธฒเธข</div>
+          <div><strong>เธเธณเธเธงเธ“เธเธฒเธเธญเธฐเนเธฃ:</strong> เนเธเนเน€เธเธเธฒเธฐเธฃเธฒเธขเธเธฒเธฃเธ—เธตเนเธกเธตเธ—เธฑเนเธ Estimate เนเธฅเธฐ Actual (Comparable)</div>
         </div>
       </div>
 
@@ -425,8 +521,8 @@ function renderCompareAnalysis() {
 
       <div class="exec-viz-grid">
         <article class="exec-viz-card hist-card">
-          <h4>1) Distribution: Actual - Estimate (sprint delta)</h4>
-          <p class="viz-desc">Shows where the portfolio clusters: on-time, early, or delayed tail.</p>
+          <h4>1) เธเธฒเธฃเธเธฃเธฐเธเธฒเธขเธ•เธฑเธงเธเธญเธเธเธงเธฒเธกเธเธฅเธฒเธ”เน€เธเธฅเธทเนเธญเธ (Actual - Estimate)</h4>
+          <p class="viz-desc">เธ”เธนเธงเนเธฒเธเธฅเธเธฒเธเธชเนเธงเธเนเธซเธเนเธเธฃเธฐเธเธธเธเธ—เธตเนเธ•เธฃเธเนเธเธ, เน€เธฃเนเธงเธเธงเนเธฒเนเธเธ เธซเธฃเธทเธญเธกเธตเธซเธฒเธเธ”เนเธฒเธเธเนเธฒ</p>
           <div class="exec-hist">
             ${histogram.map((b) => `
               <div class="bar">
@@ -438,9 +534,9 @@ function renderCompareAnalysis() {
           </div>
         </article>
 
-        <article class="exec-viz-card">
-          <h4>2) Squad Benchmark: Late-risk ranking</h4>
-          <p class="viz-desc">Ranks squads by late-rate and variability (median + IQR).</p>
+        <article class="exec-viz-card benchmark-card">
+          <h4>2) เน€เธ—เธตเธขเธ Squad เธ•เธฒเธกเธเธงเธฒเธกเน€เธชเธตเนเธขเธเธเธฒเธฃเน€เธฃเธดเนเธกเธเนเธฒ</h4>
+          <p class="viz-desc">เธเธฑเธ”เธญเธฑเธเธ”เธฑเธเธ”เนเธงเธข late rate เนเธฅเธฐเธเธงเธฒเธกเธเธฑเธเธเธงเธ (median + IQR)</p>
           <div class="exec-squad-list">
             ${squadStats.map((s) => `
               <div class="sq-row">
@@ -455,9 +551,9 @@ function renderCompareAnalysis() {
           </div>
         </article>
 
-        <article class="exec-viz-card">
-          <h4>3) Trend by Estimate Sprint</h4>
-          <p class="viz-desc">Tracks whether late-rate and median delta are improving or worsening over time.</p>
+        <article class="exec-viz-card trend-card">
+          <h4>3) เนเธเธงเนเธเนเธกเธฃเธฒเธข Sprint</h4>
+          <p class="viz-desc">เธ”เธนเธงเนเธฒ late rate เนเธฅเธฐ median delta เธ”เธตเธเธถเนเธเธซเธฃเธทเธญเนเธขเนเธฅเธเธ•เธฒเธกเน€เธงเธฅเธฒ</p>
           <div class="exec-trend">
             ${trendRows.map((t) => `
               <div class="tr-col">
@@ -473,6 +569,10 @@ function renderCompareAnalysis() {
   `
 
   document.getElementById('dashCompareMeta').textContent = `Comparable Items: ${comparable} (${coverage}% coverage)`
+  const compareValue = document.getElementById('dashCompareValue')
+  const coverageValue = document.getElementById('dashCoverageValue')
+  if (compareValue) compareValue.textContent = `${comparable}`
+  if (coverageValue) coverageValue.textContent = `(${coverage}% coverage)`
 }
 
 function renderList(hostId, rows, emptyText) {
@@ -564,8 +664,8 @@ function renderHighlights() {
     .sort((a, b) => String(a.parent.cabDate).localeCompare(String(b.parent.cabDate)))
     .slice(0, 8)
 
-  renderList('dashRisk', riskRows, 'ไม่พบรายการความเสี่ยงในเงื่อนไขที่เลือก')
-  renderList('dashCab', cabRows, 'ไม่พบรายการ CAB ในเงื่อนไขที่เลือก')
+  renderList('dashRisk', riskRows, 'เนเธกเนเธเธเธฃเธฒเธขเธเธฒเธฃเธเธงเธฒเธกเน€เธชเธตเนเธขเธเนเธเน€เธเธทเนเธญเธเนเธเธ—เธตเนเน€เธฅเธทเธญเธ')
+  renderList('dashCab', cabRows, 'เนเธกเนเธเธเธฃเธฒเธขเธเธฒเธฃ CAB เนเธเน€เธเธทเนเธญเธเนเธเธ—เธตเนเน€เธฅเธทเธญเธ')
 }
 
 function renderResultSummary() {
@@ -586,6 +686,7 @@ function renderAll() {
   filterRows()
   renderKpis()
   renderStatusBars()
+  renderSmartReading()
   renderCompareAnalysis()
   renderHighlights()
   renderTable()
@@ -604,8 +705,8 @@ function renderCompareOptions() {
   select.innerHTML = [
     '<option value="all">All Compare</option>',
     '<option value="equal">Actual = Estimate</option>',
-    '<option value="early">Actual เร็วกว่า Estimate</option>',
-    '<option value="late">Actual ช้ากว่า Estimate</option>',
+    '<option value="early">Actual เน€เธฃเนเธงเธเธงเนเธฒ Estimate</option>',
+    '<option value="late">Actual เธเนเธฒเธเธงเนเธฒ Estimate</option>',
     '<option value="na">Compare N/A</option>'
   ].join('')
   select.value = state.compare
@@ -638,6 +739,21 @@ function bindEvents() {
   })
 
   document.getElementById('dashRefresh').addEventListener('click', () => load(true))
+
+  const barBtn = document.getElementById('dashViewBar')
+  const pieBtn = document.getElementById('dashViewPie')
+  if (barBtn) {
+    barBtn.addEventListener('click', () => {
+      state.statusView = 'bar'
+      renderStatusBars()
+    })
+  }
+  if (pieBtn) {
+    pieBtn.addEventListener('click', () => {
+      state.statusView = 'pie'
+      renderStatusBars()
+    })
+  }
 }
 
 async function load(refresh = false) {
@@ -652,8 +768,10 @@ async function load(refresh = false) {
     renderAll()
 
     document.getElementById('dashSync').textContent = `Updated: ${new Date(data.generatedAt || Date.now()).toLocaleString('th-TH')}`
-    document.getElementById('dashSprintMeta').textContent = `Current Sprint: ${data.summary?.currentSprintName || '-'}`
-    document.getElementById('dashDaysMeta').textContent = `Working Days Left: ${data.summary?.workingDaysRemaining ?? '-'}`
+    const sprintValue = document.getElementById('dashSprintValue')
+    const daysValue = document.getElementById('dashDaysValue')
+    if (sprintValue) sprintValue.textContent = `${data.summary?.currentSprintName || '-'}`
+    if (daysValue) daysValue.textContent = `${data.summary?.workingDaysRemaining ?? '-'}`
   } catch (error) {
     document.getElementById('dashRows').innerHTML = `<tr><td colspan="12" class="dash-empty">Failed to load data: ${esc(error.message || error)}</td></tr>`
     document.getElementById('dashRisk').innerHTML = '<div class="dash-empty">No data</div>'
@@ -666,6 +784,7 @@ async function load(refresh = false) {
 
 bindEvents()
 load()
+
 
 
 

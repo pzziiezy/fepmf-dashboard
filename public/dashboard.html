@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="th">
 <head>
   <meta charset="UTF-8" />
@@ -60,16 +60,93 @@
       font-size: 14px;
     }
 
-    .dash-command-meta {
-      background: rgba(255, 255, 255, 0.9);
+    .dash-command-meta { min-width: 0; }
+
+    .dash-snapshot-card {
+      background: rgba(255, 255, 255, 0.92);
       border: 1px solid #d8e1ef;
       border-radius: 14px;
-      padding: 10px 12px;
-      color: #243750;
-      font-weight: 700;
-      font-size: 13px;
-      display: grid;
+      overflow: hidden;
+      box-shadow: 0 6px 18px rgba(24, 66, 128, 0.08);
+    }
+
+    .snapshot-title {
+      padding: 12px 14px 8px;
+      font-size: 16px;
+      line-height: 1.2;
+      font-weight: 800;
+      color: #0f274b;
+    }
+
+    .snapshot-tags {
+      padding: 0 14px 12px;
+      display: flex;
       gap: 8px;
+      flex-wrap: wrap;
+      border-bottom: 1px solid #e4eaf4;
+    }
+
+    .snapshot-tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 5px 10px;
+      border-radius: 10px;
+      border: 1px solid #d8e2f0;
+      background: #eef3fb;
+      color: #1f355a;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .snapshot-tag.status {
+      background: #f9e9aa;
+      border-color: #eed47c;
+      color: #5c4500;
+    }
+
+    .snapshot-tag.muted {
+      background: #f7f9fc;
+      color: #6a7f9f;
+    }
+
+    .snapshot-stats {
+      padding: 10px 10px 12px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 4px;
+    }
+
+    .snapshot-stat {
+      padding: 4px 10px;
+      border-right: 1px solid #e3e9f3;
+      min-width: 0;
+    }
+
+    .snapshot-stat:last-child { border-right: 0; }
+
+    .snapshot-value {
+      font-size: 26px;
+      line-height: 1.05;
+      color: #10294d;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .snapshot-subvalue {
+      font-size: 12px;
+      color: #5f7598;
+      font-weight: 700;
+    }
+
+    .snapshot-label {
+      margin-top: 4px;
+      font-size: 12px;
+      color: #6a7f9f;
+      font-weight: 700;
     }
 
     .dash-kpis {
@@ -138,9 +215,33 @@
     .dash-status-panel { padding: 16px; }
     .dash-status-layout {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 420px;
+      grid-template-columns: minmax(0, 1fr);
       gap: 14px;
       align-items: stretch;
+    }
+    .dash-view-switch {
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid #d8e2f2;
+      border-radius: 999px;
+      padding: 3px;
+      background: #f5f8fd;
+      gap: 3px;
+    }
+    .dash-view-btn {
+      border: 0;
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 800;
+      color: #4d6487;
+      background: transparent;
+      cursor: pointer;
+    }
+    .dash-view-btn.active {
+      background: linear-gradient(135deg, #2d6cdf 0%, #1f58bf 100%);
+      color: #fff;
+      box-shadow: 0 6px 12px rgba(38, 90, 181, 0.28);
     }
     .dash-bars {
       border: 1px solid #e1e7f3;
@@ -243,25 +344,95 @@
       align-items: flex-start;
       align-content: flex-start;
     }
-    .dash-bars-note {
-      border: 1px solid #dde6f4;
-      border-radius: 16px;
-      background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
-      padding: 12px;
+    .dash-pie-wrap {
+      display: grid;
+      grid-template-columns: 240px minmax(0, 1fr);
+      gap: 16px;
+      align-items: center;
+      min-height: 240px;
+    }
+    .dash-pie-chart {
+      width: 220px;
+      height: 220px;
+      border-radius: 50%;
+      border: 8px solid #f4f7fc;
+      box-shadow: inset 0 0 0 1px #dce5f4, 0 8px 20px rgba(40, 82, 150, 0.16);
+      position: relative;
+    }
+    .dash-pie-hole {
+      position: absolute;
+      inset: 32px;
+      border-radius: 50%;
+      background: #fff;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      border: 1px solid #e0e8f5;
+      color: #1d3b66;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1.25;
+    }
+    .dash-pie-total {
+      font-size: 26px;
+      line-height: 1;
+      font-weight: 800;
+      color: #14345f;
+    }
+    .dash-pie-legend {
       display: grid;
       gap: 8px;
+      align-content: start;
+      max-height: 240px;
+      overflow: auto;
+      padding-right: 4px;
     }
-    .dash-bars-note h4 {
+    .dash-pie-item {
+      display: grid;
+      grid-template-columns: 14px minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+      border: 1px solid #dce5f4;
+      border-radius: 10px;
+      background: #fff;
+      padding: 7px 9px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #2e4769;
+    }
+    .dash-pie-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+    }
+    .dash-pie-value {
+      color: #6a7f9f;
+      font-size: 11px;
+      font-weight: 800;
+    }
+    .dash-smart-panel {
+      padding: 14px;
+      min-height: 520px;
+      display: grid;
+      gap: 10px;
+    }
+    .dash-smart-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .dash-smart-header h4 {
       margin: 0;
-      font-size: 15px;
-      color: #1f334f;
-      letter-spacing: -.01em;
+      font-size: 18px;
+      color: #18345b;
+      letter-spacing: -0.01em;
     }
-    .dash-bars-note p {
+    .dash-smart-sub {
       margin: 0;
       font-size: 12px;
-      color: #5a6d89;
-      line-height: 1.45;
+      color: #5b7294;
     }
     .dash-smart-count {
       border: 1px solid #d9e3f3;
@@ -275,11 +446,99 @@
     .dash-smart-list {
       margin: 0;
       padding-left: 0;
-      max-height: 320px;
+      max-height: 420px;
       overflow: auto;
       display: grid;
       gap: 8px;
       list-style: none;
+    }
+    .dash-smart-group {
+      border: 1px solid #dce5f4;
+      border-radius: 14px;
+      background: linear-gradient(180deg, #ffffff 0%, #f6faff 100%);
+      padding: 8px;
+      display: grid;
+      gap: 8px;
+    }
+    .dash-smart-items {
+      display: grid;
+      gap: 6px;
+    }
+    .dash-smart-mini {
+      display: grid;
+      grid-template-columns: auto auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid #dfe8f5;
+      border-left: 4px solid var(--smart-accent, #2f74de);
+      border-radius: 10px;
+      background: #fff;
+      padding: 6px 8px;
+      min-width: 0;
+    }
+    .dash-smart-mini-key {
+      font-size: 11px;
+      font-weight: 800;
+      color: #1d4f9a;
+      text-decoration: none;
+      border: 1px solid #d5e3f8;
+      border-radius: 999px;
+      padding: 2px 8px;
+      background: #edf3ff;
+    }
+    .dash-smart-mini-squad {
+      font-size: 10px;
+      font-weight: 700;
+      color: #3a5679;
+      border: 1px solid #d9e4f4;
+      border-radius: 999px;
+      background: #f3f7fe;
+      padding: 2px 7px;
+    }
+    .dash-smart-mini-summary {
+      font-size: 11px;
+      color: #274264;
+      font-weight: 700;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .dash-smart-mini-time {
+      font-size: 11px;
+      color: #60799d;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .dash-smart-group-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      border-bottom: 1px solid #e7edf7;
+      padding-bottom: 6px;
+    }
+    .dash-smart-date-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      background: #edf4ff;
+      border: 1px solid #cfdef5;
+      padding: 4px 10px;
+      color: #1b4f9a;
+      font-size: 11px;
+      font-weight: 800;
+    }
+    .dash-smart-count-chip {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      background: #f0f7ef;
+      border: 1px solid #cde5c9;
+      padding: 3px 10px;
+      color: #2a6a45;
+      font-size: 11px;
+      font-weight: 800;
     }
     .dash-smart-list li {
       color: #2b4261;
@@ -696,7 +955,10 @@
     }
     .exec-viz-grid {
       display: grid;
-      grid-template-columns: 1.35fr 1fr;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-areas:
+        "hist hist"
+        "benchmark trend";
       gap: 10px;
       align-items: stretch;
     }
@@ -711,9 +973,11 @@
       align-content: start;
     }
     .exec-viz-card.hist-card {
-      grid-row: span 2;
-      min-height: 498px;
+      grid-area: hist;
+      min-height: 310px;
     }
+    .exec-viz-card.benchmark-card { grid-area: benchmark; }
+    .exec-viz-card.trend-card { grid-area: trend; }
     .exec-viz-card h4 {
       margin: 0;
       font-size: 14px;
@@ -727,7 +991,7 @@
       line-height: 1.35;
     }
     .exec-hist {
-      height: 430px;
+      height: 240px;
       display: grid;
       grid-template-columns: repeat(6, minmax(0, 1fr));
       align-items: end;
@@ -977,15 +1241,20 @@
       .dash-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .dash-toolbar { grid-template-columns: 1fr 1fr; }
       .dash-status-layout { grid-template-columns: 1fr; }
+      .dash-pie-wrap { grid-template-columns: 1fr; }
+      .dash-pie-chart { margin: 0 auto; }
       .dash-main-grid { grid-template-columns: 1fr; }
       .dash-analysis-grid { grid-template-columns: 1fr; }
       .dash-analysis-main strong { font-size: 40px; }
       .dash-analysis-main span { font-size: 14px; }
       .exec-readme-grid { grid-template-columns: 1fr; }
       .exec-kpi-row { grid-template-columns: 1fr 1fr; }
-      .exec-viz-grid { grid-template-columns: 1fr; }
-      .exec-viz-card.hist-card { grid-row: auto; min-height: 260px; }
+      .exec-viz-grid { grid-template-columns: 1fr; grid-template-areas: "hist" "benchmark" "trend"; }
+      .exec-viz-card.hist-card { min-height: 260px; }
       .exec-hist { height: 190px; }
+      .snapshot-stats { grid-template-columns: 1fr; }
+      .snapshot-stat { border-right: 0; border-bottom: 1px solid #e3e9f3; }
+      .snapshot-stat:last-child { border-bottom: 0; }
     }
 
     @media (max-width: 760px) {
@@ -1002,7 +1271,7 @@
       <div class="header-top">
         <div>
           <h1 class="title">Executive Dashboard</h1>
-          <div class="subtitle">FEPMF Portfolio วิเคราะห์พร้อมนำเสนอผู้บริหาร</div>
+          <div class="subtitle">FEPMF Portfolio เธงเธดเน€เธเธฃเธฒเธฐเธซเนเธเธฃเนเธญเธกเธเธณเน€เธชเธเธญเธเธนเนเธเธฃเธดเธซเธฒเธฃ</div>
         </div>
         <nav class="nav">
           <a class="active" href="/dashboard.html" target="_blank" rel="noopener noreferrer">Dashboard</a>
@@ -1023,12 +1292,34 @@
       <div class="dash-command-head">
         <div>
           <h2 class="dash-command-title">Portfolio Command Center</h2>
-          <p class="dash-command-copy">ติดตามภาพรวม FEPMF, สถานะ ITCM, และวิเคราะห์ Estimate Sprint เทียบ Actual Start Sprint แบบพร้อมสรุปตัดสินใจ</p>
+          <p class="dash-command-copy">เธ•เธดเธ”เธ•เธฒเธกเธ เธฒเธเธฃเธงเธก FEPMF, เธชเธ–เธฒเธเธฐ ITCM, เนเธฅเธฐเธงเธดเน€เธเธฃเธฒเธฐเธซเน Estimate Sprint เน€เธ—เธตเธขเธ Actual Start Sprint เนเธเธเธเธฃเนเธญเธกเธชเธฃเธธเธเธ•เธฑเธ”เธชเธดเธเนเธ</p>
         </div>
         <div class="dash-command-meta">
-          <div id="dashSprintMeta">Current Sprint: -</div>
-          <div id="dashDaysMeta">Working Days Left: -</div>
-          <div id="dashCompareMeta">Comparable Items: -</div>
+          <article class="dash-snapshot-card">
+            <div class="snapshot-title">Program Snapshot</div>
+            <div class="snapshot-tags">
+              <span class="snapshot-tag status">In monitoring</span>
+              <span class="snapshot-tag">Execution</span>
+              <span class="snapshot-tag muted">FY2026</span>
+            </div>
+            <div class="snapshot-stats">
+              <div class="snapshot-stat">
+                <div class="snapshot-value" id="dashSprintValue">-</div>
+                <div class="snapshot-label">Current Sprint</div>
+              </div>
+              <div class="snapshot-stat">
+                <div class="snapshot-value" id="dashDaysValue">-</div>
+                <div class="snapshot-label">Working Days Left</div>
+              </div>
+              <div class="snapshot-stat">
+                <div class="snapshot-value">
+                  <span id="dashCompareValue">-</span>
+                  <span id="dashCoverageValue" class="snapshot-subvalue">(-)</span>
+                </div>
+                <div class="snapshot-label">Comparable Items</div>
+              </div>
+            </div>
+          </article>
         </div>
       </div>
       <div class="dash-kpis" id="dashKpis"></div>
@@ -1050,7 +1341,11 @@
       <div class="dash-panel-head">
         <div>
           <h3 class="dash-panel-title">FEPMF Status Distribution</h3>
-          <p class="dash-panel-sub">Vertical Bar Chart แสดงจำนวนงานแต่ละ Status</p>
+          <p class="dash-panel-sub">ดูสัดส่วนงาน FEPMF แยกตามสถานะ พร้อมสลับมุมมองได้ทั้ง Vertical Bar และ Pie Chart</p>
+        </div>
+        <div class="dash-view-switch" role="tablist" aria-label="Status distribution view">
+          <button id="dashViewBar" class="dash-view-btn active" type="button">Vertical Bar</button>
+          <button id="dashViewPie" class="dash-view-btn" type="button">Pie Chart</button>
         </div>
       </div>
       <div class="dash-status-layout">
@@ -1058,13 +1353,16 @@
           <div id="dashStatusBars" class="dash-bars-grid"></div>
           <div id="dashStatusBarsMeta" class="dash-bars-meta"></div>
         </div>
-        <aside class="dash-bars-note">
-          <h4>Smart Reading</h4>
-          <p id="dashStatusSummary" class="dash-smart-count">-</p>
-          <ul id="dashStatusRecentList" class="dash-smart-list"></ul>
-          <p>รายการนี้แสดง FEPMF ที่มี activity เปลี่ยน status เป็น S7 - Project Deliverd ในช่วง 15 วันที่ผ่านมา</p>
-        </aside>
       </div>
+    </section>
+
+    <section class="dash-panel dash-smart-panel">
+      <div class="dash-smart-header">
+        <h4>Smart Reading: S7 ล่าสุด</h4>
+        <p class="dash-smart-sub">จัดกลุ่มตามวันที่ พร้อมนับจำนวน FEPMF ต่อวัน เพื่อดูภาพรวมงานที่ปิดล่าสุดแบบสั้น กระชับ และอ่านง่าย</p>
+      </div>
+      <p id="dashStatusSummary" class="dash-smart-count">-</p>
+      <ul id="dashStatusRecentList" class="dash-smart-list"></ul>
     </section>
 
     <section class="dash-main-grid">
@@ -1072,7 +1370,7 @@
         <div class="dash-panel-head">
           <div>
             <h3 class="dash-panel-title">Risk Spotlight</h3>
-            <p class="dash-panel-sub">Progress ต่ำ + มี linked work สูง</p>
+            <p class="dash-panel-sub">Progress เธ•เนเธณ + เธกเธต linked work เธชเธนเธ</p>
           </div>
         </div>
         <div id="dashRisk" class="dash-card-list"></div>
@@ -1081,7 +1379,7 @@
         <div class="dash-panel-head">
           <div>
             <h3 class="dash-panel-title">Upcoming CAB</h3>
-            <p class="dash-panel-sub">งานที่มี CAB Date ใกล้ที่สุด</p>
+            <p class="dash-panel-sub">เธเธฒเธเธ—เธตเนเธกเธต CAB Date เนเธเธฅเนเธ—เธตเนเธชเธธเธ”</p>
           </div>
         </div>
         <div id="dashCab" class="dash-card-list"></div>
@@ -1092,7 +1390,7 @@
       <div class="dash-panel-head">
         <div>
           <h3 class="dash-panel-title">Portfolio Table</h3>
-          <p class="dash-panel-sub">ตารางหลักสำหรับ drill-down ราย FEPMF</p>
+          <p class="dash-panel-sub">เธ•เธฒเธฃเธฒเธเธซเธฅเธฑเธเธชเธณเธซเธฃเธฑเธ drill-down เธฃเธฒเธข FEPMF</p>
         </div>
         <div id="dashResultInfo" class="dash-chip-list"></div>
       </div>
@@ -1123,6 +1421,7 @@
   <script src="/dashboard.js?v=20260422a"></script>
 </body>
 </html>
+
 
 
 
