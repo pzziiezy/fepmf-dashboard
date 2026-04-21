@@ -138,6 +138,27 @@ function squadCountByType(rows, type) {
   return [...map.entries()].sort((a, b) => b[1] - a[1]).map(([squad, count]) => ({ squad, count }))
 }
 
+function quantile(sortedValues, q) {
+  if (!sortedValues.length) return 0
+  const pos = (sortedValues.length - 1) * q
+  const base = Math.floor(pos)
+  const rest = pos - base
+  const next = sortedValues[base + 1] ?? sortedValues[base]
+  return sortedValues[base] + rest * (next - sortedValues[base])
+}
+
+function median(values) {
+  if (!values.length) return 0
+  const sorted = [...values].sort((a, b) => a - b)
+  return quantile(sorted, 0.5)
+}
+
+function formatSigned(value) {
+  if (value > 0) return `+${value}`
+  if (value < 0) return String(value)
+  return '0'
+}
+
 function renderKpis() {
   const rows = state.rows || []
   const totalLinked = rows.reduce((sum, row) => sum + (row.linkedCount || 0), 0)
@@ -297,60 +318,152 @@ function renderCompareAnalysis() {
   const host = document.getElementById('dashCompareAnalysis')
   const rows = state.rows || []
 
-  const groups = [
-    {
-      type: 'equal',
-      title: 'Actual = Estimate',
-      subtitle: 'เริ่มตรงตาม Estimate Sprint'
-    },
-    {
-      type: 'early',
-      title: 'Actual เร็วกว่า Estimate',
-      subtitle: 'เริ่มก่อนแผน'
-    },
-    {
-      type: 'late',
-      title: 'Actual ช้ากว่า Estimate',
-      subtitle: 'เริ่มช้ากว่าแผน'
-    }
+  const comparableRows = rows.filter((row) => row.derived.estimateNum != null && row.derived.actualNum != null)
+  const comparable = comparableRows.length
+  const coverage = rows.length ? Math.round((comparable / rows.length) * 100) : 0
+
+  if (!comparable) {
+    host.innerHTML = '<div class="dash-empty">No comparable sprint data</div>'
+    document.getElementById('dashCompareMeta').textContent = 'Comparable Items: 0'
+    return
+  }
+
+  const deltas = comparableRows.map((row) => row.derived.actualNum - row.derived.estimateNum)
+  const lateDeltas = deltas.filter((x) => x > 0).sort((a, b) => a - b)
+  const onTime = deltas.filter((x) => x === 0).length
+  const early = deltas.filter((x) => x < 0).length
+  const late = deltas.filter((x) => x > 0).length
+
+  const onTimeRate = Math.round((onTime / comparable) * 100)
+  const earlyRate = Math.round((early / comparable) * 100)
+  const lateRate = Math.round((late / comparable) * 100)
+  const medianDelta = median(deltas)
+  const p90Late = lateDeltas.length ? quantile(lateDeltas, 0.9) : 0
+
+  const bins = [
+    { key: 'early2', label: '<= -2', test: (x) => x <= -2 },
+    { key: 'early1', label: '-1', test: (x) => x === -1 },
+    { key: 'ontime', label: '0', test: (x) => x === 0 },
+    { key: 'late1', label: '+1', test: (x) => x === 1 },
+    { key: 'late2', label: '+2', test: (x) => x === 2 },
+    { key: 'late3', label: '>= +3', test: (x) => x >= 3 }
   ]
+  const histogram = bins.map((bin) => ({
+    ...bin,
+    count: deltas.filter(bin.test).length
+  }))
+  const maxHist = Math.max(...histogram.map((x) => x.count), 1)
 
-  host.innerHTML = groups.map((g) => {
-    const count = rows.filter((row) => row.derived.compareType === g.type).length
-    const squads = squadCountByType(rows, g.type)
-    const maxSquad = Math.max(...squads.map((item) => item.count), 1)
-    const rate = rows.length ? Math.round((count / rows.length) * 100) : 0
-    const squadRows = squads.length
-      ? `<div class="dash-analysis-squads">${squads.map((item) => {
-          const pct = Math.max(6, Math.round((item.count / maxSquad) * 100))
-          return `
-            <div class="dash-analysis-pill">
-              <div class="dash-analysis-pill-top">
-                <span>${esc(item.squad)}</span>
-                <strong>${esc(item.count)} งาน</strong>
+  const squadMap = new Map()
+  for (const row of comparableRows) {
+    const squad = row.parent.squad || 'No Squad'
+    const delta = row.derived.actualNum - row.derived.estimateNum
+    if (!squadMap.has(squad)) squadMap.set(squad, [])
+    squadMap.get(squad).push(delta)
+  }
+  const squadStats = [...squadMap.entries()].map(([squad, vals]) => {
+    const sorted = [...vals].sort((a, b) => a - b)
+    const lateCount = vals.filter((x) => x > 0).length
+    return {
+      squad,
+      n: vals.length,
+      lateRate: vals.length ? Math.round((lateCount / vals.length) * 100) : 0,
+      median: quantile(sorted, 0.5),
+      iqr: quantile(sorted, 0.75) - quantile(sorted, 0.25)
+    }
+  }).sort((a, b) => b.lateRate - a.lateRate || b.median - a.median || b.n - a.n).slice(0, 8)
+
+  const sprintMap = new Map()
+  for (const row of comparableRows) {
+    const key = row.derived.estimateNum
+    const delta = row.derived.actualNum - row.derived.estimateNum
+    if (!sprintMap.has(key)) sprintMap.set(key, [])
+    sprintMap.get(key).push(delta)
+  }
+  const trendRows = [...sprintMap.entries()]
+    .map(([sprint, vals]) => {
+      const lateCount = vals.filter((x) => x > 0).length
+      return {
+        sprint,
+        n: vals.length,
+        lateRate: vals.length ? Math.round((lateCount / vals.length) * 100) : 0,
+        median: median(vals)
+      }
+    })
+    .sort((a, b) => a.sprint - b.sprint)
+    .slice(-8)
+  const maxTrendLate = Math.max(...trendRows.map((x) => x.lateRate), 1)
+
+  host.innerHTML = `
+    <div class="exec-analytics">
+      <div class="exec-kpi-row">
+        <article class="exec-kpi-card">
+          <div class="k">On-time Rate</div><div class="v">${onTimeRate}%</div><div class="s">${onTime}/${comparable}</div>
+        </article>
+        <article class="exec-kpi-card">
+          <div class="k">Early Rate</div><div class="v">${earlyRate}%</div><div class="s">${early}/${comparable}</div>
+        </article>
+        <article class="exec-kpi-card risk">
+          <div class="k">Late Rate</div><div class="v">${lateRate}%</div><div class="s">${late}/${comparable}</div>
+        </article>
+        <article class="exec-kpi-card">
+          <div class="k">Median Delta</div><div class="v">${formatSigned(Math.round(medianDelta * 10) / 10)}</div><div class="s">Actual - Estimate</div>
+        </article>
+        <article class="exec-kpi-card risk">
+          <div class="k">P90 Late Delta</div><div class="v">+${Math.round(p90Late * 10) / 10}</div><div class="s">Tail risk</div>
+        </article>
+        <article class="exec-kpi-card">
+          <div class="k">Coverage</div><div class="v">${coverage}%</div><div class="s">${comparable}/${rows.length}</div>
+        </article>
+      </div>
+
+      <div class="exec-viz-grid">
+        <article class="exec-viz-card">
+          <h4>Delta Distribution (Actual - Estimate)</h4>
+          <div class="exec-hist">
+            ${histogram.map((b) => `
+              <div class="bar">
+                <div class="bar-fill ${b.key}" style="height:${Math.max(8, Math.round((b.count / maxHist) * 100))}%"></div>
+                <div class="bar-count">${b.count}</div>
+                <div class="bar-label">${b.label}</div>
               </div>
-              <div class="dash-analysis-pill-bar"><div style="width:${pct}%"></div></div>
-            </div>
-          `
-        }).join('')}</div>`
-      : '<div class="dash-analysis-empty">ไม่มี Squad ที่เข้าเงื่อนไข</div>'
+            `).join('')}
+          </div>
+        </article>
 
-    return `
-      <article class="dash-analysis-card type-${g.type}">
-        <div class="dash-analysis-title">${esc(g.title)}</div>
-        <div class="dash-analysis-main">
-          <strong>${esc(count)}</strong>
-          <span>${esc(g.subtitle)}</span>
-        </div>
-        <div class="dash-analysis-rate">${esc(rate)}% ของรายการที่กำลังดู</div>
-        ${squadRows}
-        <div class="dash-analysis-trace"></div>
-      </article>
-    `
-  }).join('')
+        <article class="exec-viz-card">
+          <h4>Squad Benchmark (Late Risk)</h4>
+          <div class="exec-squad-list">
+            ${squadStats.map((s) => `
+              <div class="sq-row">
+                <div class="sq-head">
+                  <span>${esc(s.squad)}</span>
+                  <span>${s.lateRate}% late</span>
+                </div>
+                <div class="sq-bar"><span style="width:${Math.max(8, s.lateRate)}%"></span></div>
+                <div class="sq-meta">n=${s.n} | median=${formatSigned(Math.round(s.median * 10) / 10)} | IQR=${Math.round(s.iqr * 10) / 10}</div>
+              </div>
+            `).join('') || '<div class="dash-empty">No squad benchmark</div>'}
+          </div>
+        </article>
 
-  const comparable = rows.filter((row) => row.derived.compareType !== 'na').length
-  document.getElementById('dashCompareMeta').textContent = `Comparable Items: ${comparable}`
+        <article class="exec-viz-card">
+          <h4>Trend by Estimate Sprint</h4>
+          <div class="exec-trend">
+            ${trendRows.map((t) => `
+              <div class="tr-col">
+                <div class="tr-bar" style="height:${Math.max(8, Math.round((t.lateRate / maxTrendLate) * 100))}%"></div>
+                <div class="tr-label">S${t.sprint}</div>
+                <div class="tr-meta">${t.lateRate}% | med ${formatSigned(Math.round(t.median * 10) / 10)}</div>
+              </div>
+            `).join('') || '<div class="dash-empty">No trend data</div>'}
+          </div>
+        </article>
+      </div>
+    </div>
+  `
+
+  document.getElementById('dashCompareMeta').textContent = `Comparable Items: ${comparable} (${coverage}% coverage)`
 }
 
 function renderList(hostId, rows, emptyText) {
