@@ -510,6 +510,46 @@ function renderCompareAnalysis() {
   if (compareValue) compareValue.textContent = `${comparable}`
   if (coverageValue) coverageValue.textContent = `(${coverage}% coverage)`
 }
+
+function renderStatusKpiCards() {
+  const host = document.getElementById('dashStatusKpiCards')
+  const totalNode = document.getElementById('dashStatusTotal')
+  const rows = state.rows || []
+  if (!host || !totalNode) return
+
+  const total = rows.length
+  totalNode.textContent = String(total)
+
+  if (!total) {
+    host.innerHTML = '<div class="dash-empty" style="color:#d6e7ff;border:1px dashed rgba(195,220,255,.45);border-radius:12px;">No FEPMF in current filter</div>'
+    return
+  }
+
+  const counts = new Map()
+  for (const row of rows) {
+    const status = row.parent.status || 'Unknown'
+    counts.set(status, (counts.get(status) || 0) + 1)
+  }
+
+  const ordered = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0])))
+
+  const max = Math.max(...ordered.map(([, count]) => count), 1)
+  host.innerHTML = ordered.map(([status, count]) => {
+    const share = Math.round((count / total) * 100)
+    const width = Math.max(6, Math.round((count / max) * 100))
+    return `
+      <article class="dash-status-kpi-item">
+        <div class="dash-status-kpi-row">
+          <span class="name">${esc(status)}</span>
+          <span class="count">${esc(count)}</span>
+        </div>
+        <div class="dash-status-kpi-bar"><span style="width:${width}%"></span></div>
+        <div class="dash-status-kpi-share">${share}% ของ FEPMF ทั้งหมด</div>
+      </article>
+    `
+  }).join('')
+}
 function renderList(hostId, rows, emptyText) {
   const host = document.getElementById(hostId)
   if (!rows.length) {
@@ -623,6 +663,7 @@ function renderAll() {
   renderStatusBars()
   renderSmartReading()
   renderCompareAnalysis()
+  renderStatusKpiCards()
   renderHighlights()
   renderTable()
   renderResultSummary()
@@ -712,6 +753,10 @@ async function load(refresh = false) {
     document.getElementById('dashRisk').innerHTML = '<div class="dash-empty">No data</div>'
     document.getElementById('dashCab').innerHTML = '<div class="dash-empty">No data</div>'
     document.getElementById('dashCompareAnalysis').innerHTML = '<div class="dash-empty">No data</div>'
+    const statusCards = document.getElementById('dashStatusKpiCards')
+    const statusTotal = document.getElementById('dashStatusTotal')
+    if (statusCards) statusCards.innerHTML = '<div class="dash-empty">No data</div>'
+    if (statusTotal) statusTotal.textContent = '0'
     document.getElementById('dashResultInfo').innerHTML = ''
     document.getElementById('dashSync').textContent = 'Load failed'
   }
