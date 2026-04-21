@@ -537,7 +537,7 @@ function renderStatusKpiCards() {
   totalNode.textContent = String(total)
 
   if (!total) {
-    host.innerHTML = '<div class="dash-empty" style="color:#d6e7ff;border:1px dashed rgba(195,220,255,.45);border-radius:12px;">No FEPMF in current filter</div>'
+    host.innerHTML = '<div class="dash-empty" style="border:1px dashed #c8d9ee;border-radius:12px;background:#fff;">No FEPMF in current filter</div>'
     return
   }
 
@@ -551,16 +551,25 @@ function renderStatusKpiCards() {
     .sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0])))
 
   const max = Math.max(...ordered.map(([, count]) => count), 1)
-  host.innerHTML = ordered.map(([status, count]) => {
+  const cardTones = [
+    'linear-gradient(90deg,#2f74de 0%, #42a5f5 46%, #79e8d7 100%)',
+    'linear-gradient(90deg,#7b61ff 0%, #5ca8ff 52%, #8df0d3 100%)',
+    'linear-gradient(90deg,#18a57f 0%, #5dd5b5 60%, #9eeadf 100%)',
+    'linear-gradient(90deg,#d45aa0 0%, #7f8bff 58%, #79d8f2 100%)',
+    'linear-gradient(90deg,#ef8b3a 0%, #f6b54f 56%, #ffe09c 100%)'
+  ]
+
+  host.innerHTML = ordered.map(([status, count], idx) => {
     const share = Math.round((count / total) * 100)
     const width = Math.max(6, Math.round((count / max) * 100))
+    const tone = cardTones[idx % cardTones.length]
     return `
       <article class="dash-status-kpi-item">
         <div class="dash-status-kpi-row">
           <span class="name">${esc(status)}</span>
           <span class="count">${esc(count)}</span>
         </div>
-        <div class="dash-status-kpi-bar"><span style="width:${width}%"></span></div>
+        <div class="dash-status-kpi-bar"><span style="width:${width}%;background:${tone}"></span></div>
         <div class="dash-status-kpi-share">${share}% ของ FEPMF ทั้งหมด</div>
       </article>
     `

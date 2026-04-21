@@ -757,57 +757,60 @@
       background: linear-gradient(180deg, #f2f5fb 0%, #eef2f9 100%);
       padding: 12px;
     }
-    .dash-analysis-shell {
-      display: grid;
-      grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.55fr);
-      gap: 14px;
-      align-items: start;
-    }
-    .dash-analysis-left {
-      min-width: 0;
-    }
-    .dash-status-kpi-side {
-      border: 1px solid #d8dfec;
+    .dash-status-kpi-panel {
+      border: 1px solid #d9e2f0;
       border-radius: 18px;
-      background: linear-gradient(160deg, #0d223f 0%, #123968 45%, #1a4f85 100%);
-      box-shadow: 0 18px 36px rgba(18, 42, 75, 0.28);
+      background: linear-gradient(145deg, #f8fbff 0%, #f1f6ff 100%);
+      box-shadow: 0 12px 24px rgba(28, 62, 115, 0.12);
       padding: 14px;
       display: grid;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .dash-status-kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 10px;
-      color: #eaf3ff;
-      position: sticky;
-      top: 12px;
+    }
+    .dash-status-kpi-item {
+      border: 1px solid #d5e1f2;
+      border-radius: 14px;
+      background: #fff;
+      padding: 10px;
+      display: grid;
+      gap: 8px;
+      box-shadow: 0 6px 14px rgba(39, 77, 135, 0.08);
     }
     .dash-status-kpi-head {
       display: flex;
-      align-items: flex-start;
+      align-items: center;
       justify-content: space-between;
       gap: 10px;
     }
     .dash-status-kpi-title {
       margin: 0;
-      font-size: 15px;
+      font-size: 18px;
       font-weight: 800;
-      color: #ffffff;
+      color: #15345f;
       letter-spacing: 0.01em;
     }
     .dash-status-kpi-sub {
-      margin: 2px 0 0;
-      font-size: 11px;
-      color: #bdd4f2;
+      margin: 4px 0 0;
+      font-size: 12px;
+      color: #4f6788;
       line-height: 1.35;
     }
     .dash-status-kpi-total {
-      border: 1px solid rgba(193, 220, 255, 0.35);
-      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid #c6d6ee;
+      background: linear-gradient(130deg, #2359b3 0%, #2f76df 100%);
       border-radius: 12px;
       padding: 8px 10px;
-      min-width: 104px;
+      min-width: 126px;
       text-align: right;
     }
     .dash-status-kpi-total strong {
       display: block;
-      font-size: 28px;
+      font-size: 30px;
       line-height: 1;
       color: #fff;
       font-weight: 800;
@@ -816,22 +819,7 @@
     .dash-status-kpi-total span {
       font-size: 11px;
       font-weight: 700;
-      color: #c8dbf4;
-    }
-    .dash-status-kpi-list {
-      display: grid;
-      gap: 8px;
-      max-height: 520px;
-      overflow: auto;
-      padding-right: 2px;
-    }
-    .dash-status-kpi-item {
-      border: 1px solid rgba(186, 214, 248, 0.34);
-      border-radius: 12px;
-      background: rgba(255, 255, 255, 0.08);
-      padding: 8px 9px;
-      display: grid;
-      gap: 6px;
+      color: #dbe9ff;
     }
     .dash-status-kpi-row {
       display: flex;
@@ -842,30 +830,30 @@
       font-weight: 800;
     }
     .dash-status-kpi-row .name {
-      color: #eff6ff;
+      color: #1e416f;
     }
     .dash-status-kpi-row .count {
-      color: #ffffff;
-      font-size: 15px;
+      color: #0f2f5a;
+      font-size: 24px;
       line-height: 1;
     }
     .dash-status-kpi-bar {
-      height: 7px;
+      height: 8px;
       border-radius: 999px;
-      background: rgba(208, 226, 247, 0.28);
+      background: #e7effa;
       overflow: hidden;
     }
     .dash-status-kpi-bar > span {
       display: block;
       height: 100%;
       border-radius: 999px;
-      background: linear-gradient(90deg, #6ecbff 0%, #81ffd5 100%);
+      background: linear-gradient(90deg, #2f74de 0%, #42a5f5 46%, #79e8d7 100%);
     }
     .dash-status-kpi-share {
       font-size: 11px;
       font-weight: 700;
-      color: #c3d8f2;
-      text-align: right;
+      color: #4f6787;
+      text-align: left;
     }
 
     .dash-analysis-headline {
@@ -1354,9 +1342,8 @@
       .dash-pie-wrap { grid-template-columns: 1fr; }
       .dash-pie-chart { margin: 0 auto; }
       .dash-main-grid { grid-template-columns: 1fr; }
-      .dash-analysis-shell { grid-template-columns: 1fr; }
       .dash-analysis-grid { grid-template-columns: 1fr; }
-      .dash-status-kpi-side { position: static; }
+      .dash-status-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .dash-analysis-main strong { font-size: 40px; }
       .dash-analysis-main span { font-size: 14px; }
       .exec-readme-grid { grid-template-columns: 1fr; }
@@ -1376,6 +1363,7 @@
       .dash-toolbar { grid-template-columns: 1fr; }
       .dash-status-kpi-head { flex-direction: column; }
       .dash-status-kpi-total { text-align: left; width: 100%; }
+      .dash-status-kpi-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -1437,25 +1425,22 @@
       </div>
       <div class="dash-analysis-wrap">
         <div class="dash-analysis-headline">Estimate Sprint vs Actual Start Sprint Analysis</div>
-        <div class="dash-analysis-shell">
-          <div class="dash-analysis-left">
-            <div id="dashCompareAnalysis" class="dash-analysis-grid"></div>
-          </div>
-          <aside class="dash-status-kpi-side">
-            <div class="dash-status-kpi-head">
-              <div>
-                <h4 class="dash-status-kpi-title">FEPMF Status KPI</h4>
-                <p class="dash-status-kpi-sub">สรุปจำนวนงานแต่ละสถานะจาก scope ที่เลือก</p>
-              </div>
-              <div class="dash-status-kpi-total">
-                <strong id="dashStatusTotal">0</strong>
-                <span>Total FEPMF</span>
-              </div>
-            </div>
-            <div id="dashStatusKpiCards" class="dash-status-kpi-list"></div>
-          </aside>
+        <div id="dashCompareAnalysis" class="dash-analysis-grid"></div>
+      </div>
+    </section>
+
+    <section class="dash-status-kpi-panel">
+      <div class="dash-status-kpi-head">
+        <div>
+          <h4 class="dash-status-kpi-title">FEPMF Status KPI Cards</h4>
+          <p class="dash-status-kpi-sub">แยกบล็อกสำหรับสรุปจำนวน FEPMF รายสถานะจาก scope ปัจจุบัน</p>
+        </div>
+        <div class="dash-status-kpi-total">
+          <strong id="dashStatusTotal">0</strong>
+          <span>Total FEPMF</span>
         </div>
       </div>
+      <div id="dashStatusKpiCards" class="dash-status-kpi-grid"></div>
     </section>
 
     <section class="dash-toolbar">
