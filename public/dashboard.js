@@ -348,10 +348,7 @@ function renderCompareAnalysis() {
     { key: 'late2', label: '+2', test: (x) => x === 2 },
     { key: 'late3', label: '>= +3', test: (x) => x >= 3 }
   ]
-  const histogram = bins.map((bin) => ({
-    ...bin,
-    count: deltas.filter(bin.test).length
-  }))
+  const histogram = bins.map((bin) => ({ ...bin, count: deltas.filter(bin.test).length }))
   const maxHist = Math.max(...histogram.map((x) => x.count), 1)
 
   const squadMap = new Map()
@@ -394,32 +391,42 @@ function renderCompareAnalysis() {
     .slice(-8)
   const maxTrendLate = Math.max(...trendRows.map((x) => x.lateRate), 1)
 
+  const metricCards = [
+    { key: 'On-time Rate', value: `${onTimeRate}%`, detail: `${onTime}/${comparable}`, meaning: 'Share of work that starts exactly on estimate sprint.', help: 'Higher is better.' },
+    { key: 'Early Rate', value: `${earlyRate}%`, detail: `${early}/${comparable}`, meaning: 'Share of work that starts before estimate sprint.', help: 'Good only when quality and dependencies are stable.' },
+    { key: 'Late Rate', value: `${lateRate}%`, detail: `${late}/${comparable}`, meaning: 'Share of work that starts after estimate sprint.', help: 'Primary execution risk indicator.', risk: true },
+    { key: 'Median Delta', value: formatSigned(Math.round(medianDelta * 10) / 10), detail: 'Actual - Estimate', meaning: 'Typical schedule slip/lead of the portfolio.', help: 'Positive means delay.' },
+    { key: 'P90 Late Delta', value: `+${Math.round(p90Late * 10) / 10}`, detail: 'Tail risk', meaning: '90% of late items delay less than or equal to this value.', help: 'Use for worst-case planning buffer.', risk: true },
+    { key: 'Coverage', value: `${coverage}%`, detail: `${comparable}/${rows.length}`, meaning: 'Share of rows with both estimate and actual sprint.', help: 'Low coverage reduces confidence.' }
+  ]
+
   host.innerHTML = `
     <div class="exec-analytics">
+      <div class="exec-readme">
+        <div class="exec-readme-title">How to read this panel</div>
+        <div class="exec-readme-grid">
+          <div><strong>What this measures:</strong> Estimate Sprint accuracy against Actual Start Sprint.</div>
+          <div><strong>What decision it supports:</strong> Identify squads/sprints to intervene before delays grow.</div>
+          <div><strong>What data it uses:</strong> Only rows with both Estimate and Actual (Comparable rows).</div>
+        </div>
+      </div>
+
       <div class="exec-kpi-row">
-        <article class="exec-kpi-card">
-          <div class="k">On-time Rate</div><div class="v">${onTimeRate}%</div><div class="s">${onTime}/${comparable}</div>
-        </article>
-        <article class="exec-kpi-card">
-          <div class="k">Early Rate</div><div class="v">${earlyRate}%</div><div class="s">${early}/${comparable}</div>
-        </article>
-        <article class="exec-kpi-card risk">
-          <div class="k">Late Rate</div><div class="v">${lateRate}%</div><div class="s">${late}/${comparable}</div>
-        </article>
-        <article class="exec-kpi-card">
-          <div class="k">Median Delta</div><div class="v">${formatSigned(Math.round(medianDelta * 10) / 10)}</div><div class="s">Actual - Estimate</div>
-        </article>
-        <article class="exec-kpi-card risk">
-          <div class="k">P90 Late Delta</div><div class="v">+${Math.round(p90Late * 10) / 10}</div><div class="s">Tail risk</div>
-        </article>
-        <article class="exec-kpi-card">
-          <div class="k">Coverage</div><div class="v">${coverage}%</div><div class="s">${comparable}/${rows.length}</div>
-        </article>
+        ${metricCards.map((m) => `
+          <article class="exec-kpi-card ${m.risk ? 'risk' : ''}">
+            <div class="k">${m.key}</div>
+            <div class="v">${m.value}</div>
+            <div class="s">${m.detail}</div>
+            <div class="m">${m.meaning}</div>
+            <div class="h">${m.help}</div>
+          </article>
+        `).join('')}
       </div>
 
       <div class="exec-viz-grid">
-        <article class="exec-viz-card">
-          <h4>Delta Distribution (Actual - Estimate)</h4>
+        <article class="exec-viz-card hist-card">
+          <h4>1) Distribution: Actual - Estimate (sprint delta)</h4>
+          <p class="viz-desc">Shows where the portfolio clusters: on-time, early, or delayed tail.</p>
           <div class="exec-hist">
             ${histogram.map((b) => `
               <div class="bar">
@@ -432,7 +439,8 @@ function renderCompareAnalysis() {
         </article>
 
         <article class="exec-viz-card">
-          <h4>Squad Benchmark (Late Risk)</h4>
+          <h4>2) Squad Benchmark: Late-risk ranking</h4>
+          <p class="viz-desc">Ranks squads by late-rate and variability (median + IQR).</p>
           <div class="exec-squad-list">
             ${squadStats.map((s) => `
               <div class="sq-row">
@@ -448,7 +456,8 @@ function renderCompareAnalysis() {
         </article>
 
         <article class="exec-viz-card">
-          <h4>Trend by Estimate Sprint</h4>
+          <h4>3) Trend by Estimate Sprint</h4>
+          <p class="viz-desc">Tracks whether late-rate and median delta are improving or worsening over time.</p>
           <div class="exec-trend">
             ${trendRows.map((t) => `
               <div class="tr-col">
