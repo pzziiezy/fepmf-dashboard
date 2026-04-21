@@ -705,13 +705,17 @@ export default async function handler(req, res) {
       .filter(Boolean)
 
     const deliveredRecentRaw = await fetchDeliveredRecent()
-    const deliveredRecent = deliveredRecentRaw.map((issue) => ({
-      key: issue?.key || '',
-      summary: issue?.fields?.summary || '',
-      status: issue?.fields?.status?.name || '',
-      updated: issue?.fields?.updated || '',
-      browseUrl: issue?.key ? `https://dgtbigc.atlassian.net/browse/${issue.key}` : ''
-    }))
+    const deliveredRecent = deliveredRecentRaw.map((issue) => {
+      const normalizedIssue = normalized.get(issue?.key || '')
+      return {
+        key: issue?.key || '',
+        summary: issue?.fields?.summary || '',
+        squad: normalizedIssue?.squad || '',
+        status: issue?.fields?.status?.name || '',
+        updated: issue?.fields?.updated || '',
+        browseUrl: issue?.key ? `https://dgtbigc.atlassian.net/browse/${issue.key}` : ''
+      }
+    })
 
     const summary = {
       totalParents: parents.length,

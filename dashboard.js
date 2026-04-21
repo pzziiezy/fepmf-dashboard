@@ -241,23 +241,55 @@ function renderStatusBars() {
     <span class="dash-chip">${esc(item.status)}: ${esc(item.count)}</span>
   `).join('')
 
-  const top = topRows[0]
-  const total = rows.length
-  const topPct = total ? Math.round((top.count / total) * 100) : 0
-  summary.textContent = `Status สูงสุดตอนนี้คือ ${top.status} (${top.count} งาน, ${topPct}% ของผลลัพธ์ทั้งหมด)`
-
   const recent = (state.data?.deliveredRecent || [])
     .filter((item) => item?.key)
-    .slice(0, 12)
+  const recentCount = Number(state.data?.summary?.deliveredRecentCount ?? recent.length)
+  summary.textContent = `จำนวนงานที่เข้าเงื่อนไข S7 - Project Deliverd (15 วันล่าสุด): ${recentCount} งาน`
 
   if (!recent.length) {
     recentList.innerHTML = '<li>ไม่พบรายการที่เปลี่ยนเป็น S7 ในช่วง 15 วันที่ผ่านมา</li>'
   } else {
-    recentList.innerHTML = recent.map((item) => {
-      const updated = item.updated ? new Date(item.updated).toLocaleDateString('th-TH') : '-'
+    const chunks = []
+    let currentMonthKey = ''
+
+    for (const item of recent) {
+      const dt = item.updated ? new Date(item.updated) : null
+      const safeDt = dt && !Number.isNaN(dt.getTime()) ? dt : null
+      const monthKey = safeDt ? safeDt.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase() : ''
+      if (monthKey && monthKey !== currentMonthKey) {
+        chunks.push(`<li class="dash-smart-month">${esc(monthKey)}</li>`)
+        currentMonthKey = monthKey
+      }
+
+      const weekday = safeDt ? safeDt.toLocaleDateString('en-US', { weekday: 'short' }) : '-'
+      const dayNum = safeDt ? safeDt.toLocaleDateString('en-US', { day: '2-digit' }) : '-'
+      const updated = safeDt ? safeDt.toLocaleString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'
       const url = item.browseUrl || `https://dgtbigc.atlassian.net/browse/${item.key}`
-      return `<li><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(item.key)}</a> (${esc(updated)})</li>`
-    }).join('')
+      const squad = item.squad || '-'
+      const summaryText = item.summary || '-'
+      chunks.push(`
+        <li class="dash-smart-item">
+          <div class="dash-smart-date">
+            <div class="dash-smart-weekday">${esc(weekday)}</div>
+            <div class="dash-smart-day">${esc(dayNum)}</div>
+          </div>
+          <div class="dash-smart-body">
+            <div class="dash-smart-head">
+              <a class="dash-smart-key" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(item.key)}</a>
+              <span class="dash-smart-status">S7</span>
+            </div>
+            <div class="dash-smart-meta">
+              <span class="dash-smart-squad">${esc(squad)}</span>
+              <span class="dash-smart-updated">${esc(updated)}</span>
+            </div>
+            <div class="dash-smart-summary">${esc(summaryText)}</div>
+          </div>
+          <a class="dash-smart-open" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Open</a>
+        </li>
+      `)
+    }
+
+    recentList.innerHTML = chunks.join('')
   }
 }
 

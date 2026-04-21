@@ -138,7 +138,7 @@
     .dash-status-panel { padding: 16px; }
     .dash-status-layout {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 280px;
+      grid-template-columns: minmax(0, 1fr) 420px;
       gap: 14px;
       align-items: stretch;
     }
@@ -147,9 +147,10 @@
       border-radius: 16px;
       background: linear-gradient(180deg, #fff 0%, #f9fbff 100%);
       padding: 14px 12px 12px;
-      min-height: 320px;
+      min-height: 0;
       display: grid;
       gap: 10px;
+      align-content: start;
     }
     .dash-bars-grid {
       min-height: 240px;
@@ -239,6 +240,8 @@
       display: flex;
       gap: 8px;
       flex-wrap: wrap;
+      align-items: flex-start;
+      align-content: flex-start;
     }
     .dash-bars-note {
       border: 1px solid #dde6f4;
@@ -260,19 +263,159 @@
       color: #5a6d89;
       line-height: 1.45;
     }
+    .dash-smart-count {
+      border: 1px solid #d9e3f3;
+      border-radius: 12px;
+      background: #f7faff;
+      padding: 8px 10px;
+      color: #2c466c;
+      font-size: 12px;
+      font-weight: 800;
+    }
     .dash-smart-list {
       margin: 0;
-      padding-left: 16px;
-      max-height: 180px;
+      padding-left: 0;
+      max-height: 320px;
       overflow: auto;
       display: grid;
-      gap: 6px;
+      gap: 8px;
+      list-style: none;
     }
     .dash-smart-list li {
       color: #2b4261;
       font-size: 12px;
       line-height: 1.35;
       font-weight: 700;
+    }
+    .dash-smart-month {
+      font-size: 10px;
+      color: #7388a8;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      font-weight: 800;
+      padding: 2px 2px 0;
+    }
+    .dash-smart-item {
+      display: grid;
+      grid-template-columns: 54px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid #dfe7f4;
+      border-radius: 16px;
+      padding: 8px 10px;
+      background: linear-gradient(180deg, #ffffff 0%, #f4f8ff 100%);
+      box-shadow: 0 8px 16px rgba(32, 68, 126, 0.08);
+    }
+    .dash-smart-date {
+      display: grid;
+      justify-items: center;
+      align-content: center;
+      gap: 2px;
+      min-height: 62px;
+      border-right: 1px solid #e3ebf7;
+      padding-right: 8px;
+    }
+    .dash-smart-weekday {
+      font-size: 10px;
+      color: #768aa8;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+    }
+    .dash-smart-day {
+      font-size: 26px;
+      line-height: 1;
+      color: #173b68;
+      font-weight: 800;
+      letter-spacing: -.02em;
+    }
+    .dash-smart-body {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+    }
+    .dash-smart-head {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .dash-smart-key {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid #cfe0f7;
+      background: #edf4ff;
+      color: #184e9f;
+      font-size: 11px;
+      font-weight: 800;
+      text-decoration: none;
+      letter-spacing: .01em;
+    }
+    .dash-smart-status {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #122c4f;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .02em;
+      text-transform: uppercase;
+    }
+    .dash-smart-updated {
+      font-size: 11px;
+      color: #6a7f9f;
+      font-weight: 700;
+    }
+    .dash-smart-meta {
+      font-size: 11px;
+      color: #5e7494;
+      font-weight: 700;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .dash-smart-squad {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: #f1f5fc;
+      border: 1px solid #d7e2f1;
+      color: #2f4a6e;
+      font-weight: 800;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+    }
+    .dash-smart-summary {
+      font-size: 11px;
+      color: #2f4668;
+      line-height: 1.35;
+      font-weight: 700;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .dash-smart-open {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 70px;
+      height: 30px;
+      border-radius: 999px;
+      border: 1px solid #d2def0;
+      background: #fff;
+      color: #1f4e91;
+      text-decoration: none;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 0 10px;
     }
     .dash-smart-list a {
       color: #1d58aa;
@@ -324,6 +467,9 @@
     }
 
     .dash-chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       border: 1px solid #dbe3f1;
       border-radius: 999px;
       background: #f7f9fc;
@@ -332,6 +478,9 @@
       font-weight: 700;
       padding: 5px 10px;
       white-space: nowrap;
+      height: auto;
+      min-height: 0;
+      flex: 0 0 auto;
     }
 
     .dash-analysis-grid {
@@ -660,7 +809,7 @@
         </div>
         <aside class="dash-bars-note">
           <h4>Smart Reading</h4>
-          <p id="dashStatusSummary">-</p>
+          <p id="dashStatusSummary" class="dash-smart-count">-</p>
           <ul id="dashStatusRecentList" class="dash-smart-list"></ul>
           <p>รายการนี้แสดง FEPMF ที่มี activity เปลี่ยน status เป็น S7 - Project Deliverd ในช่วง 15 วันที่ผ่านมา</p>
         </aside>
