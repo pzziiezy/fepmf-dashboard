@@ -437,17 +437,6 @@ function renderCompareAnalysis() {
   const medianDelta = median(deltas)
   const p90Late = lateDeltas.length ? quantile(lateDeltas, 0.9) : 0
 
-  const bins = [
-    { key: 'early2', label: '<= -2', test: (x) => x <= -2 },
-    { key: 'early1', label: '-1', test: (x) => x === -1 },
-    { key: 'ontime', label: '0', test: (x) => x === 0 },
-    { key: 'late1', label: '+1', test: (x) => x === 1 },
-    { key: 'late2', label: '+2', test: (x) => x === 2 },
-    { key: 'late3', label: '>= +3', test: (x) => x >= 3 }
-  ]
-  const histogram = bins.map((bin) => ({ ...bin, count: deltas.filter(bin.test).length }))
-  const maxHist = Math.max(...histogram.map((x) => x.count), 1)
-
   const squadMap = new Map()
   for (const row of comparableRows) {
     const squad = row.parent.squad || 'No Squad'
@@ -467,28 +456,6 @@ function renderCompareAnalysis() {
       iqr: quantile(sorted, 0.75) - quantile(sorted, 0.25)
     }
   }).sort((a, b) => b.lateRate - a.lateRate || b.median - a.median || b.n - a.n).slice(0, 8)
-
-  const sprintMap = new Map()
-  for (const row of comparableRows) {
-    const key = row.derived.estimateNum
-    const delta = row.derived.actualNum - row.derived.estimateNum
-    if (!sprintMap.has(key)) sprintMap.set(key, [])
-    sprintMap.get(key).push(delta)
-  }
-
-  const trendRows = [...sprintMap.entries()]
-    .map(([sprint, vals]) => {
-      const lateCount = vals.filter((x) => x > 0).length
-      return {
-        sprint,
-        n: vals.length,
-        lateRate: vals.length ? Math.round((lateCount / vals.length) * 100) : 0,
-        median: median(vals)
-      }
-    })
-    .sort((a, b) => a.sprint - b.sprint)
-    .slice(-8)
-  const maxTrendLate = Math.max(...trendRows.map((x) => x.lateRate), 1)
 
   const metricCards = [
     { key: 'ตรงแผน', value: `${onTimeRate}%`, detail: `${onTime}/${comparable}`, meaning: 'เริ่มงานตรงกับ Estimate Sprint', help: 'ค่ายิ่งสูงยิ่งดี' },
@@ -523,22 +490,8 @@ function renderCompareAnalysis() {
       </div>
 
       <div class="exec-viz-grid">
-        <article class="exec-viz-card hist-card">
-          <h4>1) การกระจายของ Delta (Actual - Estimate)</h4>
-          <p class="viz-desc">ดูว่าผลงานส่วนใหญ่กระจุกที่ตรงแผน เร็วกว่าแผน หรือช้ากว่าแผน</p>
-          <div class="exec-hist">
-            ${histogram.map((b) => `
-              <div class="bar">
-                <div class="bar-fill ${b.key}" style="height:${Math.max(8, Math.round((b.count / maxHist) * 100))}%"></div>
-                <div class="bar-count">${b.count}</div>
-                <div class="bar-label">${b.label}</div>
-              </div>
-            `).join('')}
-          </div>
-        </article>
-
-        <article class="exec-viz-card benchmark-card">
-          <h4>2) Squad Benchmark: ความเสี่ยงเริ่มช้า</h4>
+        <article class="exec-viz-card benchmark-card" style="grid-column:1 / -1;">
+          <h4>Squad Benchmark: ความเสี่ยงเริ่มช้า</h4>
           <p class="viz-desc">จัดอันดับ Squad ตาม Late Rate และความผันผวน (Median + IQR)</p>
           <div class="exec-squad-list">
             ${squadStats.map((s) => `
@@ -551,20 +504,6 @@ function renderCompareAnalysis() {
                 <div class="sq-meta">n=${s.n} | median=${formatSigned(Math.round(s.median * 10) / 10)} | IQR=${Math.round(s.iqr * 10) / 10}</div>
               </div>
             `).join('') || '<div class="dash-empty">No squad benchmark</div>'}
-          </div>
-        </article>
-
-        <article class="exec-viz-card trend-card">
-          <h4>3) Trend by Estimate Sprint</h4>
-          <p class="viz-desc">ติดตามแนวโน้ม Late Rate และ Median Delta ราย Sprint</p>
-          <div class="exec-trend">
-            ${trendRows.map((t) => `
-              <div class="tr-col">
-                <div class="tr-bar" style="height:${Math.max(8, Math.round((t.lateRate / maxTrendLate) * 100))}%"></div>
-                <div class="tr-label">S${t.sprint}</div>
-                <div class="tr-meta">${t.lateRate}% | med ${formatSigned(Math.round(t.median * 10) / 10)}</div>
-              </div>
-            `).join('') || '<div class="dash-empty">No trend data</div>'}
           </div>
         </article>
       </div>
