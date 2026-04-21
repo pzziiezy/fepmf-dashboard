@@ -426,7 +426,6 @@ function renderCompareAnalysis() {
   }
 
   const deltas = comparableRows.map((row) => row.derived.actualNum - row.derived.estimateNum)
-  const lateDeltas = deltas.filter((x) => x > 0).sort((a, b) => a - b)
   const onTime = deltas.filter((x) => x === 0).length
   const early = deltas.filter((x) => x < 0).length
   const late = deltas.filter((x) => x > 0).length
@@ -434,8 +433,6 @@ function renderCompareAnalysis() {
   const onTimeRate = Math.round((onTime / comparable) * 100)
   const earlyRate = Math.round((early / comparable) * 100)
   const lateRate = Math.round((late / comparable) * 100)
-  const medianDelta = median(deltas)
-  const p90Late = lateDeltas.length ? quantile(lateDeltas, 0.9) : 0
 
   const squadMap = new Map()
   for (const row of comparableRows) {
@@ -460,10 +457,7 @@ function renderCompareAnalysis() {
   const metricCards = [
     { key: 'ตรงแผน', value: `${onTimeRate}%`, detail: `${onTime}/${comparable}`, meaning: 'เริ่มงานตรงกับ Estimate Sprint', help: 'ค่ายิ่งสูงยิ่งดี' },
     { key: 'เริ่มก่อนแผน', value: `${earlyRate}%`, detail: `${early}/${comparable}`, meaning: 'เริ่มงานเร็วกว่าที่ประเมินไว้', help: 'ดีเมื่อไม่กระทบ dependency' },
-    { key: 'เริ่มช้ากว่าแผน', value: `${lateRate}%`, detail: `${late}/${comparable}`, meaning: 'สัดส่วนงานที่เริ่มช้ากว่า Estimate Sprint', help: 'ตัวชี้วัดความเสี่ยงหลัก', risk: true },
-    { key: 'Median Delta', value: formatSigned(Math.round(medianDelta * 10) / 10), detail: 'Actual - Estimate', meaning: 'ค่ากลางของความคลาดเคลื่อนทั้งพอร์ต', help: 'ค่าบวกแปลว่ามีแนวโน้มเริ่มช้า' },
-    { key: 'P90 Late Delta', value: `+${Math.round(p90Late * 10) / 10}`, detail: 'Tail risk', meaning: '90% ของงานที่ช้าจะช้าไม่เกินค่านี้', help: 'ใช้เป็น buffer ตอนวางแผน', risk: true },
-    { key: 'Coverage', value: `${coverage}%`, detail: `${comparable}/${rows.length}`, meaning: 'รายการที่มีข้อมูลทั้ง Estimate และ Actual', help: 'Coverage ต่ำทำให้วิเคราะห์ไม่แม่น' }
+    { key: 'เริ่มช้ากว่าแผน', value: `${lateRate}%`, detail: `${late}/${comparable}`, meaning: 'สัดส่วนงานที่เริ่มช้ากว่า Estimate Sprint', help: 'ตัวชี้วัดความเสี่ยงหลัก', risk: true }
   ]
 
   host.innerHTML = `
