@@ -210,21 +210,31 @@ function renderKpis() {
 }
 
 function renderCurrentSprintPendingMetric() {
-  const valueNode = document.getElementById('dashCompareValue')
-  const subNode = document.getElementById('dashCoverageValue')
-  if (!valueNode || !subNode) return
+  const percentNode = document.getElementById('dashPendingPercent')
+  const pendingCountNode = document.getElementById('dashPendingCount')
+  const totalNode = document.getElementById('dashPendingTotal')
+  const ringNode = document.getElementById('dashPendingRing')
+  if (!percentNode || !pendingCountNode || !totalNode || !ringNode) return
 
   const rows = state.rows || []
   const currentSprintNum = parseSprintNumber(state.data?.summary?.currentSprintName)
   if (currentSprintNum == null) {
-    valueNode.textContent = '0'
-    subNode.textContent = '(exclude S7)'
+    percentNode.textContent = '0'
+    pendingCountNode.textContent = '0'
+    totalNode.textContent = '0'
+    ringNode.style.setProperty('--pct', '0')
     return
   }
 
-  const pendingCount = rows.filter((row) => !isS7Status(row.parent.status) && row.derived.actualNum === currentSprintNum).length
-  valueNode.textContent = String(pendingCount)
-  subNode.textContent = '(exclude S7)'
+  const currentSprintRows = rows.filter((row) => row.derived.actualNum === currentSprintNum)
+  const totalCurrent = currentSprintRows.length
+  const pendingCount = currentSprintRows.filter((row) => !isS7Status(row.parent.status)).length
+  const pct = totalCurrent ? Math.round((pendingCount / totalCurrent) * 100) : 0
+
+  percentNode.textContent = String(pct)
+  pendingCountNode.textContent = String(pendingCount)
+  totalNode.textContent = String(totalCurrent)
+  ringNode.style.setProperty('--pct', String(pct))
 }
 
 function renderStatusBars() {
@@ -273,39 +283,74 @@ function renderStatusBars() {
 
   if (state.statusView === 'pie') {
     const total = rowsByCount.reduce((sum, item) => sum + item.count, 0) || 1
-    let offset = 0
+    const radius = 82
+    const c = 2 * Math.PI * radius
+    const gapPct = 2.6
+
+    let currentPct = 0
     const slices = rowsByCount.map((item, index) => {
       const pct = (item.count / total) * 100
-      const start = offset
-      offset += pct
+      const usablePct = Math.max(0.8, pct - gapPct)
+      const length = (usablePct / 100) * c
+      const offset = -((currentPct + gapPct / 2) / 100) * c
+      currentPct += pct
       return {
         ...item,
         pct,
         color: palette[index % palette.length].pie,
-        start,
-        end: offset
+        length,
+        offset
       }
     })
 
-    const conic = slices
-      .map((slice) => `${slice.color} ${slice.start.toFixed(2)}% ${slice.end.toFixed(2)}%`)
-      .join(', ')
+    const focus = slices[0]
+    const describe = (status) => {
+      const s = String(status || '').toLowerCase()
+      if (s.includes('open')) return 'Awaiting execution'
+      if (s.includes('cancel')) return 'Stopped or withdrawn'
+      if (s.includes('s7')) return 'Project delivered'
+      return 'Active status mix'
+    }
+    const rank = (pct) => (pct >= 35 ? 'dominant' : pct >= 15 ? 'key' : 'minor')
 
     host.innerHTML = `
       <div class="dash-pie-wrap">
-        <div class="dash-pie-chart" style="background:conic-gradient(${conic})">
-          <div class="dash-pie-hole">
-            <div class="dash-pie-total">${total}</div>
-            <div>งานทั้งหมด</div>
+        <div class="dash-pie-left">
+          <svg class="dash-pie-svg" viewBox="0 0 200 200" aria-label="Status pie chart">
+            <circle class="dash-pie-ring-bg" cx="100" cy="100" r="${radius}"></circle>
+            ${slices.map((slice) => `
+              <circle
+                class="dash-pie-seg"
+                cx="100"
+                cy="100"
+                r="${radius}"
+                stroke="${slice.color}"
+                stroke-dasharray="${slice.length.toFixed(2)} ${c.toFixed(2)}"
+                stroke-dashoffset="${slice.offset.toFixed(2)}"
+              ></circle>
+            `).join('')}
+          </svg>
+          <div class="dash-pie-focus">
+            <div class="dash-pie-focus-top">
+              <span class="dash-pie-focus-mark" style="background:${focus.color}"></span>
+              <span>${focus.pct.toFixed(1)}%</span>
+            </div>
+            <div class="dash-pie-focus-sub">${esc(focus.status)} | ${rank(focus.pct)}</div>
           </div>
         </div>
         <div class="dash-pie-legend">
           ${slices.map((slice) => `
-            <div class="dash-pie-item">
-              <span class="dash-pie-dot" style="background:${slice.color}"></span>
-              <span>${esc(slice.status)}</span>
-              <span class="dash-pie-value">${esc(slice.count)} (${Math.round(slice.pct)}%)</span>
-            </div>
+            <article class="dash-pie-item">
+              <span class="dash-pie-icon" style="border-color:${slice.color};color:${slice.color}">${esc(String(slice.status).slice(0, 2).toUpperCase())}</span>
+              <div class="dash-pie-copy">
+                <div class="dash-pie-name">${esc(slice.status)}</div>
+                <div class="dash-pie-desc">${describe(slice.status)}</div>
+              </div>
+              <div class="dash-pie-stat">
+                <div class="dash-pie-value">${slice.pct.toFixed(1)}%</div>
+                <div class="dash-pie-rank">${rank(slice.pct)}</div>
+              </div>
+            </article>
           `).join('')}
         </div>
       </div>
@@ -550,27 +595,28 @@ function renderStatusKpiCards() {
   const ordered = [...counts.entries()]
     .sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0])))
 
-  const max = Math.max(...ordered.map(([, count]) => count), 1)
-  const cardTones = [
-    'linear-gradient(90deg,#2f74de 0%, #42a5f5 46%, #79e8d7 100%)',
-    'linear-gradient(90deg,#7b61ff 0%, #5ca8ff 52%, #8df0d3 100%)',
-    'linear-gradient(90deg,#18a57f 0%, #5dd5b5 60%, #9eeadf 100%)',
-    'linear-gradient(90deg,#d45aa0 0%, #7f8bff 58%, #79d8f2 100%)',
-    'linear-gradient(90deg,#ef8b3a 0%, #f6b54f 56%, #ffe09c 100%)'
+  const tones = [
+    { bgA: '#e8c6ff', bgB: '#d7a2f8', accent: '#a755e5' },
+    { bgA: '#ffc897', bgB: '#f7a868', accent: '#ea7e37' },
+    { bgA: '#bdf0d7', bgB: '#8fdab5', accent: '#239b68' },
+    { bgA: '#ffd5e5', bgB: '#f5abc8', accent: '#d44f88' },
+    { bgA: '#cbe6ff', bgB: '#9dcdf9', accent: '#2f74de' },
+    { bgA: '#fff0b8', bgB: '#f9dd7f', accent: '#c89a14' }
   ]
 
   host.innerHTML = ordered.map(([status, count], idx) => {
     const share = Math.round((count / total) * 100)
-    const width = Math.max(6, Math.round((count / max) * 100))
-    const tone = cardTones[idx % cardTones.length]
+    const tone = tones[idx % tones.length]
     return `
-      <article class="dash-status-kpi-item">
-        <div class="dash-status-kpi-row">
-          <span class="name">${esc(status)}</span>
-          <span class="count">${esc(count)}</span>
+      <article class="dash-status-kpi-item" style="--kpi-bg-a:${tone.bgA};--kpi-bg-b:${tone.bgB};--kpi-accent:${tone.accent};">
+        <div class="dash-status-kpi-icon">${esc(String(status).slice(0, 1).toUpperCase() || '?')}</div>
+        <div class="dash-status-kpi-count">${esc(count)}</div>
+        <div class="dash-status-kpi-name">${esc(status)} Tasks</div>
+        <div class="dash-status-kpi-note">${share}% ของ FEPMF ทั้งหมด</div>
+        <div class="dash-status-kpi-cta">
+          <span>Explore</span>
+          <span class="dash-status-kpi-cta-dot">→</span>
         </div>
-        <div class="dash-status-kpi-bar"><span style="width:${width}%;background:${tone}"></span></div>
-        <div class="dash-status-kpi-share">${share}% ของ FEPMF ทั้งหมด</div>
       </article>
     `
   }).join('')
@@ -598,6 +644,77 @@ function renderList(hostId, rows, emptyText) {
           <span>Compare: ${esc(compareLabel(row.derived.compareType))}</span>
         </div>
         <div class="dash-item-bar"><div style="width:${Math.max(0, Math.min(100, row.progressPercent || 0))}%"></div></div>
+      </article>
+    `
+  }).join('')
+}
+
+function cabDateObj(value) {
+  if (!value) return null
+  const d = new Date(`${value}T00:00:00`)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
+function renderUpcomingCabCards(rows) {
+  const host = document.getElementById('dashCab')
+  const sub = document.getElementById('dashCabSub')
+  const countChip = document.getElementById('dashCabCount')
+  if (!host) return
+  host.className = 'cab-list'
+
+  const now = new Date()
+  now.setHours(0, 0, 0, 0)
+  const windowDays = 21
+  const end = new Date(now)
+  end.setDate(end.getDate() + windowDays)
+
+  const candidates = rows
+    .filter((row) => !isS7Status(row.parent.status))
+    .map((row) => ({ row, cab: cabDateObj(row.parent.cabDate) }))
+    .filter((x) => x.cab && x.cab >= now && x.cab <= end)
+    .sort((a, b) => a.cab - b.cab)
+
+  if (sub) sub.textContent = `งานไม่ใช่ S7 ที่ CAB Date ภายใน ${windowDays} วันจากวันนี้`
+  if (countChip) countChip.textContent = `${candidates.length} งาน`
+
+  if (!candidates.length) {
+    host.innerHTML = '<div class="dash-empty">ไม่พบงาน non-S7 ที่มี CAB Date ในช่วงเร็ว ๆ นี้</div>'
+    return
+  }
+
+  const maxItems = 10
+  const view = candidates.slice(0, maxItems)
+  host.innerHTML = view.map(({ row, cab }, idx) => {
+    const dateText = cab
+      ? cab.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+      : '-'
+    const dayText = cab ? cab.toLocaleDateString('en-GB', { day: '2-digit' }) : '--'
+    const monText = cab ? cab.toLocaleDateString('en-US', { month: 'short' }).toUpperCase() : '---'
+    const url = row.parent.browseUrl || '#'
+    const itcm = row.derived.itcmKeys[0] || '-'
+    const status = row.parent.status || '-'
+    const compare = compareLabel(row.derived.compareType)
+    const width = Math.min(100, 60 + ((idx % 4) * 12))
+    return `
+      <article class="cab-item">
+        <div class="cab-date-pill">
+          <div>${esc(dayText)}</div>
+          <div>${esc(monText)}</div>
+        </div>
+        <div class="cab-main">
+          <div class="cab-head">
+            <a class="cab-key" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(row.parent.key)}</a>
+            <span class="cab-status">${esc(status)}</span>
+          </div>
+          <div class="cab-summary">${esc(row.parent.summary || '-')}</div>
+          <div class="cab-meta">
+            <span>Squad: ${esc(row.parent.squad || '-')}</span>
+            <span>CAB: ${esc(dateText)}</span>
+            <span>ITCM: ${esc(itcm)}</span>
+            <span>Compare: ${esc(compare)}</span>
+          </div>
+          <div class="cab-line"><span style="width:${width}%"></span></div>
+        </div>
       </article>
     `
   }).join('')
@@ -659,13 +776,8 @@ function renderHighlights() {
     })
     .slice(0, 8)
 
-  const cabRows = [...rows]
-    .filter((row) => row.parent.cabDate)
-    .sort((a, b) => String(a.parent.cabDate).localeCompare(String(b.parent.cabDate)))
-    .slice(0, 8)
-
   renderList('dashRisk', riskRows, 'ไม่พบรายการความเสี่ยงในเงื่อนไขที่เลือก')
-  renderList('dashCab', cabRows, 'ไม่พบรายการ CAB ในเงื่อนไขที่เลือก')
+  renderUpcomingCabCards(rows)
 }
 
 function renderResultSummary() {
@@ -781,12 +893,16 @@ async function load(refresh = false) {
     document.getElementById('dashCompareAnalysis').innerHTML = '<div class="dash-empty">No data</div>'
     const statusCards = document.getElementById('dashStatusKpiCards')
     const statusTotal = document.getElementById('dashStatusTotal')
-    const compareValue = document.getElementById('dashCompareValue')
-    const coverageValue = document.getElementById('dashCoverageValue')
+    const pendingPercent = document.getElementById('dashPendingPercent')
+    const pendingCount = document.getElementById('dashPendingCount')
+    const pendingTotal = document.getElementById('dashPendingTotal')
+    const pendingRing = document.getElementById('dashPendingRing')
     if (statusCards) statusCards.innerHTML = '<div class="dash-empty">No data</div>'
     if (statusTotal) statusTotal.textContent = '0'
-    if (compareValue) compareValue.textContent = '0'
-    if (coverageValue) coverageValue.textContent = '(exclude S7)'
+    if (pendingPercent) pendingPercent.textContent = '0'
+    if (pendingCount) pendingCount.textContent = '0'
+    if (pendingTotal) pendingTotal.textContent = '0'
+    if (pendingRing) pendingRing.style.setProperty('--pct', '0')
     document.getElementById('dashResultInfo').innerHTML = ''
     document.getElementById('dashSync').textContent = 'Load failed'
   }
