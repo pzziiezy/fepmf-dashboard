@@ -283,9 +283,9 @@ function renderStatusBars() {
 
   if (state.statusView === 'pie') {
     const total = rowsByCount.reduce((sum, item) => sum + item.count, 0) || 1
-    const radius = 82
+    const radius = 72
     const c = 2 * Math.PI * radius
-    const gapPct = 2.6
+    const gapPct = 3.2
 
     let currentPct = 0
     const slices = rowsByCount.map((item, index) => {
@@ -303,7 +303,6 @@ function renderStatusBars() {
       }
     })
 
-    const focus = slices[0]
     const describe = (status) => {
       const s = String(status || '').toLowerCase()
       if (s.includes('open')) return 'Awaiting execution'
@@ -318,7 +317,7 @@ function renderStatusBars() {
         <div class="dash-pie-left">
           <svg class="dash-pie-svg" viewBox="0 0 200 200" aria-label="Status pie chart">
             <circle class="dash-pie-ring-bg" cx="100" cy="100" r="${radius}"></circle>
-            ${slices.map((slice) => `
+            ${slices.map((slice, idx) => `
               <circle
                 class="dash-pie-seg"
                 cx="100"
@@ -327,20 +326,21 @@ function renderStatusBars() {
                 stroke="${slice.color}"
                 stroke-dasharray="${slice.length.toFixed(2)} ${c.toFixed(2)}"
                 stroke-dashoffset="${slice.offset.toFixed(2)}"
+                data-idx="${idx}"
               ></circle>
             `).join('')}
           </svg>
-          <div class="dash-pie-focus">
+          <div id="dashPieFocus" class="dash-pie-focus">
             <div class="dash-pie-focus-top">
-              <span class="dash-pie-focus-mark" style="background:${focus.color}"></span>
-              <span>${focus.pct.toFixed(1)}%</span>
+              <span id="dashPieFocusMark" class="dash-pie-focus-mark"></span>
+              <span id="dashPieFocusValue">0.0%</span>
             </div>
-            <div class="dash-pie-focus-sub">${esc(focus.status)} | ${rank(focus.pct)}</div>
+            <div id="dashPieFocusSub" class="dash-pie-focus-sub">-</div>
           </div>
         </div>
         <div class="dash-pie-legend">
-          ${slices.map((slice) => `
-            <article class="dash-pie-item">
+          ${slices.map((slice, idx) => `
+            <article class="dash-pie-item" data-idx="${idx}">
               <span class="dash-pie-icon" style="border-color:${slice.color};color:${slice.color}">${esc(String(slice.status).slice(0, 2).toUpperCase())}</span>
               <div class="dash-pie-copy">
                 <div class="dash-pie-name">${esc(slice.status)}</div>
@@ -355,6 +355,34 @@ function renderStatusBars() {
         </div>
       </div>
     `
+
+    const focusEl = host.querySelector('#dashPieFocus')
+    const focusMarkEl = host.querySelector('#dashPieFocusMark')
+    const focusValueEl = host.querySelector('#dashPieFocusValue')
+    const focusSubEl = host.querySelector('#dashPieFocusSub')
+    const segs = host.querySelectorAll('.dash-pie-seg')
+    const items = host.querySelectorAll('.dash-pie-item')
+
+    const applyFocus = (idx) => {
+      const slice = slices[idx]
+      if (!slice || !focusEl || !focusMarkEl || !focusValueEl || !focusSubEl) return
+      focusMarkEl.style.background = slice.color
+      focusValueEl.textContent = `${slice.pct.toFixed(1)}%`
+      focusSubEl.textContent = `${slice.status} | ${rank(slice.pct)}`
+      focusEl.classList.add('active')
+    }
+    const clearFocus = () => {
+      if (focusEl) focusEl.classList.remove('active')
+    }
+
+    segs.forEach((seg) => {
+      seg.addEventListener('mouseenter', () => applyFocus(Number(seg.getAttribute('data-idx'))))
+      seg.addEventListener('mouseleave', clearFocus)
+    })
+    items.forEach((item) => {
+      item.addEventListener('mouseenter', () => applyFocus(Number(item.getAttribute('data-idx'))))
+      item.addEventListener('mouseleave', clearFocus)
+    })
 
     meta.innerHTML = rowsByCount.slice(0, 4).map((item) => `
       <span class="dash-chip">${esc(item.status)}: ${esc(item.count)}</span>

@@ -36,6 +36,15 @@ export default async function handler(req, res) {
     return String(v || '').toLowerCase()
   }
 
+  function isS7DeliveredStatusName(v) {
+    const text = String(v || '').toLowerCase().replace(/\s+/g, ' ').trim()
+    if (!text) return false
+    if (text === 's7') return true
+    if (text === 's7 - project deliverd') return true
+    if (text === 's7 - project delivered') return true
+    return text.startsWith('s7') && text.includes('project deliver')
+  }
+
   function uniq(arr) {
     return [...new Set((arr || []).filter(Boolean))]
   }
@@ -479,13 +488,14 @@ export default async function handler(req, res) {
     return response.json()
   }
 
-  async function fetchAllByJql(jql, fields = []) {
+  async function fetchAllByJql(jql, fields = [], options = {}) {
     let nextPageToken
     let guard = 0
     let all = []
 
     while (true) {
       const body = { jql, fields, maxResults: 100 }
+      if (Array.isArray(options.expand) && options.expand.length) body.expand = options.expand
       if (nextPageToken) body.nextPageToken = nextPageToken
       const page = await fetchJira('/search/jql', { method: 'POST', body: JSON.stringify(body) })
       const issues = page.issues || []
@@ -515,6 +525,7 @@ export default async function handler(req, res) {
 
   async function fetchDeliveredRecent() {
     const fields = ['summary', 'status', 'updated']
+    const cutoff = Date.now() - (15 * 24 * 60 * 60 * 1000)
     const jqlCandidates = [
       'project = FEPMF AND status CHANGED TO "S7 - Project Deliverd" AFTER -15d ORDER BY updated DESC',
       'project = FEPMF AND status CHANGED TO "S7 - Project Delivered" AFTER -15d ORDER BY updated DESC',
@@ -523,8 +534,26 @@ export default async function handler(req, res) {
 
     for (const jql of jqlCandidates) {
       try {
-        const issues = await fetchAllByJql(jql, fields)
-        if (issues.length) return issues
+        const issues = await fetchAllByJql(jql, fields, { expand: ['changelog'] })
+        const withTransitions = issues.map((issue) => {
+          const histories = issue?.changelog?.histories || []
+          const transitions = []
+          for (const history of histories) {
+            const created = history?.created || ''
+            for (const item of history?.items || []) {
+              if (lower(item?.field) !== 'status') continue
+              if (!isS7DeliveredStatusName(item?.toString || item?.to)) continue
+              const ts = new Date(created).getTime()
+              if (!Number.isFinite(ts) || ts < cutoff) continue
+              transitions.push(created)
+            }
+          }
+
+          const s7ChangedAt = transitions.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] || ''
+          return { ...issue, __s7ChangedAt: s7ChangedAt }
+        })
+        const filtered = withTransitions.filter((issue) => issue.__s7ChangedAt)
+        if (filtered.length) return filtered
       } catch (_) {
         // try next JQL candidate
       }
@@ -712,7 +741,7 @@ export default async function handler(req, res) {
         summary: issue?.fields?.summary || '',
         squad: normalizedIssue?.squad || '',
         status: issue?.fields?.status?.name || '',
-        updated: issue?.fields?.updated || '',
+        updated: issue?.__s7ChangedAt || issue?.fields?.updated || '',
         browseUrl: issue?.key ? `https://dgtbigc.atlassian.net/browse/${issue.key}` : ''
       }
     })
