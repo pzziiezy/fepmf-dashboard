@@ -4,7 +4,8 @@
   query: '',
   status: 'all',
   compare: 'all',
-  statusView: 'bar'
+  statusView: 'bar',
+  kpiModalStatus: null
 }
 
 function esc(v) {
@@ -69,17 +70,14 @@ function isLikelyNotStarted(status) {
 
 function deriveActualStartSprint(row) {
   const started = []
-  const all = []
 
   for (const item of row.workItems || []) {
     const sprintNum = parseSprintNumber(item.sprint) ?? parseSprintNumber(item.estimateSprint)
     if (sprintNum == null) continue
-    all.push(sprintNum)
     if (!isLikelyNotStarted(item.status)) started.push(sprintNum)
   }
 
   if (started.length) return Math.min(...started)
-  if (all.length) return Math.min(...all)
   return null
 }
 
@@ -279,7 +277,6 @@ function renderStatusBars() {
 
   const rowsByCount = [...orderedStatuses]
     .map((status) => ({ status, count: counts.get(status) || 0 }))
-    .sort((a, b) => b.count - a.count)
 
   if (state.statusView === 'pie') {
     const total = rowsByCount.reduce((sum, item) => sum + item.count, 0) || 1
@@ -620,8 +617,12 @@ function renderStatusKpiCards() {
     counts.set(status, (counts.get(status) || 0) + 1)
   }
 
-  const ordered = [...counts.entries()]
-    .sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0])))
+  const statusOrder = state.data?.meta?.statusOrder || []
+  const orderedStatuses = [
+    ...statusOrder.filter((status) => counts.has(status)),
+    ...[...counts.keys()].filter((status) => !statusOrder.includes(status)).sort((a, b) => String(a).localeCompare(String(b)))
+  ]
+  const ordered = orderedStatuses.map((status) => [status, counts.get(status) || 0])
 
   const tones = [
     { bgA: '#e8c6ff', bgB: '#d7a2f8', accent: '#a755e5' },
@@ -637,122 +638,84 @@ function renderStatusKpiCards() {
     const tone = tones[idx % tones.length]
     return `
       <article class="dash-status-kpi-item" style="--kpi-bg-a:${tone.bgA};--kpi-bg-b:${tone.bgB};--kpi-accent:${tone.accent};">
-        <div class="dash-status-kpi-icon">${esc(String(status).slice(0, 1).toUpperCase() || '?')}</div>
+        <div class="dash-status-kpi-icon">${esc(status || '?')}</div>
         <div class="dash-status-kpi-count">${esc(count)}</div>
         <div class="dash-status-kpi-name">${esc(status)} Tasks</div>
         <div class="dash-status-kpi-note">${share}% ของ FEPMF ทั้งหมด</div>
-        <div class="dash-status-kpi-cta">
+        <button class="dash-status-kpi-cta" type="button" data-status="${esc(status)}" aria-label="Explore ${esc(status)} status">
           <span>Explore</span>
           <span class="dash-status-kpi-cta-dot">→</span>
-        </div>
+        </button>
       </article>
     `
   }).join('')
 }
-function renderList(hostId, rows, emptyText) {
-  const host = document.getElementById(hostId)
-  if (!rows.length) {
-    host.innerHTML = `<div class="dash-empty">${esc(emptyText)}</div>`
+
+function tableRowMarkup(row) {
+  const estimateText = row.derived.estimateNum != null ? `Sprint${row.derived.estimateNum}` : '-'
+  const actualText = row.derived.actualNum != null ? `Sprint${row.derived.actualNum}` : '-'
+  const itcmKeys = row.derived.itcmKeys.length
+    ? row.derived.itcmKeys.map((key) => `<div class="dash-itcm-line">${esc(key)}</div>`).join('')
+    : '<div class="dash-itcm-line">-</div>'
+  const itcmStatuses = row.derived.itcmStatuses.length
+    ? row.derived.itcmStatuses.map((status) => `<div class="dash-itcm-line">${esc(status)}</div>`).join('')
+    : '<div class="dash-itcm-line">-</div>'
+
+  return `
+    <tr>
+      <td><a class="dash-item-key" href="${esc(row.parent.browseUrl)}" target="_blank" rel="noopener noreferrer">${esc(row.parent.key)}</a></td>
+      <td class="dash-col-summary">${esc(row.parent.summary || '-')}</td>
+      <td><span class="${badgeClass(row.parent.status)}">${esc(row.parent.status || '-')}</span></td>
+      <td>${esc(row.parent.squad || '-')}</td>
+      <td>${esc(estimateText)}</td>
+      <td>${esc(actualText)}</td>
+      <td><span class="dash-compare ${compareClass(row.derived.compareType)}">${esc(compareLabel(row.derived.compareType))}</span></td>
+      <td><div class="dash-itcm-cell">${itcmKeys}</div></td>
+      <td><div class="dash-itcm-cell">${itcmStatuses}</div></td>
+      <td>${esc(formatDate(row.parent.cabDate))}</td>
+      <td><strong>${esc(row.progressPercent || 0)}%</strong></td>
+      <td>${esc(row.linkedCount || 0)}</td>
+    </tr>
+  `
+}
+
+function renderStatusModalRows(status) {
+  const modalRows = document.getElementById('dashStatusModalRows')
+  const modalStatus = document.getElementById('dashStatusModalStatus')
+  const modalCount = document.getElementById('dashStatusModalCount')
+  if (!modalRows || !modalStatus || !modalCount) return
+
+  const filtered = (state.rows || [])
+    .filter((row) => String(row.parent.status || 'Unknown') === String(status || ''))
+    .sort((a, b) => String(a.parent.key || '').localeCompare(String(b.parent.key || '')))
+
+  modalStatus.textContent = status || '-'
+  modalCount.textContent = `${filtered.length} รายการ`
+
+  if (!filtered.length) {
+    modalRows.innerHTML = '<tr><td colspan="12" class="dash-empty">No result found</td></tr>'
     return
   }
 
-  host.innerHTML = rows.map((row) => {
-    const itcm = row.derived.itcmKeys[0] || '-'
-    return `
-      <article class="dash-item">
-        <div class="dash-item-top">
-          <a class="dash-item-key" href="${esc(row.parent.browseUrl)}" target="_blank" rel="noopener noreferrer">${esc(row.parent.key)}</a>
-          <span class="${badgeClass(row.parent.status)}">${esc(row.parent.status || '-')}</span>
-        </div>
-        <div class="dash-item-summary">${esc(row.parent.summary || '-')}</div>
-        <div class="dash-item-meta">
-          <span>Squad: ${esc(row.parent.squad || '-')}</span>
-          <span>CAB: ${esc(formatDate(row.parent.cabDate))}</span>
-          <span>ITCM: ${esc(itcm)}</span>
-          <span>Compare: ${esc(compareLabel(row.derived.compareType))}</span>
-        </div>
-        <div class="dash-item-bar"><div style="width:${Math.max(0, Math.min(100, row.progressPercent || 0))}%"></div></div>
-      </article>
-    `
-  }).join('')
+  modalRows.innerHTML = filtered.map(tableRowMarkup).join('')
 }
 
-function cabDateObj(value) {
-  if (!value) return null
-  const d = new Date(`${value}T00:00:00`)
-  return Number.isNaN(d.getTime()) ? null : d
+function openStatusModal(status) {
+  const modal = document.getElementById('dashStatusModal')
+  if (!modal) return
+  state.kpiModalStatus = status || null
+  renderStatusModalRows(status)
+  modal.classList.add('open')
+  modal.setAttribute('aria-hidden', 'false')
+  document.body.classList.add('modal-open')
 }
 
-function renderUpcomingCabCards(rows) {
-  const host = document.getElementById('dashCab')
-  const sub = document.getElementById('dashCabSub')
-  const countChip = document.getElementById('dashCabCount')
-  if (!host) return
-  host.className = 'cab-list'
-
-  const now = new Date()
-  now.setHours(0, 0, 0, 0)
-  const windowDays = 21
-  const end = new Date(now)
-  end.setDate(end.getDate() + windowDays)
-
-  const candidates = rows
-    .filter((row) => !isS7Status(row.parent.status))
-    .map((row) => ({ row, cab: cabDateObj(row.parent.cabDate) }))
-    .filter((x) => x.cab && x.cab >= now && x.cab <= end)
-    .sort((a, b) => a.cab - b.cab)
-
-  if (sub) sub.textContent = `งานไม่ใช่ S7 ที่ CAB Date ภายใน ${windowDays} วันจากวันนี้`
-  if (countChip) countChip.textContent = `${candidates.length} งาน`
-
-  if (!candidates.length) {
-    host.innerHTML = '<div class="dash-empty">ไม่พบงาน non-S7 ที่มี CAB Date ในช่วงเร็ว ๆ นี้</div>'
-    return
-  }
-
-  const maxItems = 10
-  const view = candidates.slice(0, maxItems)
-  host.innerHTML = view.map(({ row, cab }, idx) => {
-    const dateText = cab
-      ? cab.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-      : '-'
-    const dayText = cab ? cab.toLocaleDateString('en-GB', { day: '2-digit' }) : '--'
-    const monText = cab ? cab.toLocaleDateString('en-US', { month: 'short' }).toUpperCase() : '---'
-    const url = row.parent.browseUrl || '#'
-    const itcm = row.derived.itcmKeys[0] || '-'
-    const status = row.parent.status || '-'
-    const compare = compareLabel(row.derived.compareType)
-    const width = Math.min(100, 60 + ((idx % 4) * 12))
-    return `
-      <article class="cab-item">
-        <div class="cab-date-pill">
-          <div>${esc(dayText)}</div>
-          <div>${esc(monText)}</div>
-        </div>
-        <div class="cab-main">
-          <div class="cab-head">
-            <a class="cab-key" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(row.parent.key)}</a>
-            <span class="cab-status">${esc(status)}</span>
-          </div>
-          <div class="cab-summary">${esc(row.parent.summary || '-')}</div>
-          <div class="cab-meta">
-            <span>Squad: ${esc(row.parent.squad || '-')}</span>
-            <span>CAB: ${esc(dateText)}</span>
-            <span>ITCM: ${esc(itcm)}</span>
-            <span>Compare: ${esc(compare)}</span>
-          </div>
-          <div class="cab-line"><span style="width:${width}%"></span></div>
-        </div>
-      </article>
-    `
-  }).join('')
-}
-
-function compareClass(type) {
-  if (type === 'equal') return 'cmp-equal'
-  if (type === 'early') return 'cmp-early'
-  if (type === 'late') return 'cmp-late'
-  return 'cmp-na'
+function closeStatusModal() {
+  const modal = document.getElementById('dashStatusModal')
+  if (!modal) return
+  modal.classList.remove('open')
+  modal.setAttribute('aria-hidden', 'true')
+  document.body.classList.remove('modal-open')
 }
 
 function renderTable() {
@@ -765,33 +728,8 @@ function renderTable() {
 
   host.innerHTML = rows
     .sort((a, b) => String(a.parent.key || '').localeCompare(String(b.parent.key || '')))
-    .map((row) => {
-      const estimateText = row.derived.estimateNum != null ? `Sprint${row.derived.estimateNum}` : '-'
-      const actualText = row.derived.actualNum != null ? `Sprint${row.derived.actualNum}` : '-'
-      const itcmKeys = row.derived.itcmKeys.length
-        ? row.derived.itcmKeys.map((key) => `<div class="dash-itcm-line">${esc(key)}</div>`).join('')
-        : '<div class="dash-itcm-line">-</div>'
-      const itcmStatuses = row.derived.itcmStatuses.length
-        ? row.derived.itcmStatuses.map((status) => `<div class="dash-itcm-line">${esc(status)}</div>`).join('')
-        : '<div class="dash-itcm-line">-</div>'
-
-      return `
-        <tr>
-          <td><a class="dash-item-key" href="${esc(row.parent.browseUrl)}" target="_blank" rel="noopener noreferrer">${esc(row.parent.key)}</a></td>
-          <td class="dash-col-summary">${esc(row.parent.summary || '-')}</td>
-          <td><span class="${badgeClass(row.parent.status)}">${esc(row.parent.status || '-')}</span></td>
-          <td>${esc(row.parent.squad || '-')}</td>
-          <td>${esc(estimateText)}</td>
-          <td>${esc(actualText)}</td>
-          <td><span class="dash-compare ${compareClass(row.derived.compareType)}">${esc(compareLabel(row.derived.compareType))}</span></td>
-          <td><div class="dash-itcm-cell">${itcmKeys}</div></td>
-          <td><div class="dash-itcm-cell">${itcmStatuses}</div></td>
-          <td>${esc(formatDate(row.parent.cabDate))}</td>
-          <td><strong>${esc(row.progressPercent || 0)}%</strong></td>
-          <td>${esc(row.linkedCount || 0)}</td>
-        </tr>
-      `
-    }).join('')
+    .map(tableRowMarkup)
+    .join('')
 }
 
 function renderHighlights() {
@@ -833,6 +771,7 @@ function renderAll() {
   renderHighlights()
   renderTable()
   renderResultSummary()
+  if (state.kpiModalStatus) renderStatusModalRows(state.kpiModalStatus)
 }
 
 function renderStatusOptions() {
@@ -895,7 +834,22 @@ function bindEvents() {
       state.statusView = 'pie'
       renderStatusBars()
     })
-  }
+  }  document.addEventListener('click', (event) => {
+    const cta = event.target.closest('.dash-status-kpi-cta[data-status]')
+    if (cta) {
+      openStatusModal(cta.dataset.status || '')
+      return
+    }
+    if (event.target.matches('[data-close-status-modal]')) {
+      closeStatusModal()
+      return
+    }
+    const modal = document.getElementById('dashStatusModal')
+    if (modal && event.target === modal) closeStatusModal()
+  })
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeStatusModal()
+  })
 }
 
 async function load(refresh = false) {
@@ -938,6 +892,7 @@ async function load(refresh = false) {
 
 bindEvents()
 load()
+
 
 
 

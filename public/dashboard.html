@@ -273,11 +273,28 @@
     }
 
     .dash-status-panel { padding: 16px; }
+    .dash-insight-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+      gap: 12px;
+      align-items: stretch;
+    }
+    .dash-insight-row > .dash-analysis-wrap,
+    .dash-insight-row > .dash-status-panel {
+      margin-top: 0;
+      min-width: 0;
+      height: 100%;
+    }
+    .dash-insight-row .dash-status-panel {
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
     .dash-status-layout {
       display: grid;
       grid-template-columns: minmax(0, 1fr);
       gap: 14px;
       align-items: stretch;
+      min-height: 0;
     }
     .dash-view-switch {
       display: inline-flex;
@@ -312,6 +329,8 @@
       display: grid;
       gap: 10px;
       align-content: start;
+      min-height: 0;
+      height: 100%;
     }
     .dash-bars-grid {
       min-height: 240px;
@@ -963,16 +982,21 @@
     .dash-status-kpi-icon {
       position: absolute;
       top: -14px;
-      width: 32px;
+      min-width: 34px;
+      max-width: 76px;
       height: 32px;
+      padding: 0 8px;
       border-radius: 999px;
       border: 2px solid #fff;
       background: #fff;
       display: grid;
       place-items: center;
       color: var(--kpi-accent, #7f3fe6);
-      font-size: 12px;
+      font-size: 10px;
       font-weight: 800;
+      letter-spacing: 0.01em;
+      text-transform: uppercase;
+      white-space: nowrap;
       box-shadow: 0 6px 10px rgba(31, 47, 84, 0.2);
     }
     .dash-status-kpi-count {
@@ -1005,6 +1029,7 @@
       font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 0.04em;
+      cursor: pointer;
     }
     .dash-status-kpi-cta-dot {
       width: 14px;
@@ -1569,6 +1594,79 @@
       line-height: 1.35;
     }
 
+    body.modal-open {
+      overflow: hidden;
+    }
+
+    .dash-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(6, 18, 38, 0.56);
+      z-index: 1200;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+    }
+
+    .dash-modal.open {
+      display: flex;
+    }
+
+    .dash-modal-card {
+      width: min(1440px, 96vw);
+      max-height: 90vh;
+      background: #f8fbff;
+      border: 1px solid #c9d8ee;
+      border-radius: 16px;
+      box-shadow: 0 20px 50px rgba(10, 29, 57, 0.35);
+      display: grid;
+      grid-template-rows: auto 1fr;
+      overflow: hidden;
+    }
+
+    .dash-modal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 12px 14px;
+      border-bottom: 1px solid #d5e1f2;
+      background: linear-gradient(120deg, #eef5ff 0%, #f6f9ff 100%);
+    }
+
+    .dash-modal-title {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 800;
+      color: #143862;
+    }
+
+    .dash-modal-sub {
+      margin: 3px 0 0;
+      font-size: 12px;
+      color: #4c6486;
+      font-weight: 600;
+    }
+
+    .dash-modal-close {
+      border: 1px solid #bdd0eb;
+      background: #fff;
+      color: #244d81;
+      border-radius: 10px;
+      min-width: 36px;
+      height: 36px;
+      font-size: 20px;
+      font-weight: 700;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    .dash-modal-body {
+      padding: 10px;
+      overflow: auto;
+    }
+
     .dash-status-pill {
       border-radius: 999px;
       padding: 3px 9px;
@@ -1621,6 +1719,7 @@
       .dash-command-head { grid-template-columns: 1fr; }
       .dash-command-meta { grid-template-columns: 1fr; }
       .dash-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .dash-insight-row { grid-template-columns: 1fr; }
       .dash-toolbar { grid-template-columns: 1fr 1fr; }
       .dash-status-layout { grid-template-columns: 1fr; }
       .dash-pie-wrap { grid-template-columns: 1fr; }
@@ -1713,11 +1812,6 @@
       </div>
     </section>
 
-    <section class="dash-analysis-wrap">
-      <div class="dash-analysis-headline">Estimate Sprint vs Actual Start Sprint Analysis</div>
-      <div id="dashCompareAnalysis" class="dash-analysis-grid"></div>
-    </section>
-
     <section class="dash-status-kpi-panel">
       <div class="dash-status-kpi-head">
         <div>
@@ -1732,31 +1826,38 @@
       <div id="dashStatusKpiCards" class="dash-status-kpi-grid"></div>
     </section>
 
+    <section class="dash-insight-row">
+      <section class="dash-analysis-wrap">
+        <div class="dash-analysis-headline">Estimate Sprint vs Actual Start Sprint Analysis</div>
+        <div id="dashCompareAnalysis" class="dash-analysis-grid"></div>
+      </section>
+
+      <section class="dash-panel dash-status-panel">
+        <div class="dash-panel-head">
+          <div>
+            <h3 class="dash-panel-title">FEPMF Status Distribution</h3>
+            <p class="dash-panel-sub">ดูสัดส่วนงาน FEPMF แยกตามสถานะ พร้อมสลับมุมมองได้ทั้ง Vertical Bar และ Pie Chart</p>
+          </div>
+          <div class="dash-view-switch" role="tablist" aria-label="Status distribution view">
+            <button id="dashViewBar" class="dash-view-btn active" type="button">Vertical Bar</button>
+            <button id="dashViewPie" class="dash-view-btn" type="button">Pie Chart</button>
+          </div>
+        </div>
+        <div class="dash-status-layout">
+          <div class="dash-bars">
+            <div id="dashStatusBars" class="dash-bars-grid"></div>
+            <div id="dashStatusBarsMeta" class="dash-bars-meta"></div>
+          </div>
+        </div>
+      </section>
+    </section>
+
     <section class="dash-toolbar">
       <input id="dashSearch" class="search" placeholder="Search FEPMF, ITCM, Child key, Summary, Squad, Status" />
       <select id="dashStatus" class="search"></select>
       <select id="dashSprintCompare" class="search"></select>
       <button id="dashClear" class="btn" type="button">Clear</button>
       <button id="dashRefresh" class="btn primary" type="button">Refresh</button>
-    </section>
-
-    <section class="dash-panel dash-status-panel">
-      <div class="dash-panel-head">
-        <div>
-          <h3 class="dash-panel-title">FEPMF Status Distribution</h3>
-          <p class="dash-panel-sub">ดูสัดส่วนงาน FEPMF แยกตามสถานะ พร้อมสลับมุมมองได้ทั้ง Vertical Bar และ Pie Chart</p>
-        </div>
-        <div class="dash-view-switch" role="tablist" aria-label="Status distribution view">
-          <button id="dashViewBar" class="dash-view-btn active" type="button">Vertical Bar</button>
-          <button id="dashViewPie" class="dash-view-btn" type="button">Pie Chart</button>
-        </div>
-      </div>
-      <div class="dash-status-layout">
-        <div class="dash-bars">
-          <div id="dashStatusBars" class="dash-bars-grid"></div>
-          <div id="dashStatusBarsMeta" class="dash-bars-meta"></div>
-        </div>
-      </div>
     </section>
 
     <section class="dash-panel dash-smart-panel">
@@ -1820,6 +1921,41 @@
         </table>
       </div>
     </section>
+  </div>
+
+  <div id="dashStatusModal" class="dash-modal" aria-hidden="true">
+    <div class="dash-modal-card" role="dialog" aria-modal="true" aria-labelledby="dashStatusModalTitle">
+      <div class="dash-modal-head">
+        <div>
+          <h3 id="dashStatusModalTitle" class="dash-modal-title">Status Detail: <span id="dashStatusModalStatus">-</span></h3>
+          <p class="dash-modal-sub">ตารางเดียวกับ Portfolio Table แต่กรองเฉพาะสถานะนี้: <strong id="dashStatusModalCount">0 รายการ</strong></p>
+        </div>
+        <button class="dash-modal-close" type="button" data-close-status-modal aria-label="Close modal">×</button>
+      </div>
+      <div class="dash-modal-body">
+        <div class="dash-table-wrap">
+          <table class="dash-table">
+            <thead>
+              <tr>
+                <th>FEPMF</th>
+                <th>Summary</th>
+                <th>Status</th>
+                <th>Squad</th>
+                <th>Estimate Sprint</th>
+                <th>Actual Start Sprint</th>
+                <th>Sprint Compare</th>
+                <th>ITCM</th>
+                <th>ITCM Status</th>
+                <th>CAB Date</th>
+                <th>Progress</th>
+                <th>Linked</th>
+              </tr>
+            </thead>
+            <tbody id="dashStatusModalRows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="/dashboard.js?v=20260422a"></script>
