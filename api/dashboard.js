@@ -535,11 +535,14 @@ export default async function handler(req, res) {
 
   async function fetchDeliveredRecent() {
     const fields = ['summary', 'status', 'updated']
-    const cutoff = Date.now() - (15 * 24 * 60 * 60 * 1000)
+    const now = new Date()
+    const windowStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1, 0, 0, 0))
+    const cutoff = windowStart.getTime()
+    const windowStartIso = windowStart.toISOString().slice(0, 10)
     const jqlCandidates = [
-      'project = FEPMF AND status CHANGED TO "S7 - Project Deliverd" AFTER -15d ORDER BY updated DESC',
-      'project = FEPMF AND status CHANGED TO "S7 - Project Delivered" AFTER -15d ORDER BY updated DESC',
-      'project = FEPMF AND status CHANGED TO S7 AFTER -15d ORDER BY updated DESC'
+      `project = FEPMF AND status CHANGED TO "S7 - Project Deliverd" AFTER "${windowStartIso}" ORDER BY updated DESC`,
+      `project = FEPMF AND status CHANGED TO "S7 - Project Delivered" AFTER "${windowStartIso}" ORDER BY updated DESC`,
+      `project = FEPMF AND status CHANGED TO S7 AFTER "${windowStartIso}" ORDER BY updated DESC`
     ]
 
     for (const jql of jqlCandidates) {
@@ -563,13 +566,13 @@ export default async function handler(req, res) {
           return { ...issue, __s7ChangedAt: s7ChangedAt }
         })
         const filtered = withTransitions.filter((issue) => issue.__s7ChangedAt)
-        if (filtered.length) return filtered
+        if (filtered.length) return { issues: filtered, windowStartIso }
       } catch (_) {
         // try next JQL candidate
       }
     }
 
-    return []
+    return { issues: [], windowStartIso }
   }
 
   try {
@@ -749,7 +752,8 @@ export default async function handler(req, res) {
       })
       .filter(Boolean)
 
-    const deliveredRecentRaw = await fetchDeliveredRecent()
+    const deliveredRecentResult = await fetchDeliveredRecent()
+    const deliveredRecentRaw = deliveredRecentResult.issues || []
     const deliveredRecent = deliveredRecentRaw.map((issue) => {
       const normalizedIssue = normalized.get(issue?.key || '')
       return {
@@ -772,7 +776,8 @@ export default async function handler(req, res) {
       currentSprintStart: currentSprint ? currentSprint.start : '',
       currentSprintEnd: currentSprint ? currentSprint.end : '',
       workingDaysRemaining: workingDaysLeft,
-      deliveredRecentCount: deliveredRecent.length
+      deliveredRecentCount: deliveredRecent.length,
+      deliveredRecentWindowStart: deliveredRecentResult.windowStartIso || ''
     }
 
     const payload = {

@@ -1610,6 +1610,31 @@
       font-weight: 800;
       white-space: nowrap;
     }
+    .dash-sort-btn {
+      border: 0;
+      background: transparent;
+      width: 100%;
+      padding: 0;
+      margin: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      color: inherit;
+      font: inherit;
+      font-weight: inherit;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .dash-sort-btn .dash-sort-icon {
+      color: #90a3bf;
+      font-size: 11px;
+      line-height: 1;
+      font-weight: 900;
+    }
+    .dash-sort-btn.active .dash-sort-icon {
+      color: #2a63c3;
+    }
 
     .dash-table td { color: #253b58; }
 
@@ -1926,20 +1951,20 @@
       </div>
       <div class="dash-table-wrap">
         <table class="dash-table">
-          <thead>
+          <thead id="dashTableHead">
             <tr>
-              <th>FEPMF</th>
-              <th>Summary</th>
-              <th>Status</th>
-              <th>Squad</th>
-              <th>Estimate Sprint</th>
-              <th>Actual Start Sprint</th>
-              <th>Sprint Compare</th>
-              <th>ITCM</th>
-              <th>ITCM Status</th>
-              <th>CAB Date</th>
-              <th>Progress</th>
-              <th>Linked</th>
+              <th><button class="dash-sort-btn" type="button" data-sort-key="fepmf"><span>FEPMF</span><span class="dash-sort-icon">↕</span></button></th>
+              <th><button class="dash-sort-btn" type="button" data-sort-key="summary"><span>Summary</span><span class="dash-sort-icon">↕</span></button></th>
+              <th><button class="dash-sort-btn" type="button" data-sort-key="status"><span>Status</span><span class="dash-sort-icon">↕</span></button></th>
+              <th><button class="dash-sort-btn" type="button" data-sort-key="squad"><span>Squad</span><span class="dash-sort-icon">↕</span></button></th>
+              <th><button class="dash-sort-btn" type="button" data-sort-key="estimate"><span>Estimate Sprint</span><span class="dash-sort-icon">↕</span></button></th>
+              <th><button class="dash-sort-btn" type="button" data-sort-key="actual"><span>Actual Start Sprint</span><span class="dash-sort-icon">↕</span></button></th>
+              <th><button class="dash-sort-btn" type="button" data-sort-key="compare"><span>Sprint Compare</span><span class="dash-sort-icon">↕</span></button></th>
+              <th><button class="dash-sort-btn" type="button" data-sort-key="itcm"><span>ITCM</span><span class="dash-sort-icon">↕</span></button></th>
+              <th><button class="dash-sort-btn" type="button" data-sort-key="itcmStatus"><span>ITCM Status</span><span class="dash-sort-icon">↕</span></button></th>
+              <th><button class="dash-sort-btn" type="button" data-sort-key="cabDate"><span>CAB Date</span><span class="dash-sort-icon">↕</span></button></th>
+              <th><button class="dash-sort-btn" type="button" data-sort-key="progress"><span>Progress</span><span class="dash-sort-icon">↕</span></button></th>
+              <th><button class="dash-sort-btn" type="button" data-sort-key="linked"><span>Linked</span><span class="dash-sort-icon">↕</span></button></th>
             </tr>
           </thead>
           <tbody id="dashRows"></tbody>

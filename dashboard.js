@@ -407,9 +407,14 @@ function renderSmartReading() {
   const recentList = document.getElementById('dashStatusRecentList')
   if (!summary || !recentList) return
 
+  const windowStart = state.data?.summary?.deliveredRecentWindowStart
+  const windowLabel = windowStart
+    ? new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${windowStart}T00:00:00Z`))
+    : 'ช่วงที่กำหนด'
+
   const recent = (state.data?.deliveredRecent || []).filter((item) => item?.key)
   if (!recent.length) {
-    summary.textContent = '15 วันล่าสุด: ไม่พบงานที่เปลี่ยนเป็น S7'
+    summary.textContent = `ตั้งแต่ ${windowLabel}: ไม่พบงานที่เปลี่ยนเป็น S7`
     recentList.innerHTML = '<li>ยังไม่มีรายการ FEPMF ที่เข้าเงื่อนไขในช่วงเวลานี้</li>'
     return
   }
@@ -424,7 +429,7 @@ function renderSmartReading() {
   const dateKeys = [...grouped.keys()].sort((a, b) => String(b).localeCompare(String(a)))
   const totalRows = recent.length
   const totalDates = dateKeys.filter((k) => k !== 'unknown').length
-  summary.textContent = `15 วันล่าสุด: ${totalRows} งาน ครอบคลุม ${totalDates} วันที่มีการเปลี่ยนสถานะเป็น S7`
+  summary.textContent = `ตั้งแต่ ${windowLabel}: ${totalRows} งาน ครอบคลุม ${totalDates} วันที่มีการเปลี่ยนสถานะเป็น S7`
 
   const accent = ['#2f74de', '#2aa0bf', '#7b64e2', '#e15893', '#ef8b3a', '#4e9e55']
   const groupsHtml = dateKeys.map((dateKey, groupIndex) => {
@@ -503,19 +508,11 @@ function renderCompareAnalysis() {
   const earlyRate = Math.round((early / comparable) * 100)
   const lateRate = Math.max(0, 100 - onTimeRate - earlyRate)
 
-  const statusOrder = state.data?.meta?.statusOrder || ['Open', 'S0', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'Cancelled']
-  const statusColor = {
-    Open: '#2b72de',
-    S0: '#2aa0bf',
-    S1: '#4f69df',
-    S2: '#e35493',
-    S3: '#f08337',
-    S4: '#62a83b',
-    S5: '#7a5ad8',
-    S6: '#4b7987',
-    S7: '#13a86b',
-    Cancelled: '#8a96aa'
-  }
+  const compareSegments = [
+    { key: 'early', label: 'เริ่มก่อนแผน', color: '#2d66c6' },
+    { key: 'equal', label: 'ตรงแผน', color: '#2f7f67' },
+    { key: 'late', label: 'เริ่มช้ากว่าแผน', color: '#c04373' }
+  ]
 
   const squadMap = new Map()
   for (const row of comparableRows) {
@@ -526,24 +523,19 @@ function renderCompareAnalysis() {
   }
 
   const squadMix = [...squadMap.entries()].map(([squad, list]) => {
-    const counts = new Map()
-    for (const row of list) {
-      const status = row.parent.status || 'Unknown'
-      counts.set(status, (counts.get(status) || 0) + 1)
+    const byCompare = {
+      early: list.filter((r) => r.derived.compareType === 'early').length,
+      equal: list.filter((r) => r.derived.compareType === 'equal').length,
+      late: list.filter((r) => r.derived.compareType === 'late').length
     }
-
-    const orderedStatuses = [
-      ...statusOrder.filter((status) => counts.has(status)),
-      ...[...counts.keys()].filter((status) => !statusOrder.includes(status)).sort((a, b) => String(a).localeCompare(String(b)))
-    ]
-    const segments = orderedStatuses.map((status) => {
-      const count = counts.get(status) || 0
+    const segments = compareSegments.map((seg) => {
+      const count = byCompare[seg.key] || 0
       const pct = list.length ? (count / list.length) * 100 : 0
       return {
-        status,
-        count,
+        key: seg.key,
+        label: seg.label,
         pct,
-        color: statusColor[status] || '#6f84a4'
+        color: seg.color
       }
     })
     return {
@@ -585,8 +577,8 @@ function renderCompareAnalysis() {
 
       <div class="exec-viz-grid">
         <article class="exec-viz-card benchmark-card" style="grid-column:1 / -1;">
-          <h4>Squad Benchmark: Mix Status ของ Comparable FEPMF</h4>
-          <p class="viz-desc">1 Squad = 1 Bar แสดงสัดส่วนสถานะของ FEPMF ที่มีทั้ง Estimate Sprint และ Actual Start Sprint (ไม่รวม No Squad)</p>
+          <h4>Squad Benchmark: Mix Compare ของ Comparable FEPMF</h4>
+          <p class="viz-desc">1 Squad = 1 Bar จากค่า Compare จริง (เริ่มก่อนแผน / ตรงแผน / เริ่มช้ากว่าแผน) โดยใช้เฉพาะ FEPMF ที่มี Estimate และ Actual และไม่รวม No Squad</p>
           <div class="exec-squad-list">
             ${squadMix.map((s) => `
               <div class="sq-row">
@@ -596,11 +588,11 @@ function renderCompareAnalysis() {
                 </div>
                 <div class="sq-stack">
                   ${s.segments.map((seg) => `
-                    <span class="sq-seg" style="width:${seg.pct.toFixed(2)}%;background:${seg.color}" title="${esc(seg.status)} ${seg.count} (${seg.pct.toFixed(1)}%)"></span>
+                    <span class="sq-seg" style="width:${seg.pct.toFixed(2)}%;background:${seg.color}" title="${esc(seg.label)} ${seg.pct.toFixed(1)}%"></span>
                   `).join('')}
                 </div>
                 <div class="sq-meta">
-                  ${s.segments.map((seg) => `${seg.status}:${seg.count}`).join(' | ')}
+                  ${s.segments.map((seg) => `${seg.label} ${seg.pct.toFixed(1)}%`).join(' | ')}
                 </div>
               </div>
             `).join('') || '<div class="dash-empty">No squad benchmark</div>'}
@@ -774,6 +766,51 @@ function compareClass(type) {
   return 'cmp-na'
 }
 
+function tableSortValue(row, key) {
+  if (key === 'fepmf') return String(row.parent.key || '').toLowerCase()
+  if (key === 'summary') return String(row.parent.summary || '').toLowerCase()
+  if (key === 'status') return String(row.parent.status || '').toLowerCase()
+  if (key === 'squad') return String(row.parent.squad || '').toLowerCase()
+  if (key === 'estimate') return row.derived.estimateNum ?? Number.POSITIVE_INFINITY
+  if (key === 'actual') return row.derived.actualNum ?? Number.POSITIVE_INFINITY
+  if (key === 'compare') {
+    const rank = { equal: 0, early: 1, late: 2, na: 3 }
+    return rank[row.derived.compareType] ?? 99
+  }
+  if (key === 'itcm') return (row.derived.itcmKeys || []).join('|').toLowerCase()
+  if (key === 'itcmStatus') return (row.derived.itcmStatuses || []).join('|').toLowerCase()
+  if (key === 'cabDate') {
+    const d = safeDate(`${row.parent.cabDate || ''}T00:00:00Z`)
+    return d ? d.getTime() : Number.POSITIVE_INFINITY
+  }
+  if (key === 'progress') return Number(row.progressPercent || 0)
+  if (key === 'linked') return Number(row.linkedCount || 0)
+  return ''
+}
+
+function updateTableSortHeaders() {
+  const head = document.getElementById('dashTableHead')
+  if (!head) return
+  if (!state.tableSort) state.tableSort = { key: 'fepmf', dir: 'asc' }
+  for (const btn of head.querySelectorAll('[data-sort-key]')) {
+    const key = btn.getAttribute('data-sort-key')
+    const icon = btn.querySelector('.dash-sort-icon')
+    const active = key === state.tableSort.key
+    btn.classList.toggle('active', active)
+    let ariaSort = 'none'
+    let symbol = '↕'
+    if (active && state.tableSort.dir === 'asc') {
+      ariaSort = 'ascending'
+      symbol = '↑'
+    } else if (active && state.tableSort.dir === 'desc') {
+      ariaSort = 'descending'
+      symbol = '↓'
+    }
+    btn.setAttribute('aria-sort', ariaSort)
+    if (icon) icon.textContent = symbol
+  }
+}
+
 function tableRowMarkup(row) {
   const estimateText = row.derived.estimateNum != null ? `Sprint${row.derived.estimateNum}` : '-'
   const actualText = row.derived.actualNum != null ? `Sprint${row.derived.actualNum}` : '-'
@@ -844,15 +881,26 @@ function closeStatusModal() {
 function renderTable() {
   const host = document.getElementById('dashRows')
   const rows = state.rows || []
+  if (!state.tableSort) state.tableSort = { key: 'fepmf', dir: 'asc' }
   if (!rows.length) {
     host.innerHTML = '<tr><td colspan="12" class="dash-empty">No result found</td></tr>'
+    updateTableSortHeaders()
     return
   }
 
-  host.innerHTML = rows
-    .sort((a, b) => String(a.parent.key || '').localeCompare(String(b.parent.key || '')))
+  const sortedRows = [...rows]
+    .sort((a, b) => {
+      const av = tableSortValue(a, state.tableSort.key)
+      const bv = tableSortValue(b, state.tableSort.key)
+      if (av < bv) return state.tableSort.dir === 'asc' ? -1 : 1
+      if (av > bv) return state.tableSort.dir === 'asc' ? 1 : -1
+      return String(a.parent.key || '').localeCompare(String(b.parent.key || ''))
+    })
+
+  host.innerHTML = sortedRows
     .map(tableRowMarkup)
     .join('')
+  updateTableSortHeaders()
 }
 
 function renderHighlights() {
@@ -943,6 +991,23 @@ function bindEvents() {
   })
 
   document.getElementById('dashRefresh').addEventListener('click', () => load(true))
+  const tableHead = document.getElementById('dashTableHead')
+  if (tableHead) {
+    tableHead.addEventListener('click', (event) => {
+      const btn = event.target.closest('[data-sort-key]')
+      if (!btn) return
+      const key = btn.getAttribute('data-sort-key')
+      if (!key) return
+      if (!state.tableSort) state.tableSort = { key: 'fepmf', dir: 'asc' }
+      if (state.tableSort.key === key) {
+        state.tableSort.dir = state.tableSort.dir === 'asc' ? 'desc' : 'asc'
+      } else {
+        state.tableSort.key = key
+        state.tableSort.dir = 'asc'
+      }
+      renderTable()
+    })
+  }
 
   const barBtn = document.getElementById('dashViewBar')
   const pieBtn = document.getElementById('dashViewPie')
