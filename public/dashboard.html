@@ -430,21 +430,21 @@
     }
     .dash-pie-wrap {
       display: grid;
-      grid-template-columns: 260px minmax(260px, 440px);
+      grid-template-columns: 290px minmax(280px, 1fr);
       justify-content: start;
-      gap: 10px;
-      align-items: center;
-      min-height: 220px;
+      gap: 14px;
+      align-items: stretch;
+      min-height: 260px;
     }
     .dash-pie-left {
       position: relative;
       display: grid;
       place-items: center;
-      min-height: 250px;
+      min-height: 260px;
     }
     .dash-pie-svg {
-      width: 210px;
-      height: 210px;
+      width: 240px;
+      height: 240px;
     }
     .dash-pie-ring-bg {
       fill: none;
@@ -506,9 +506,11 @@
       display: grid;
       gap: 6px;
       align-content: start;
-      max-height: 220px;
+      max-height: none;
+      height: 100%;
+      min-height: 0;
       overflow: auto;
-      padding-right: 2px;
+      padding-right: 4px;
     }
     .dash-pie-item {
       border: 1px solid #dce5f4;
@@ -915,10 +917,11 @@
     }
 
     .dash-analysis-wrap {
-      border: 1px solid #c4d1e4;
-      border-radius: 16px;
-      background: linear-gradient(180deg, #f2f5fb 0%, #eef2f9 100%);
-      padding: 12px;
+      border: 1px solid var(--dash-border);
+      border-radius: var(--dash-radius);
+      background: var(--dash-panel);
+      box-shadow: var(--dash-soft-shadow);
+      padding: 14px;
     }
     .dash-status-kpi-panel {
       border: 1px solid #d9e2f0;
@@ -1360,6 +1363,19 @@
       font-size: 10px;
       color: #617a9e;
       font-weight: 700;
+      line-height: 1.35;
+    }
+    .sq-stack {
+      height: 8px;
+      border-radius: 999px;
+      background: #e1e9f6;
+      overflow: hidden;
+      display: flex;
+      width: 100%;
+    }
+    .sq-seg {
+      display: block;
+      height: 100%;
     }
     .exec-trend {
       height: 170px;

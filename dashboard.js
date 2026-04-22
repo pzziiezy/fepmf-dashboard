@@ -57,30 +57,6 @@ function parseSprintNumber(value) {
   return m ? Number(m[1]) : null
 }
 
-function isLikelyNotStarted(status) {
-  const text = normalizeText(status)
-  if (!text) return true
-  if (text.includes('to do')) return true
-  if (text.includes('open')) return true
-  if (text.includes('backlog')) return true
-  if (text.includes('pending')) return true
-  if (text === 's0' || text === 's1' || text === 's2' || text === 's3') return true
-  return false
-}
-
-function deriveActualStartSprint(row) {
-  const started = []
-
-  for (const item of row.workItems || []) {
-    const sprintNum = parseSprintNumber(item.sprint) ?? parseSprintNumber(item.estimateSprint)
-    if (sprintNum == null) continue
-    if (!isLikelyNotStarted(item.status)) started.push(sprintNum)
-  }
-
-  if (started.length) return Math.min(...started)
-  return null
-}
-
 function deriveCompareType(estimate, actual) {
   if (estimate == null || actual == null) return 'na'
   if (actual === estimate) return 'equal'
@@ -104,8 +80,8 @@ function itcmItems(row) {
 }
 
 function enrichRow(row) {
-  const estimateNum = parseSprintNumber(row.parent.estimateSprint || row.parent.sprint)
-  const actualNum = deriveActualStartSprint(row)
+  const estimateNum = parseSprintNumber(row.parent.estimateSprint)
+  const actualNum = parseSprintNumber(row.parent.actualStartSprint)
   const compareType = deriveCompareType(estimateNum, actualNum)
   const itcms = itcmItems(row)
   const itcmKeys = [...new Set(itcms.map((item) => item.key).filter(Boolean))]
@@ -525,27 +501,58 @@ function renderCompareAnalysis() {
 
   const onTimeRate = Math.round((onTime / comparable) * 100)
   const earlyRate = Math.round((early / comparable) * 100)
-  const lateRate = Math.round((late / comparable) * 100)
+  const lateRate = Math.max(0, 100 - onTimeRate - earlyRate)
+
+  const statusOrder = state.data?.meta?.statusOrder || ['Open', 'S0', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'Cancelled']
+  const statusColor = {
+    Open: '#2b72de',
+    S0: '#2aa0bf',
+    S1: '#4f69df',
+    S2: '#e35493',
+    S3: '#f08337',
+    S4: '#62a83b',
+    S5: '#7a5ad8',
+    S6: '#4b7987',
+    S7: '#13a86b',
+    Cancelled: '#8a96aa'
+  }
 
   const squadMap = new Map()
   for (const row of comparableRows) {
-    const squad = row.parent.squad || 'No Squad'
-    const delta = row.derived.actualNum - row.derived.estimateNum
+    const squad = String(row.parent.squad || '').trim()
+    if (!squad || /^no squad$/i.test(squad)) continue
     if (!squadMap.has(squad)) squadMap.set(squad, [])
-    squadMap.get(squad).push(delta)
+    squadMap.get(squad).push(row)
   }
 
-  const squadStats = [...squadMap.entries()].map(([squad, vals]) => {
-    const sorted = [...vals].sort((a, b) => a - b)
-    const lateCount = vals.filter((x) => x > 0).length
+  const squadMix = [...squadMap.entries()].map(([squad, list]) => {
+    const counts = new Map()
+    for (const row of list) {
+      const status = row.parent.status || 'Unknown'
+      counts.set(status, (counts.get(status) || 0) + 1)
+    }
+
+    const orderedStatuses = [
+      ...statusOrder.filter((status) => counts.has(status)),
+      ...[...counts.keys()].filter((status) => !statusOrder.includes(status)).sort((a, b) => String(a).localeCompare(String(b)))
+    ]
+    const segments = orderedStatuses.map((status) => {
+      const count = counts.get(status) || 0
+      const pct = list.length ? (count / list.length) * 100 : 0
+      return {
+        status,
+        count,
+        pct,
+        color: statusColor[status] || '#6f84a4'
+      }
+    })
     return {
       squad,
-      n: vals.length,
-      lateRate: vals.length ? Math.round((lateCount / vals.length) * 100) : 0,
-      median: quantile(sorted, 0.5),
-      iqr: quantile(sorted, 0.75) - quantile(sorted, 0.25)
+      n: list.length,
+      share: comparable ? Math.round((list.length / comparable) * 100) : 0,
+      segments
     }
-  }).sort((a, b) => b.lateRate - a.lateRate || b.median - a.median || b.n - a.n).slice(0, 8)
+  }).sort((a, b) => b.n - a.n || String(a.squad).localeCompare(String(b.squad))).slice(0, 10)
 
   const metricCards = [
     { key: 'ตรงแผน', value: `${onTimeRate}%`, detail: `${onTime}/${comparable}`, meaning: 'เริ่มงานตรงกับ Estimate Sprint', help: 'ค่ายิ่งสูงยิ่งดี' },
@@ -558,7 +565,7 @@ function renderCompareAnalysis() {
       <div class="exec-readme">
         <div class="exec-readme-title">วิธีอ่านผลวิเคราะห์</div>
         <div class="exec-readme-grid">
-          <div><strong>วัดอะไร:</strong> ความแม่นยำของ Estimate Sprint เทียบ Actual Start Sprint</div>
+          <div><strong>วัดอะไร:</strong> เปรียบเทียบ Estimate Sprint กับ Actual Start Sprint จาก field จริงของ FEPMF</div>
           <div><strong>ใช้ตัดสินใจอะไร:</strong> หา Squad/Sprint ที่ควรเร่งแก้ก่อนความล่าช้าขยายวง</div>
           <div><strong>ฐานข้อมูล:</strong> ใช้เฉพาะรายการที่มีทั้ง Estimate และ Actual (Comparable)</div>
         </div>
@@ -578,17 +585,23 @@ function renderCompareAnalysis() {
 
       <div class="exec-viz-grid">
         <article class="exec-viz-card benchmark-card" style="grid-column:1 / -1;">
-          <h4>Squad Benchmark: ความเสี่ยงเริ่มช้า</h4>
-          <p class="viz-desc">จัดอันดับ Squad ตาม Late Rate และความผันผวน (Median + IQR)</p>
+          <h4>Squad Benchmark: Mix Status ของ Comparable FEPMF</h4>
+          <p class="viz-desc">1 Squad = 1 Bar แสดงสัดส่วนสถานะของ FEPMF ที่มีทั้ง Estimate Sprint และ Actual Start Sprint (ไม่รวม No Squad)</p>
           <div class="exec-squad-list">
-            ${squadStats.map((s) => `
+            ${squadMix.map((s) => `
               <div class="sq-row">
                 <div class="sq-head">
                   <span>${esc(s.squad)}</span>
-                  <span>${s.lateRate}% late</span>
+                  <span>${s.n} FEPMF (${s.share}%)</span>
                 </div>
-                <div class="sq-bar"><span style="width:${Math.max(8, s.lateRate)}%"></span></div>
-                <div class="sq-meta">n=${s.n} | median=${formatSigned(Math.round(s.median * 10) / 10)} | IQR=${Math.round(s.iqr * 10) / 10}</div>
+                <div class="sq-stack">
+                  ${s.segments.map((seg) => `
+                    <span class="sq-seg" style="width:${seg.pct.toFixed(2)}%;background:${seg.color}" title="${esc(seg.status)} ${seg.count} (${seg.pct.toFixed(1)}%)"></span>
+                  `).join('')}
+                </div>
+                <div class="sq-meta">
+                  ${s.segments.map((seg) => `${seg.status}:${seg.count}`).join(' | ')}
+                </div>
               </div>
             `).join('') || '<div class="dash-empty">No squad benchmark</div>'}
           </div>

@@ -305,9 +305,18 @@ export default async function handler(req, res) {
       if (m) return `Sprint${m[0]}`
       return text
     }
+    return ''
+  }
 
-    const fromSprint = parseSprintFromIssue(issue, [])
-    return fromSprint.name || ''
+  function getActualStartSprint(issue, actualStartSprintFieldIds = []) {
+    for (const value of getFieldValues(issue, actualStartSprintFieldIds)) {
+      const text = String(Array.isArray(value) ? value[0] : value || '').trim()
+      if (!text) continue
+      const m = text.match(/\d+/)
+      if (m) return `Sprint${m[0]}`
+      return text
+    }
+    return ''
   }
 
   function normalizeIssue(issue, cfg) {
@@ -334,6 +343,7 @@ export default async function handler(req, res) {
       sprintEnd: sprint.end,
       squad: inferSquad(issue, cfg.squadFieldIds),
       estimateSprint: getEstimateSprint(issue, cfg.estimateSprintFieldIds),
+      actualStartSprint: getActualStartSprint(issue, cfg.actualStartSprintFieldIds),
       labels,
       components,
       keywords
@@ -585,6 +595,11 @@ export default async function handler(req, res) {
       ...fuzzyFieldIds(fieldCatalog, ['estimate sprint']).slice(0, 5)
     ])
 
+    const actualStartSprintFieldIds = uniq([
+      ...exactFieldIds(fieldCatalog, ['Actual Start Sprint', 'Actual Sprint']),
+      ...fuzzyFieldIds(fieldCatalog, ['actual start sprint', 'actual sprint']).slice(0, 6)
+    ])
+
     const childFieldIds = uniq([
       ...exactFieldIds(fieldCatalog, ['Child work items', 'Child work item']),
       ...fuzzyFieldIds(fieldCatalog, ['child work item']).slice(0, 6)
@@ -618,12 +633,13 @@ export default async function handler(req, res) {
       ...progressFieldIds,
       ...squadFieldIds,
       ...estimateSprintFieldIds,
+      ...actualStartSprintFieldIds,
       ...childFieldIds,
       ...linkedFieldIds,
       ...parentRefFieldIds
     ])
 
-    const cfg = { sprintFieldIds, progressFieldIds, squadFieldIds, estimateSprintFieldIds }
+    const cfg = { sprintFieldIds, progressFieldIds, squadFieldIds, estimateSprintFieldIds, actualStartSprintFieldIds }
 
     const parentsRaw = await fetchAllByJql('project = FEPMF ORDER BY updated DESC', baseFields)
     const parentKeys = parentsRaw.map((x) => x.key)
