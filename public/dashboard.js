@@ -405,6 +405,7 @@ function renderStatusBars() {
     `
   }).join('')
 
+  const minGridWidth = Math.max(orderedStatuses.length * 66, 520)
   host.innerHTML = `
     <div class="dash-vbar-layout">
       <div class="dash-y-axis">
@@ -414,7 +415,9 @@ function renderStatusBars() {
         <span>${esc(Math.round(maxCount * 0.25))}</span>
         <span>0</span>
       </div>
-      <div class="dash-vbar-grid">${barsHtml}</div>
+      <div class="dash-vbar-scroll">
+        <div class="dash-vbar-grid" style="grid-template-columns:repeat(${orderedStatuses.length}, minmax(58px,58px));min-width:${minGridWidth}px;">${barsHtml}</div>
+      </div>
     </div>
   `
 
@@ -649,6 +652,113 @@ function renderStatusKpiCards() {
       </article>
     `
   }).join('')
+}
+
+function renderList(hostId, rows, emptyText) {
+  const host = document.getElementById(hostId)
+  if (!host) return
+  if (!rows.length) {
+    host.innerHTML = `<div class="dash-empty">${esc(emptyText)}</div>`
+    return
+  }
+
+  host.innerHTML = rows.map((row) => {
+    const itcm = row.derived.itcmKeys[0] || '-'
+    return `
+      <article class="dash-item">
+        <div class="dash-item-top">
+          <a class="dash-item-key" href="${esc(row.parent.browseUrl)}" target="_blank" rel="noopener noreferrer">${esc(row.parent.key)}</a>
+          <span class="${badgeClass(row.parent.status)}">${esc(row.parent.status || '-')}</span>
+        </div>
+        <div class="dash-item-summary">${esc(row.parent.summary || '-')}</div>
+        <div class="dash-item-meta">
+          <span>Squad: ${esc(row.parent.squad || '-')}</span>
+          <span>CAB: ${esc(formatDate(row.parent.cabDate))}</span>
+          <span>ITCM: ${esc(itcm)}</span>
+          <span>Compare: ${esc(compareLabel(row.derived.compareType))}</span>
+        </div>
+        <div class="dash-item-bar"><div style="width:${Math.max(0, Math.min(100, row.progressPercent || 0))}%"></div></div>
+      </article>
+    `
+  }).join('')
+}
+
+function cabDateObj(value) {
+  if (!value) return null
+  const d = new Date(`${value}T00:00:00`)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
+function renderUpcomingCabCards(rows) {
+  const host = document.getElementById('dashCab')
+  const sub = document.getElementById('dashCabSub')
+  const countChip = document.getElementById('dashCabCount')
+  if (!host) return
+  host.className = 'cab-list'
+
+  const now = new Date()
+  now.setHours(0, 0, 0, 0)
+  const windowDays = 21
+  const end = new Date(now)
+  end.setDate(end.getDate() + windowDays)
+
+  const candidates = rows
+    .filter((row) => !isS7Status(row.parent.status))
+    .map((row) => ({ row, cab: cabDateObj(row.parent.cabDate) }))
+    .filter((x) => x.cab && x.cab >= now && x.cab <= end)
+    .sort((a, b) => a.cab - b.cab)
+
+  if (sub) sub.textContent = `งานไม่ใช่ S7 ที่ CAB Date ภายใน ${windowDays} วันจากวันนี้`
+  if (countChip) countChip.textContent = `${candidates.length} งาน`
+
+  if (!candidates.length) {
+    host.innerHTML = '<div class="dash-empty">ไม่พบงาน non-S7 ที่มี CAB Date ในช่วงเร็ว ๆ นี้</div>'
+    return
+  }
+
+  const maxItems = 10
+  const view = candidates.slice(0, maxItems)
+  host.innerHTML = view.map(({ row, cab }, idx) => {
+    const dateText = cab
+      ? cab.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+      : '-'
+    const dayText = cab ? cab.toLocaleDateString('en-GB', { day: '2-digit' }) : '--'
+    const monText = cab ? cab.toLocaleDateString('en-US', { month: 'short' }).toUpperCase() : '---'
+    const url = row.parent.browseUrl || '#'
+    const itcm = row.derived.itcmKeys[0] || '-'
+    const status = row.parent.status || '-'
+    const compare = compareLabel(row.derived.compareType)
+    const width = Math.min(100, 60 + ((idx % 4) * 12))
+    return `
+      <article class="cab-item">
+        <div class="cab-date-pill">
+          <div>${esc(dayText)}</div>
+          <div>${esc(monText)}</div>
+        </div>
+        <div class="cab-main">
+          <div class="cab-head">
+            <a class="cab-key" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(row.parent.key)}</a>
+            <span class="cab-status">${esc(status)}</span>
+          </div>
+          <div class="cab-summary">${esc(row.parent.summary || '-')}</div>
+          <div class="cab-meta">
+            <span>Squad: ${esc(row.parent.squad || '-')}</span>
+            <span>CAB: ${esc(dateText)}</span>
+            <span>ITCM: ${esc(itcm)}</span>
+            <span>Compare: ${esc(compare)}</span>
+          </div>
+          <div class="cab-line"><span style="width:${width}%"></span></div>
+        </div>
+      </article>
+    `
+  }).join('')
+}
+
+function compareClass(type) {
+  if (type === 'equal') return 'cmp-equal'
+  if (type === 'early') return 'cmp-early'
+  if (type === 'late') return 'cmp-late'
+  return 'cmp-na'
 }
 
 function tableRowMarkup(row) {

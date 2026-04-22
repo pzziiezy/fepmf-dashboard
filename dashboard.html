@@ -341,6 +341,11 @@
       gap: 10px;
       min-height: 240px;
     }
+    .dash-vbar-scroll {
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding-bottom: 2px;
+    }
     .dash-y-axis {
       display: grid;
       grid-template-rows: repeat(5, 1fr);
@@ -357,9 +362,9 @@
     .dash-vbar-grid {
       position: relative;
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(68px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(58px, 58px));
       align-items: end;
-      gap: 10px;
+      gap: 8px;
       padding: 4px 4px 0;
       border-left: 1px solid #dce6f4;
       border-bottom: 1px solid #dce6f4;
@@ -388,7 +393,7 @@
       justify-content: center;
     }
     .dash-bar-fill {
-      width: 42px;
+      width: 34px;
       border-radius: 12px 12px 7px 7px;
       min-height: 4px;
       box-shadow: 0 8px 16px rgba(44, 84, 153, .28);
