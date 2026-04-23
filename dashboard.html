@@ -283,8 +283,10 @@
       margin-top: 12px;
       padding: 10px;
       border-radius: 14px;
-      grid-template-columns: minmax(260px, 1fr) 140px 140px 190px 190px auto auto;
+      display: flex;
+      flex-wrap: wrap;
       gap: 8px;
+      align-items: center;
       background: rgba(255, 255, 255, 0.95);
       box-shadow: 0 8px 20px rgba(24, 66, 128, 0.08);
     }
@@ -293,16 +295,25 @@
       font-size: 13px;
       padding-top: 8px;
       padding-bottom: 8px;
+      flex: 0 1 160px;
+      min-width: 120px;
+    }
+    .dash-toolbar-compact #dashSearch {
+      flex: 1 1 280px;
+      min-width: 220px;
     }
     .dash-toolbar-compact .btn {
       min-height: 38px;
       font-size: 13px;
       padding: 0 14px;
       border-radius: 12px;
+      flex: 0 0 auto;
     }
     .dash-multi {
       position: relative;
       min-width: 0;
+      flex: 1 1 180px;
+      max-width: 220px;
     }
     .dash-multi summary {
       list-style: none;
@@ -646,14 +657,15 @@
       max-height: 100%;
       height: 100%;
       min-height: 0;
-      overflow: auto;
+      overflow: hidden;
       padding-right: 4px;
+      grid-auto-rows: minmax(0, 1fr);
     }
     .dash-pie-item {
       border: 1px solid #dce5f4;
       border-radius: 12px;
       background: #fff;
-      padding: 6px 8px;
+      padding: 4px 8px;
       display: grid;
       grid-template-columns: auto minmax(0, 1fr) auto;
       gap: 8px;
@@ -679,18 +691,13 @@
     }
     .dash-pie-copy {
       display: grid;
-      gap: 2px;
+      gap: 0;
       min-width: 0;
     }
     .dash-pie-name {
       font-size: 13px;
       color: #173a63;
       font-weight: 800;
-    }
-    .dash-pie-desc {
-      font-size: 11px;
-      color: #5e7699;
-      line-height: 1.25;
     }
     .dash-pie-stat {
       text-align: right;
@@ -709,10 +716,12 @@
       font-weight: 800;
     }
     .dash-smart-panel {
-      padding: 14px;
-      min-height: 520px;
+      padding: 12px;
+      min-height: 360px;
+      max-height: 420px;
       display: grid;
-      gap: 10px;
+      grid-template-rows: auto auto minmax(0, 1fr);
+      gap: 8px;
     }
     .dash-smart-header {
       display: flex;
@@ -736,65 +745,89 @@
       border: 1px solid #d9e3f3;
       border-radius: 12px;
       background: #f7faff;
-      padding: 8px 10px;
+      padding: 6px 10px;
       color: #2c466c;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 800;
     }
     .dash-smart-list {
       margin: 0;
       padding-left: 0;
-      max-height: 420px;
-      overflow: auto;
+      max-height: 100%;
+      overflow: hidden auto;
       display: grid;
-      gap: 8px;
+      gap: 6px;
       list-style: none;
     }
     .dash-smart-group {
       border: 1px solid #dce5f4;
-      border-radius: 14px;
-      background: linear-gradient(180deg, #ffffff 0%, #f6faff 100%);
-      padding: 8px;
-      display: grid;
-      gap: 8px;
-    }
-    .dash-smart-items {
+      border-radius: 12px;
+      background: #fff;
+      padding: 6px;
       display: grid;
       gap: 6px;
     }
-    .dash-smart-mini {
+    .dash-smart-items {
       display: grid;
-      grid-template-columns: auto auto minmax(0, 1fr) auto;
-      align-items: center;
-      gap: 8px;
+      gap: 5px;
+    }
+    .dash-smart-note {
+      display: grid;
+      grid-template-columns: 32px minmax(0, 1fr) auto;
+      align-items: start;
+      gap: 7px;
       border: 1px solid #dfe8f5;
       border-left: 4px solid var(--smart-accent, #2f74de);
-      border-radius: 10px;
+      border-radius: 9px;
       background: #fff;
-      padding: 6px 8px;
+      padding: 6px;
       min-width: 0;
     }
+    .dash-smart-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      background: #eef4ff;
+      border: 1px solid #d3e1f7;
+      color: #365d9c;
+      font-size: 10px;
+      font-weight: 800;
+      display: grid;
+      place-items: center;
+      margin-top: 1px;
+    }
+    .dash-smart-note-main {
+      min-width: 0;
+      display: grid;
+      gap: 3px;
+    }
+    .dash-smart-note-top {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
     .dash-smart-mini-key {
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 800;
       color: #1d4f9a;
       text-decoration: none;
       border: 1px solid #d5e3f8;
       border-radius: 999px;
-      padding: 2px 8px;
+      padding: 1px 7px;
       background: #edf3ff;
     }
     .dash-smart-mini-squad {
-      font-size: 10px;
+      font-size: 9px;
       font-weight: 700;
       color: #3a5679;
       border: 1px solid #d9e4f4;
       border-radius: 999px;
       background: #f3f7fe;
-      padding: 2px 7px;
+      padding: 1px 6px;
     }
     .dash-smart-mini-summary {
-      font-size: 11px;
+      font-size: 10px;
       color: #274264;
       font-weight: 700;
       overflow: hidden;
@@ -802,9 +835,22 @@
       white-space: nowrap;
     }
     .dash-smart-mini-time {
-      font-size: 11px;
+      font-size: 10px;
       color: #60799d;
       font-weight: 700;
+      white-space: nowrap;
+    }
+    .dash-smart-open-btn {
+      align-self: center;
+      border: 1px solid #c6d8f3;
+      border-radius: 999px;
+      background: #f5f9ff;
+      color: #1f58bf;
+      font-size: 10px;
+      font-weight: 800;
+      text-decoration: none;
+      padding: 4px 10px;
+      line-height: 1;
       white-space: nowrap;
     }
     .dash-smart-group-head {
@@ -813,7 +859,7 @@
       justify-content: space-between;
       gap: 8px;
       border-bottom: 1px solid #e7edf7;
-      padding-bottom: 6px;
+      padding: 0 0 4px;
     }
     .dash-smart-date-chip {
       display: inline-flex;
@@ -833,9 +879,9 @@
       border-radius: 999px;
       background: #f0f7ef;
       border: 1px solid #cde5c9;
-      padding: 3px 10px;
+      padding: 2px 9px;
       color: #2a6a45;
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 800;
     }
     .dash-smart-list li {
@@ -1980,8 +2026,22 @@
           <p class="dash-command-copy">ติดตามภาพรวม FEPMF, สถานะ ITCM และวิเคราะห์ Estimate Sprint เทียบ Actual Start Sprint แบบพร้อมใช้ตัดสินใจ</p>
           <div class="dash-toolbar dash-toolbar-compact">
             <input id="dashSearch" class="search" placeholder="Search FEPMF, ITCM, Child key, Summary, Squad, Status" />
-            <select id="dashStatus" class="search"></select>
-            <select id="dashSprintCompare" class="search"></select>
+            <details class="dash-multi" id="dashStatusMulti">
+              <summary id="dashStatusSummaryText">Status: All</summary>
+              <div class="dash-multi-panel">
+                <input id="dashStatusSearch" class="dash-multi-search" type="text" placeholder="Search Status" />
+                <label class="dash-multi-item all"><input id="dashStatusAll" type="checkbox" checked />All</label>
+                <div id="dashStatusOptions" class="dash-multi-list"></div>
+              </div>
+            </details>
+            <details class="dash-multi" id="dashCompareMulti">
+              <summary id="dashCompareSummaryText">Compare: All</summary>
+              <div class="dash-multi-panel">
+                <input id="dashCompareSearch" class="dash-multi-search" type="text" placeholder="Search Compare" />
+                <label class="dash-multi-item all"><input id="dashCompareAll" type="checkbox" checked />All</label>
+                <div id="dashCompareOptions" class="dash-multi-list"></div>
+              </div>
+            </details>
             <details class="dash-multi" id="dashBusinessTypeMulti">
               <summary id="dashBusinessTypeSummary">Business Type: All</summary>
               <div class="dash-multi-panel">

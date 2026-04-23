@@ -4,6 +4,8 @@
   query: '',
   status: 'all',
   compare: 'all',
+  statusSelections: [],
+  compareSelections: [],
   businessTypes: [],
   businessPartners: [],
   statusView: 'bar',
@@ -140,8 +142,8 @@ function rowBlob(row) {
 function filterRows() {
   const terms = state.query.trim().toLowerCase().split(/\s+/).filter(Boolean)
   state.rows = (state.data?.parents || []).map(enrichRow).filter((row) => {
-    if (state.status !== 'all' && row.parent.status !== state.status) return false
-    if (state.compare !== 'all' && row.derived.compareType !== state.compare) return false
+    if (state.statusSelections.length && !state.statusSelections.includes(row.parent.status || 'Unknown')) return false
+    if (state.compareSelections.length && !state.compareSelections.includes(row.derived.compareType)) return false
     if (state.businessTypes.length && !row.derived.businessTypes.some((v) => state.businessTypes.includes(v))) return false
     if (state.businessPartners.length && !row.derived.businessPartners.some((v) => state.businessPartners.includes(v))) return false
     if (!terms.length) return true
@@ -302,21 +304,6 @@ function renderStatusBars() {
       }
     })
 
-    const describe = (status) => {
-      const s = String(status || '').trim().toUpperCase()
-      if (s === 'OPEN') return 'รอเริ่มดำเนินงาน'
-      if (s === 'S0') return 'อยู่ช่วง Idea / Define requirement'
-      if (s === 'S1') return 'อยู่ช่วงวิเคราะห์และออกแบบแนวทาง'
-      if (s === 'S2') return 'อยู่ช่วงเตรียมพัฒนา / เตรียมงานระบบ'
-      if (s === 'S3') return 'อยู่ช่วงพัฒนาและทดสอบภายใน'
-      if (s === 'S4') return 'อยู่ช่วงทดสอบร่วม / UAT'
-      if (s === 'S5') return 'อยู่ช่วงเตรียมขึ้นระบบ / CAB'
-      if (s === 'S6') return 'อยู่ช่วง Deploy / Hypercare'
-      if (s === 'S7') return 'ปิดงานแล้ว (Project delivered)'
-      if (s === 'CANCELLED') return 'ยกเลิกหรือหยุดดำเนินการ'
-      return `สถานะ ${status || '-'} ใน pipeline`
-    }
-
     host.innerHTML = `
       <div class="dash-pie-wrap">
         <div class="dash-pie-left">
@@ -349,7 +336,6 @@ function renderStatusBars() {
               <span class="dash-pie-icon" style="border-color:${slice.color};color:${slice.color}">${esc(String(slice.status).slice(0, 2).toUpperCase())}</span>
               <div class="dash-pie-copy">
                 <div class="dash-pie-name">${esc(slice.status)}</div>
-                <div class="dash-pie-desc">${describe(slice.status)}</div>
               </div>
               <div class="dash-pie-stat">
                 <div class="dash-pie-value">${slice.pct.toFixed(1)}%</div>
@@ -429,9 +415,7 @@ function renderStatusBars() {
     </div>
   `
 
-  meta.innerHTML = rowsByCount.slice(0, 4).map((item) => `
-    <span class="dash-chip">${esc(item.status)}: ${esc(item.count)}</span>
-  `).join('')
+  meta.innerHTML = ''
 }
 
 function renderSmartReading() {
@@ -500,13 +484,20 @@ function renderSmartReading() {
               : '-'
             const summaryText = item.summary || '-'
             const color = accent[(groupIndex + itemIndex) % accent.length]
+            const avatarText = String(squad || item.key || 'F').replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase() || 'F'
             return `
-              <div class="dash-smart-mini" style="--smart-accent:${color}">
-                <a class="dash-smart-mini-key" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(item.key)}</a>
-                <span class="dash-smart-mini-squad">${esc(squad)}</span>
-                <span class="dash-smart-mini-summary">${esc(summaryText)}</span>
-                <span class="dash-smart-mini-time">${esc(timeText)}</span>
-              </div>
+              <article class="dash-smart-note" style="--smart-accent:${color}">
+                <span class="dash-smart-avatar">${esc(avatarText)}</span>
+                <div class="dash-smart-note-main">
+                  <div class="dash-smart-note-top">
+                    <a class="dash-smart-mini-key" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(item.key)}</a>
+                    <span class="dash-smart-mini-squad">${esc(squad)}</span>
+                    <span class="dash-smart-mini-time">${esc(timeText)}</span>
+                  </div>
+                  <div class="dash-smart-mini-summary">${esc(summaryText)}</div>
+                </div>
+                <a class="dash-smart-open-btn" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Open</a>
+              </article>
             `
           }).join('')}
         </div>
@@ -969,22 +960,55 @@ function renderAll() {
 }
 
 function renderStatusOptions() {
-  const select = document.getElementById('dashStatus')
   const statuses = state.data?.meta?.available?.statuses || []
-  select.innerHTML = ['<option value="all">All Status</option>', ...statuses.map((s) => `<option value="${esc(s)}">${esc(s)}</option>`)].join('')
-  select.value = state.status
+  const host = document.getElementById('dashStatusOptions')
+  const allNode = document.getElementById('dashStatusAll')
+  const summaryNode = document.getElementById('dashStatusSummaryText')
+  if (!host || !allNode || !summaryNode) return
+  const selected = state.statusSelections || []
+
+  host.innerHTML = statuses.length
+    ? statuses.map((status) => {
+      const checked = selected.includes(status) ? 'checked' : ''
+      return `<label class="dash-multi-item" data-label="${esc(String(status).toLowerCase())}"><input type="checkbox" value="${esc(status)}" ${checked}/> ${esc(status)}</label>`
+    }).join('')
+    : '<div class="dash-empty">No value</div>'
+
+  allNode.checked = selected.length === 0
+  if (!selected.length) {
+    summaryNode.textContent = 'Status: All'
+  } else {
+    const preview = selected.slice(0, 2).join(', ')
+    summaryNode.textContent = selected.length > 2 ? `Status: ${preview} +${selected.length - 2}` : `Status: ${preview}`
+  }
 }
 
 function renderCompareOptions() {
-  const select = document.getElementById('dashSprintCompare')
-  select.innerHTML = [
-    '<option value="all">All Compare</option>',
-    '<option value="equal">Actual = Estimate</option>',
-    '<option value="early">Actual เร็วกว่า Estimate</option>',
-    '<option value="late">Actual ช้ากว่า Estimate</option>',
-    '<option value="na">Compare N/A</option>'
-  ].join('')
-  select.value = state.compare
+  const compareOptions = [
+    { value: 'equal', label: 'Actual = Estimate' },
+    { value: 'early', label: 'Actual เร็วกว่า Estimate' },
+    { value: 'late', label: 'Actual ช้ากว่า Estimate' },
+    { value: 'na', label: 'Compare N/A' }
+  ]
+  const host = document.getElementById('dashCompareOptions')
+  const allNode = document.getElementById('dashCompareAll')
+  const summaryNode = document.getElementById('dashCompareSummaryText')
+  if (!host || !allNode || !summaryNode) return
+  const selected = state.compareSelections || []
+
+  host.innerHTML = compareOptions.map((opt) => {
+    const checked = selected.includes(opt.value) ? 'checked' : ''
+    return `<label class="dash-multi-item" data-label="${esc(String(opt.label).toLowerCase())}"><input type="checkbox" value="${esc(opt.value)}" ${checked}/> ${esc(opt.label)}</label>`
+  }).join('')
+
+  allNode.checked = selected.length === 0
+  if (!selected.length) {
+    summaryNode.textContent = 'Compare: All'
+  } else {
+    const selectedLabels = compareOptions.filter((o) => selected.includes(o.value)).map((o) => o.label)
+    const preview = selectedLabels.slice(0, 2).join(', ')
+    summaryNode.textContent = selectedLabels.length > 2 ? `Compare: ${preview} +${selectedLabels.length - 2}` : `Compare: ${preview}`
+  }
 }
 
 function getBusinessFilterValues(key) {
@@ -1064,14 +1088,46 @@ function bindEvents() {
     renderAll()
   })
 
-  document.getElementById('dashStatus').addEventListener('change', (event) => {
-    state.status = event.target.value || 'all'
+  document.getElementById('dashStatusAll').addEventListener('change', (event) => {
+    if (!event.target.checked) return
+    state.statusSelections = []
+    renderStatusOptions()
     renderAll()
   })
 
-  document.getElementById('dashSprintCompare').addEventListener('change', (event) => {
-    state.compare = event.target.value || 'all'
+  document.getElementById('dashCompareAll').addEventListener('change', (event) => {
+    if (!event.target.checked) return
+    state.compareSelections = []
+    renderCompareOptions()
     renderAll()
+  })
+
+  document.getElementById('dashStatusOptions').addEventListener('change', () => {
+    const checked = [...document.querySelectorAll('#dashStatusOptions input[type="checkbox"]:checked')]
+      .map((n) => String(n.value || '').trim())
+      .filter(Boolean)
+    const allValues = state.data?.meta?.available?.statuses || []
+    state.statusSelections = checked.length === allValues.length ? [] : checked
+    renderStatusOptions()
+    renderAll()
+  })
+
+  document.getElementById('dashCompareOptions').addEventListener('change', () => {
+    const checked = [...document.querySelectorAll('#dashCompareOptions input[type="checkbox"]:checked')]
+      .map((n) => String(n.value || '').trim())
+      .filter(Boolean)
+    const allValues = ['equal', 'early', 'late', 'na']
+    state.compareSelections = checked.length === allValues.length ? [] : checked
+    renderCompareOptions()
+    renderAll()
+  })
+
+  document.getElementById('dashStatusSearch').addEventListener('input', () => {
+    filterBusinessOptionList('dashStatusSearch', 'dashStatusOptions')
+  })
+
+  document.getElementById('dashCompareSearch').addEventListener('input', () => {
+    filterBusinessOptionList('dashCompareSearch', 'dashCompareOptions')
   })
 
   document.getElementById('dashBusinessTypeAll').addEventListener('change', (event) => {
@@ -1118,15 +1174,17 @@ function bindEvents() {
 
   document.getElementById('dashClear').addEventListener('click', () => {
     state.query = ''
-    state.status = 'all'
-    state.compare = 'all'
+    state.statusSelections = []
+    state.compareSelections = []
     state.businessTypes = []
     state.businessPartners = []
     document.getElementById('dashSearch').value = ''
-    document.getElementById('dashStatus').value = 'all'
-    document.getElementById('dashSprintCompare').value = 'all'
+    document.getElementById('dashStatusSearch').value = ''
+    document.getElementById('dashCompareSearch').value = ''
     document.getElementById('dashBusinessTypeSearch').value = ''
     document.getElementById('dashBusinessPartnerSearch').value = ''
+    renderStatusOptions()
+    renderCompareOptions()
     renderBusinessFilters()
     renderAll()
   })
@@ -1177,16 +1235,24 @@ function bindEvents() {
     const modal = document.getElementById('dashStatusModal')
     if (modal && event.target === modal) closeStatusModal()
 
+    const statusMulti = document.getElementById('dashStatusMulti')
+    const compareMulti = document.getElementById('dashCompareMulti')
     const typeMulti = document.getElementById('dashBusinessTypeMulti')
     const partnerMulti = document.getElementById('dashBusinessPartnerMulti')
+    if (statusMulti && !statusMulti.contains(event.target)) statusMulti.removeAttribute('open')
+    if (compareMulti && !compareMulti.contains(event.target)) compareMulti.removeAttribute('open')
     if (typeMulti && !typeMulti.contains(event.target)) typeMulti.removeAttribute('open')
     if (partnerMulti && !partnerMulti.contains(event.target)) partnerMulti.removeAttribute('open')
   })
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
       closeStatusModal()
+      const statusMulti = document.getElementById('dashStatusMulti')
+      const compareMulti = document.getElementById('dashCompareMulti')
       const typeMulti = document.getElementById('dashBusinessTypeMulti')
       const partnerMulti = document.getElementById('dashBusinessPartnerMulti')
+      if (statusMulti) statusMulti.removeAttribute('open')
+      if (compareMulti) compareMulti.removeAttribute('open')
       if (typeMulti) typeMulti.removeAttribute('open')
       if (partnerMulti) partnerMulti.removeAttribute('open')
     }
@@ -1234,6 +1300,8 @@ async function load(refresh = false) {
 
 bindEvents()
 load()
+
+
 
 
 
