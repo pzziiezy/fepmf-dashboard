@@ -39,7 +39,7 @@ export default async function handler(req, res) {
   function isS7DeliveredStatusName(v) {
     const text = String(v || '').toLowerCase().replace(/\s+/g, ' ').trim()
     if (!text) return false
-    if (text === 's7') return true
+    if (/^s7(\b|[^0-9])/.test(text)) return true
     if (text === 's7 - project deliverd') return true
     if (text === 's7 - project delivered') return true
     return text.startsWith('s7') && text.includes('project deliver')
@@ -539,66 +539,81 @@ export default async function handler(req, res) {
     const windowStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1, 0, 0, 0))
     const cutoff = windowStart.getTime()
     const windowStartIso = windowStart.toISOString().slice(0, 10)
-    const jqlCandidates = [
-      `project = FEPMF AND status CHANGED TO "S7 - Project Deliverd" AFTER "${windowStartIso}" ORDER BY updated DESC`,
-      `project = FEPMF AND status CHANGED TO "S7 - Project Delivered" AFTER "${windowStartIso}" ORDER BY updated DESC`,
-      `project = FEPMF AND status CHANGED TO S7 AFTER "${windowStartIso}" ORDER BY updated DESC`,
-      `project = FEPMF AND updated >= "${windowStartIso}" ORDER BY updated DESC`
-    ]
+    const changedToS7Jql = [
+      `project = FEPMF AND (`,
+      `status CHANGED TO "S7 - Project Deliverd" AFTER "${windowStartIso}"`,
+      `OR status CHANGED TO "S7 - Project Delivered" AFTER "${windowStartIso}"`,
+      `OR status CHANGED TO "S7" AFTER "${windowStartIso}"`,
+      `) ORDER BY updated DESC`
+    ].join(' ')
+    const fallbackJql = `project = FEPMF AND updated >= "${windowStartIso}" ORDER BY updated DESC`
+    const concurrency = 15
 
-    for (const jql of jqlCandidates) {
+    function findLatestS7Transition(histories = []) {
+      const transitions = []
+      for (const history of histories || []) {
+        const created = history?.created || ''
+        for (const item of history?.items || []) {
+          if (lower(item?.field) !== 'status') continue
+          if (!isS7DeliveredStatusName(item?.toString || item?.to)) continue
+          const ts = new Date(created).getTime()
+          if (!Number.isFinite(ts) || ts < cutoff) continue
+          transitions.push(created)
+        }
+      }
+      return transitions.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] || ''
+    }
+
+    async function withFullChangelog(issue) {
+      const hasHistories = Array.isArray(issue?.changelog?.histories) && issue.changelog.histories.length > 0
+      if (hasHistories) return issue
       try {
-        const issues = await fetchAllByJql(jql, fields, { expand: ['changelog'] })
-        const hasAnyChangelog = issues.some((issue) => Array.isArray(issue?.changelog?.histories))
-        const withTransitions = issues.map((issue) => {
-          const histories = issue?.changelog?.histories || []
-          const transitions = []
-          for (const history of histories) {
-            const created = history?.created || ''
-            for (const item of history?.items || []) {
-              if (lower(item?.field) !== 'status') continue
-              if (!isS7DeliveredStatusName(item?.toString || item?.to)) continue
-              const ts = new Date(created).getTime()
-              if (!Number.isFinite(ts) || ts < cutoff) continue
-              transitions.push(created)
-            }
-          }
-
-          const s7ChangedAt = transitions.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] || ''
-          return { ...issue, __s7ChangedAt: s7ChangedAt }
-        })
-        let filtered = withTransitions.filter((issue) => issue.__s7ChangedAt)
-
-        // Fallback: if JQL already matched status-changed issues but changelog isn't expanded,
-        // trust Jira result and use updated as event timestamp.
-        if (!filtered.length && issues.length && !hasAnyChangelog && /status\s+CHANGED\s+TO/i.test(jql)) {
-          filtered = issues
-            .map((issue) => ({ ...issue, __s7ChangedAt: issue?.fields?.updated || '' }))
-            .filter((issue) => {
-              const ts = new Date(issue.__s7ChangedAt || '').getTime()
-              return Number.isFinite(ts) && ts >= cutoff
-            })
+        const full = await fetchJira(`/issue/${encodeURIComponent(issue.key)}?fields=summary,status,updated&expand=changelog`)
+        return {
+          ...issue,
+          fields: { ...(issue?.fields || {}), ...(full?.fields || {}) },
+          changelog: full?.changelog || issue?.changelog || { histories: [] }
         }
-
-        // Fallback: broad query + changelog parse can still miss transitions in edge cases.
-        // Include items that are currently S7 and updated within window.
-        if (!filtered.length && /updated\s*>=/i.test(jql)) {
-          filtered = issues
-            .filter((issue) => isS7DeliveredStatusName(issue?.fields?.status?.name))
-            .map((issue) => ({ ...issue, __s7ChangedAt: issue?.fields?.updated || '' }))
-            .filter((issue) => {
-              const ts = new Date(issue.__s7ChangedAt || '').getTime()
-              return Number.isFinite(ts) && ts >= cutoff
-            })
-        }
-
-        if (filtered.length) return { issues: filtered, windowStartIso }
       } catch (_) {
-        // try next JQL candidate
+        return issue
       }
     }
 
-    return { issues: [], windowStartIso }
+    try {
+      let baseIssues = await fetchAllByJql(changedToS7Jql, fields, { expand: ['changelog'] })
+      if (!baseIssues.length) {
+        baseIssues = await fetchAllByJql(fallbackJql, fields, { expand: ['changelog'] })
+      }
+      const enriched = []
+
+      for (let i = 0; i < baseIssues.length; i += concurrency) {
+        const batch = baseIssues.slice(i, i + concurrency)
+        const resolved = await Promise.all(batch.map(withFullChangelog))
+        enriched.push(...resolved)
+      }
+
+      let filtered = enriched
+        .map((issue) => {
+          const s7ChangedAt = findLatestS7Transition(issue?.changelog?.histories || [])
+          return { ...issue, __s7ChangedAt: s7ChangedAt }
+        })
+        .filter((issue) => issue.__s7ChangedAt)
+
+      // Final fallback: if transition history is unavailable, use currently-S7 issues updated in window.
+      if (!filtered.length) {
+        filtered = enriched
+          .filter((issue) => isS7DeliveredStatusName(issue?.fields?.status?.name))
+          .map((issue) => ({ ...issue, __s7ChangedAt: issue?.fields?.updated || '' }))
+          .filter((issue) => {
+            const ts = new Date(issue.__s7ChangedAt || '').getTime()
+            return Number.isFinite(ts) && ts >= cutoff
+          })
+      }
+
+      return { issues: filtered, windowStartIso }
+    } catch (_) {
+      return { issues: [], windowStartIso }
+    }
   }
 
   try {

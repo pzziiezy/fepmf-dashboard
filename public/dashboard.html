@@ -280,7 +280,7 @@
       align-items: center;
     }
     .dash-toolbar-compact {
-      margin-top: -2px;
+      margin-top: 12px;
       padding: 10px;
       border-radius: 14px;
       grid-template-columns: minmax(260px, 1fr) 150px 150px auto auto;
@@ -1874,6 +1874,13 @@
         <div>
           <h2 class="dash-command-title">Portfolio Command Center</h2>
           <p class="dash-command-copy">ติดตามภาพรวม FEPMF, สถานะ ITCM และวิเคราะห์ Estimate Sprint เทียบ Actual Start Sprint แบบพร้อมใช้ตัดสินใจ</p>
+          <div class="dash-toolbar dash-toolbar-compact">
+            <input id="dashSearch" class="search" placeholder="Search FEPMF, ITCM, Child key, Summary, Squad, Status" />
+            <select id="dashStatus" class="search"></select>
+            <select id="dashSprintCompare" class="search"></select>
+            <button id="dashClear" class="btn" type="button">Clear</button>
+            <button id="dashRefresh" class="btn primary" type="button">Refresh</button>
+          </div>
         </div>
         <div class="dash-command-meta">
           <article class="dash-snapshot-card">
@@ -1904,13 +1911,6 @@
             </div>
           </article>
         </div>
-      </div>
-      <div class="dash-toolbar dash-toolbar-compact">
-        <input id="dashSearch" class="search" placeholder="Search FEPMF, ITCM, Child key, Summary, Squad, Status" />
-        <select id="dashStatus" class="search"></select>
-        <select id="dashSprintCompare" class="search"></select>
-        <button id="dashClear" class="btn" type="button">Clear</button>
-        <button id="dashRefresh" class="btn primary" type="button">Refresh</button>
       </div>
     </section>
 
