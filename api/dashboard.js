@@ -502,12 +502,30 @@ export default async function handler(req, res) {
     let nextPageToken
     let guard = 0
     let all = []
+    const requestedExpand = Array.isArray(options.expand) && options.expand.length ? options.expand : null
+    let allowExpand = Boolean(requestedExpand)
 
     while (true) {
       const body = { jql, fields, maxResults: 100 }
-      if (Array.isArray(options.expand) && options.expand.length) body.expand = options.expand
+      if (allowExpand && requestedExpand) body.expand = requestedExpand
       if (nextPageToken) body.nextPageToken = nextPageToken
-      const page = await fetchJira('/search/jql', { method: 'POST', body: JSON.stringify(body) })
+      let page
+      try {
+        page = await fetchJira('/search/jql', { method: 'POST', body: JSON.stringify(body) })
+      } catch (error) {
+        const message = String(error?.message || '')
+        const isExpandPayloadError = allowExpand
+          && message.includes('Invalid request payload')
+          && message.includes('/search/jql')
+        if (isExpandPayloadError) {
+          allowExpand = false
+          const retryBody = { jql, fields, maxResults: 100 }
+          if (nextPageToken) retryBody.nextPageToken = nextPageToken
+          page = await fetchJira('/search/jql', { method: 'POST', body: JSON.stringify(retryBody) })
+        } else {
+          throw error
+        }
+      }
       const issues = page.issues || []
       all = all.concat(issues)
       nextPageToken = page.nextPageToken
