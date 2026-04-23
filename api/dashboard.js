@@ -564,6 +564,13 @@ export default async function handler(req, res) {
       `OR status CHANGED TO "S7" AFTER "${windowStartIso}"`,
       `) ORDER BY updated DESC`
     ].join(' ')
+    const wasS7Jql = [
+      `project = FEPMF AND (`,
+      `status WAS "S7 - Project Deliverd" AFTER "${windowStartIso}"`,
+      `OR status WAS "S7 - Project Delivered" AFTER "${windowStartIso}"`,
+      `OR status WAS "S7" AFTER "${windowStartIso}"`,
+      `) ORDER BY updated DESC`
+    ].join(' ')
     const fallbackJql = `project = FEPMF AND updated >= "${windowStartIso}" ORDER BY updated DESC`
     const concurrency = 15
 
@@ -598,9 +605,13 @@ export default async function handler(req, res) {
     }
 
     try {
-      let baseIssues = await fetchAllByJql(changedToS7Jql, fields, { expand: ['changelog'] })
+      let baseIssues = []
+      try { baseIssues = await fetchAllByJql(changedToS7Jql, fields) } catch (_) {}
       if (!baseIssues.length) {
-        baseIssues = await fetchAllByJql(fallbackJql, fields, { expand: ['changelog'] })
+        try { baseIssues = await fetchAllByJql(wasS7Jql, fields) } catch (_) {}
+      }
+      if (!baseIssues.length) {
+        baseIssues = await fetchAllByJql(fallbackJql, fields)
       }
       const enriched = []
 
