@@ -283,7 +283,7 @@
       margin-top: 12px;
       padding: 10px;
       border-radius: 14px;
-      grid-template-columns: minmax(260px, 1fr) 150px 150px auto auto;
+      grid-template-columns: minmax(260px, 1fr) 140px 140px 190px 190px auto auto;
       gap: 8px;
       background: rgba(255, 255, 255, 0.95);
       box-shadow: 0 8px 20px rgba(24, 66, 128, 0.08);
@@ -299,6 +299,101 @@
       font-size: 13px;
       padding: 0 14px;
       border-radius: 12px;
+    }
+    .dash-multi {
+      position: relative;
+      min-width: 0;
+    }
+    .dash-multi summary {
+      list-style: none;
+      min-height: 38px;
+      border: 1px solid #d5deeb;
+      border-radius: 12px;
+      background: #fff;
+      color: #203454;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 8px 34px 8px 12px;
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .dash-multi summary::-webkit-details-marker { display: none; }
+    .dash-multi summary::after {
+      content: '▾';
+      position: absolute;
+      right: 12px;
+      top: 9px;
+      color: #506789;
+      font-size: 12px;
+      pointer-events: none;
+    }
+    .dash-multi[open] summary {
+      border-color: #9fb8de;
+      box-shadow: 0 0 0 2px rgba(47, 116, 222, 0.12);
+    }
+    .dash-multi-panel {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      width: 100%;
+      min-width: 220px;
+      max-height: 260px;
+      border: 1px solid #c9d8ee;
+      border-radius: 12px;
+      background: #fff;
+      box-shadow: 0 14px 28px rgba(26, 52, 92, 0.18);
+      padding: 8px;
+      z-index: 40;
+      display: grid;
+      gap: 6px;
+    }
+    .dash-multi-search {
+      min-height: 32px;
+      border: 1px solid #d7e1ef;
+      border-radius: 8px;
+      padding: 0 9px;
+      font-size: 12px;
+      color: #203454;
+      outline: none;
+    }
+    .dash-multi-search:focus {
+      border-color: #95b5e3;
+      box-shadow: 0 0 0 2px rgba(47, 116, 222, 0.14);
+    }
+    .dash-multi-list {
+      max-height: 194px;
+      overflow: auto;
+      display: grid;
+      gap: 4px;
+      padding-right: 2px;
+    }
+    .dash-multi-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid #e1e8f3;
+      border-radius: 8px;
+      background: #f9fbff;
+      padding: 5px 7px;
+      font-size: 12px;
+      color: #1f365a;
+      font-weight: 700;
+      cursor: pointer;
+      user-select: none;
+    }
+    .dash-multi-item.all {
+      background: #f0f6ff;
+      border-color: #c8daf2;
+    }
+    .dash-multi-item input {
+      width: 14px;
+      height: 14px;
+      margin: 0;
+      accent-color: #2d6cdf;
     }
 
     .dash-status-panel {
@@ -608,11 +703,10 @@
       line-height: 1;
       font-weight: 800;
     }
-    .dash-pie-rank {
-      color: #5f7598;
+    .dash-pie-count {
+      color: #2f74de;
       font-size: 11px;
-      font-weight: 700;
-      text-transform: lowercase;
+      font-weight: 800;
     }
     .dash-smart-panel {
       padding: 14px;
@@ -956,6 +1050,10 @@
     #dashCompareAnalysis.dash-analysis-grid {
       display: block;
       width: 100%;
+      min-height: 0;
+      height: 100%;
+      overflow: auto;
+      padding-right: 2px;
     }
 
     .dash-analysis-wrap {
@@ -963,7 +1061,12 @@
       border-radius: var(--dash-radius);
       background: var(--dash-panel);
       box-shadow: var(--dash-soft-shadow);
-      padding: 14px;
+      padding: 16px;
+      min-height: 520px;
+      max-height: 520px;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: 10px;
     }
     .dash-status-kpi-panel {
       border: 1px solid #d9e2f0;
@@ -1812,6 +1915,7 @@
       .dash-command-meta { grid-template-columns: 1fr; }
       .dash-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .dash-insight-row { grid-template-columns: 1fr; }
+      .dash-analysis-wrap { min-height: auto; max-height: none; }
       .dash-status-panel { min-height: auto; max-height: none; }
       .dash-status-layout { height: auto; }
       .dash-bars-grid { height: auto; max-height: none; }
@@ -1878,6 +1982,22 @@
             <input id="dashSearch" class="search" placeholder="Search FEPMF, ITCM, Child key, Summary, Squad, Status" />
             <select id="dashStatus" class="search"></select>
             <select id="dashSprintCompare" class="search"></select>
+            <details class="dash-multi" id="dashBusinessTypeMulti">
+              <summary id="dashBusinessTypeSummary">Business Type: All</summary>
+              <div class="dash-multi-panel">
+                <input id="dashBusinessTypeSearch" class="dash-multi-search" type="text" placeholder="Search Business Type" />
+                <label class="dash-multi-item all"><input id="dashBusinessTypeAll" type="checkbox" checked />All</label>
+                <div id="dashBusinessTypeOptions" class="dash-multi-list"></div>
+              </div>
+            </details>
+            <details class="dash-multi" id="dashBusinessPartnerMulti">
+              <summary id="dashBusinessPartnerSummary">Business Partner: All</summary>
+              <div class="dash-multi-panel">
+                <input id="dashBusinessPartnerSearch" class="dash-multi-search" type="text" placeholder="Search Business Partner" />
+                <label class="dash-multi-item all"><input id="dashBusinessPartnerAll" type="checkbox" checked />All</label>
+                <div id="dashBusinessPartnerOptions" class="dash-multi-list"></div>
+              </div>
+            </details>
             <button id="dashClear" class="btn" type="button">Clear</button>
             <button id="dashRefresh" class="btn primary" type="button">Refresh</button>
           </div>

@@ -319,6 +319,25 @@ export default async function handler(req, res) {
     return ''
   }
 
+  function valueToStrings(value) {
+    if (value == null) return []
+    if (Array.isArray(value)) return uniq(value.flatMap(valueToStrings))
+    if (typeof value === 'object') {
+      const preferred = [value.value, value.name, value.displayName, value.label]
+        .flatMap(valueToStrings)
+        .filter(Boolean)
+      if (preferred.length) return uniq(preferred)
+      return uniq(Object.values(value).flatMap(valueToStrings).filter(Boolean))
+    }
+    return uniq(String(value).split(/[|,]/).map((v) => String(v || '').trim()).filter(Boolean))
+  }
+
+  function getNamedFieldValues(issue, fieldIds = []) {
+    const out = []
+    for (const value of getFieldValues(issue, fieldIds)) out.push(...valueToStrings(value))
+    return uniq(out)
+  }
+
   function normalizeIssue(issue, cfg) {
     const sprint = parseSprintFromIssue(issue, cfg.sprintFieldIds)
     const statusRaw = getStatus(issue)
@@ -342,6 +361,8 @@ export default async function handler(req, res) {
       sprintStart: sprint.start,
       sprintEnd: sprint.end,
       squad: inferSquad(issue, cfg.squadFieldIds),
+      businessType: getNamedFieldValues(issue, cfg.businessTypeFieldIds),
+      businessPartner: getNamedFieldValues(issue, cfg.businessPartnerFieldIds),
       estimateSprint: getEstimateSprint(issue, cfg.estimateSprintFieldIds),
       actualStartSprint: getActualStartSprint(issue, cfg.actualStartSprintFieldIds),
       labels,
@@ -669,6 +690,16 @@ export default async function handler(req, res) {
       ...fuzzyFieldIds(fieldCatalog, ['squad', 'team']).slice(0, 6)
     ])
 
+    const businessTypeFieldIds = uniq([
+      ...exactFieldIds(fieldCatalog, ['Business Type']),
+      ...fuzzyFieldIds(fieldCatalog, ['business type']).slice(0, 6)
+    ])
+
+    const businessPartnerFieldIds = uniq([
+      ...exactFieldIds(fieldCatalog, ['Business Partner']),
+      ...fuzzyFieldIds(fieldCatalog, ['business partner']).slice(0, 6)
+    ])
+
     const estimateSprintFieldIds = uniq([
       ...exactFieldIds(fieldCatalog, ['Estimate Sprint', 'Estimated Sprint']),
       ...fuzzyFieldIds(fieldCatalog, ['estimate sprint']).slice(0, 5)
@@ -711,6 +742,8 @@ export default async function handler(req, res) {
       ...sprintFieldIds,
       ...progressFieldIds,
       ...squadFieldIds,
+      ...businessTypeFieldIds,
+      ...businessPartnerFieldIds,
       ...estimateSprintFieldIds,
       ...actualStartSprintFieldIds,
       ...childFieldIds,
@@ -718,7 +751,15 @@ export default async function handler(req, res) {
       ...parentRefFieldIds
     ])
 
-    const cfg = { sprintFieldIds, progressFieldIds, squadFieldIds, estimateSprintFieldIds, actualStartSprintFieldIds }
+    const cfg = {
+      sprintFieldIds,
+      progressFieldIds,
+      squadFieldIds,
+      businessTypeFieldIds,
+      businessPartnerFieldIds,
+      estimateSprintFieldIds,
+      actualStartSprintFieldIds
+    }
 
     const parentsRaw = await fetchAllByJql('project = FEPMF ORDER BY updated DESC', baseFields)
     const parentKeys = parentsRaw.map((x) => x.key)
@@ -819,6 +860,8 @@ export default async function handler(req, res) {
           key: row.parent.key,
           summary: row.parent.summary,
           squad: row.parent.squad,
+          businessType: row.parent.businessType,
+          businessPartner: row.parent.businessPartner,
           status: row.parent.status,
           start,
           end,
@@ -867,6 +910,8 @@ export default async function handler(req, res) {
         available: {
           statuses: statusSort(uniq(parents.map((x) => x.parent.status))),
           squads: uniq(parents.map((x) => x.parent.squad)).filter((x) => KNOWN_SQUADS.includes(x)),
+          businessTypes: uniq(parents.flatMap((x) => x.parent.businessType || [])).sort(),
+          businessPartners: uniq(parents.flatMap((x) => x.parent.businessPartner || [])).sort(),
           cabDates: uniq(parents.map((x) => x.parent.cabDate)).filter(Boolean).sort()
         }
       },

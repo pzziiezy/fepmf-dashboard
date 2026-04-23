@@ -4,6 +4,8 @@
   query: '',
   status: 'all',
   compare: 'all',
+  businessTypes: [],
+  businessPartners: [],
   statusView: 'bar',
   kpiModalStatus: null
 }
@@ -51,6 +53,22 @@ function normalizeText(value) {
   return String(value || '').trim().toLowerCase()
 }
 
+function normalizeMultiValues(value) {
+  if (value == null) return []
+  if (Array.isArray(value)) return [...new Set(value.flatMap(normalizeMultiValues).filter(Boolean))]
+  if (typeof value === 'object') {
+    const preferred = [value.value, value.name, value.displayName, value.label]
+      .flatMap((v) => normalizeMultiValues(v))
+      .filter(Boolean)
+    if (preferred.length) return [...new Set(preferred)]
+    return [...new Set(Object.values(value).flatMap(normalizeMultiValues).filter(Boolean))]
+  }
+  return String(value)
+    .split(/[|,]/)
+    .map((v) => String(v || '').trim())
+    .filter(Boolean)
+}
+
 function parseSprintNumber(value) {
   const text = String(value || '')
   const m = text.match(/sprint\s*([0-9]+)/i)
@@ -86,6 +104,8 @@ function enrichRow(row) {
   const itcms = itcmItems(row)
   const itcmKeys = [...new Set(itcms.map((item) => item.key).filter(Boolean))]
   const itcmStatuses = [...new Set(itcms.map((item) => item.status || '-'))]
+  const businessTypes = normalizeMultiValues(row.parent.businessType)
+  const businessPartners = normalizeMultiValues(row.parent.businessPartner)
 
   return {
     ...row,
@@ -94,7 +114,9 @@ function enrichRow(row) {
       actualNum,
       compareType,
       itcmKeys,
-      itcmStatuses
+      itcmStatuses,
+      businessTypes,
+      businessPartners
     }
   }
 }
@@ -107,6 +129,8 @@ function rowBlob(row) {
     row.parent.squad,
     row.parent.estimateSprint,
     row.derived.actualNum != null ? `Sprint${row.derived.actualNum}` : '',
+    ...row.derived.businessTypes,
+    ...row.derived.businessPartners,
     ...row.derived.itcmKeys,
     ...row.derived.itcmStatuses,
     ...(row.workItems || []).flatMap((item) => [item.key, item.summary, item.status, item.assignee])
@@ -118,6 +142,8 @@ function filterRows() {
   state.rows = (state.data?.parents || []).map(enrichRow).filter((row) => {
     if (state.status !== 'all' && row.parent.status !== state.status) return false
     if (state.compare !== 'all' && row.derived.compareType !== state.compare) return false
+    if (state.businessTypes.length && !row.derived.businessTypes.some((v) => state.businessTypes.includes(v))) return false
+    if (state.businessPartners.length && !row.derived.businessPartners.some((v) => state.businessPartners.includes(v))) return false
     if (!terms.length) return true
     const blob = rowBlob(row)
     return terms.every((term) => blob.includes(term))
@@ -277,13 +303,19 @@ function renderStatusBars() {
     })
 
     const describe = (status) => {
-      const s = String(status || '').toLowerCase()
-      if (s.includes('open')) return 'Awaiting execution'
-      if (s.includes('cancel')) return 'Stopped or withdrawn'
-      if (s.includes('s7')) return 'Project delivered'
-      return 'Active status mix'
+      const s = String(status || '').trim().toUpperCase()
+      if (s === 'OPEN') return 'รอเริ่มดำเนินงาน'
+      if (s === 'S0') return 'อยู่ช่วง Idea / Define requirement'
+      if (s === 'S1') return 'อยู่ช่วงวิเคราะห์และออกแบบแนวทาง'
+      if (s === 'S2') return 'อยู่ช่วงเตรียมพัฒนา / เตรียมงานระบบ'
+      if (s === 'S3') return 'อยู่ช่วงพัฒนาและทดสอบภายใน'
+      if (s === 'S4') return 'อยู่ช่วงทดสอบร่วม / UAT'
+      if (s === 'S5') return 'อยู่ช่วงเตรียมขึ้นระบบ / CAB'
+      if (s === 'S6') return 'อยู่ช่วง Deploy / Hypercare'
+      if (s === 'S7') return 'ปิดงานแล้ว (Project delivered)'
+      if (s === 'CANCELLED') return 'ยกเลิกหรือหยุดดำเนินการ'
+      return `สถานะ ${status || '-'} ใน pipeline`
     }
-    const rank = (pct) => (pct >= 35 ? 'dominant' : pct >= 15 ? 'key' : 'minor')
 
     host.innerHTML = `
       <div class="dash-pie-wrap">
@@ -321,7 +353,7 @@ function renderStatusBars() {
               </div>
               <div class="dash-pie-stat">
                 <div class="dash-pie-value">${slice.pct.toFixed(1)}%</div>
-                <div class="dash-pie-rank">${rank(slice.pct)}</div>
+                <div class="dash-pie-count">${slice.count} FEPMF</div>
               </div>
             </article>
           `).join('')}
@@ -341,7 +373,7 @@ function renderStatusBars() {
       if (!slice || !focusEl || !focusMarkEl || !focusValueEl || !focusSubEl) return
       focusMarkEl.style.background = slice.color
       focusValueEl.textContent = `${slice.pct.toFixed(1)}%`
-      focusSubEl.textContent = `${slice.status} | ${rank(slice.pct)}`
+      focusSubEl.textContent = `${slice.status} | ${slice.count} FEPMF`
       focusEl.classList.add('active')
     }
     const clearFocus = () => {
@@ -554,15 +586,6 @@ function renderCompareAnalysis() {
 
   host.innerHTML = `
     <div class="exec-analytics">
-      <div class="exec-readme">
-        <div class="exec-readme-title">วิธีอ่านผลวิเคราะห์</div>
-        <div class="exec-readme-grid">
-          <div><strong>วัดอะไร:</strong> เปรียบเทียบ Estimate Sprint กับ Actual Start Sprint จาก field จริงของ FEPMF</div>
-          <div><strong>ใช้ตัดสินใจอะไร:</strong> หา Squad/Sprint ที่ควรเร่งแก้ก่อนความล่าช้าขยายวง</div>
-          <div><strong>ฐานข้อมูล:</strong> ใช้เฉพาะรายการที่มีทั้ง Estimate และ Actual (Comparable)</div>
-        </div>
-      </div>
-
       <div class="exec-kpi-row">
         ${metricCards.map((m) => `
           <article class="exec-kpi-card ${m.risk ? 'risk' : ''}">
@@ -964,6 +987,77 @@ function renderCompareOptions() {
   select.value = state.compare
 }
 
+function getBusinessFilterValues(key) {
+  const fromMeta = state.data?.meta?.available?.[key]
+  if (Array.isArray(fromMeta) && fromMeta.length) {
+    return [...new Set(fromMeta.map((v) => String(v || '').trim()).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b))
+  }
+  const parentKey = key === 'businessTypes' ? 'businessType' : 'businessPartner'
+  const fallback = (state.data?.parents || []).flatMap((row) => normalizeMultiValues(row?.parent?.[parentKey]))
+  return [...new Set(fallback.map((v) => String(v || '').trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b))
+}
+
+function updateBusinessFilterSummary(summaryId, label, selected) {
+  const summary = document.getElementById(summaryId)
+  if (!summary) return
+  if (!selected.length) {
+    summary.textContent = `${label}: All`
+    return
+  }
+  const preview = selected.slice(0, 2).join(', ')
+  summary.textContent = selected.length > 2 ? `${label}: ${preview} +${selected.length - 2}` : `${label}: ${preview}`
+}
+
+function renderBusinessFilterOptions(opts) {
+  const values = getBusinessFilterValues(opts.dataKey)
+  const selected = state[opts.stateKey] || []
+  const optionsNode = document.getElementById(opts.optionsId)
+  const allNode = document.getElementById(opts.allId)
+  if (!optionsNode || !allNode) return
+
+  optionsNode.innerHTML = values.length
+    ? values.map((value) => {
+      const checked = selected.includes(value) ? 'checked' : ''
+      return `<label class="dash-multi-item" data-label="${esc(value.toLowerCase())}"><input type="checkbox" value="${esc(value)}" ${checked}/> ${esc(value)}</label>`
+    }).join('')
+    : '<div class="dash-empty">No value</div>'
+
+  allNode.checked = selected.length === 0
+  updateBusinessFilterSummary(opts.summaryId, opts.label, selected)
+}
+
+function filterBusinessOptionList(inputId, optionsId) {
+  const input = document.getElementById(inputId)
+  const list = document.getElementById(optionsId)
+  if (!input || !list) return
+  const q = String(input.value || '').trim().toLowerCase()
+  list.querySelectorAll('.dash-multi-item[data-label]').forEach((node) => {
+    const label = String(node.getAttribute('data-label') || '')
+    node.style.display = !q || label.includes(q) ? '' : 'none'
+  })
+}
+
+function renderBusinessFilters() {
+  renderBusinessFilterOptions({
+    dataKey: 'businessTypes',
+    stateKey: 'businessTypes',
+    optionsId: 'dashBusinessTypeOptions',
+    allId: 'dashBusinessTypeAll',
+    summaryId: 'dashBusinessTypeSummary',
+    label: 'Business Type'
+  })
+  renderBusinessFilterOptions({
+    dataKey: 'businessPartners',
+    stateKey: 'businessPartners',
+    optionsId: 'dashBusinessPartnerOptions',
+    allId: 'dashBusinessPartnerAll',
+    summaryId: 'dashBusinessPartnerSummary',
+    label: 'Business Partner'
+  })
+}
+
 function bindEvents() {
   document.getElementById('dashSearch').addEventListener('input', (event) => {
     state.query = event.target.value || ''
@@ -980,13 +1074,60 @@ function bindEvents() {
     renderAll()
   })
 
+  document.getElementById('dashBusinessTypeAll').addEventListener('change', (event) => {
+    if (!event.target.checked) return
+    state.businessTypes = []
+    renderBusinessFilters()
+    renderAll()
+  })
+
+  document.getElementById('dashBusinessPartnerAll').addEventListener('change', (event) => {
+    if (!event.target.checked) return
+    state.businessPartners = []
+    renderBusinessFilters()
+    renderAll()
+  })
+
+  document.getElementById('dashBusinessTypeOptions').addEventListener('change', () => {
+    const checked = [...document.querySelectorAll('#dashBusinessTypeOptions input[type="checkbox"]:checked')]
+      .map((n) => String(n.value || '').trim())
+      .filter(Boolean)
+    const values = getBusinessFilterValues('businessTypes')
+    state.businessTypes = checked.length === values.length ? [] : checked
+    renderBusinessFilters()
+    renderAll()
+  })
+
+  document.getElementById('dashBusinessPartnerOptions').addEventListener('change', () => {
+    const checked = [...document.querySelectorAll('#dashBusinessPartnerOptions input[type="checkbox"]:checked')]
+      .map((n) => String(n.value || '').trim())
+      .filter(Boolean)
+    const values = getBusinessFilterValues('businessPartners')
+    state.businessPartners = checked.length === values.length ? [] : checked
+    renderBusinessFilters()
+    renderAll()
+  })
+
+  document.getElementById('dashBusinessTypeSearch').addEventListener('input', () => {
+    filterBusinessOptionList('dashBusinessTypeSearch', 'dashBusinessTypeOptions')
+  })
+
+  document.getElementById('dashBusinessPartnerSearch').addEventListener('input', () => {
+    filterBusinessOptionList('dashBusinessPartnerSearch', 'dashBusinessPartnerOptions')
+  })
+
   document.getElementById('dashClear').addEventListener('click', () => {
     state.query = ''
     state.status = 'all'
     state.compare = 'all'
+    state.businessTypes = []
+    state.businessPartners = []
     document.getElementById('dashSearch').value = ''
     document.getElementById('dashStatus').value = 'all'
     document.getElementById('dashSprintCompare').value = 'all'
+    document.getElementById('dashBusinessTypeSearch').value = ''
+    document.getElementById('dashBusinessPartnerSearch').value = ''
+    renderBusinessFilters()
     renderAll()
   })
 
@@ -1022,7 +1163,8 @@ function bindEvents() {
       state.statusView = 'pie'
       renderStatusBars()
     })
-  }  document.addEventListener('click', (event) => {
+  }
+  document.addEventListener('click', (event) => {
     const cta = event.target.closest('.dash-status-kpi-cta[data-status]')
     if (cta) {
       openStatusModal(cta.dataset.status || '')
@@ -1034,9 +1176,20 @@ function bindEvents() {
     }
     const modal = document.getElementById('dashStatusModal')
     if (modal && event.target === modal) closeStatusModal()
+
+    const typeMulti = document.getElementById('dashBusinessTypeMulti')
+    const partnerMulti = document.getElementById('dashBusinessPartnerMulti')
+    if (typeMulti && !typeMulti.contains(event.target)) typeMulti.removeAttribute('open')
+    if (partnerMulti && !partnerMulti.contains(event.target)) partnerMulti.removeAttribute('open')
   })
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') closeStatusModal()
+    if (event.key === 'Escape') {
+      closeStatusModal()
+      const typeMulti = document.getElementById('dashBusinessTypeMulti')
+      const partnerMulti = document.getElementById('dashBusinessPartnerMulti')
+      if (typeMulti) typeMulti.removeAttribute('open')
+      if (partnerMulti) partnerMulti.removeAttribute('open')
+    }
   })
 }
 
@@ -1049,6 +1202,7 @@ async function load(refresh = false) {
     state.data = data
     renderStatusOptions()
     renderCompareOptions()
+    renderBusinessFilters()
     renderAll()
 
     document.getElementById('dashSync').textContent = `Updated: ${new Date(data.generatedAt || Date.now()).toLocaleString('th-TH')}`
@@ -1080,6 +1234,14 @@ async function load(refresh = false) {
 
 bindEvents()
 load()
+
+
+
+
+
+
+
+
 
 
 
