@@ -612,10 +612,16 @@ export default async function handler(req, res) {
 
       let filtered = enriched
         .map((issue) => {
-          const s7ChangedAt = findLatestS7Transition(issue?.changelog?.histories || [])
-          return { ...issue, __s7ChangedAt: s7ChangedAt }
+          const fromHistory = findLatestS7Transition(issue?.changelog?.histories || [])
+          const fallbackUpdated = issue?.fields?.updated || ''
+          const stamp = fromHistory || fallbackUpdated
+          return { ...issue, __s7ChangedAt: stamp }
         })
-        .filter((issue) => issue.__s7ChangedAt)
+        .filter((issue) => {
+          if (!issue.__s7ChangedAt) return false
+          const ts = new Date(issue.__s7ChangedAt).getTime()
+          return Number.isFinite(ts) && ts >= cutoff
+        })
 
       // Final fallback: if transition history is unavailable, use currently-S7 issues updated in window.
       if (!filtered.length) {
