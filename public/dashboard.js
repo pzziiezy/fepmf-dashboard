@@ -509,9 +509,9 @@ function renderCompareAnalysis() {
   const lateRate = Math.max(0, 100 - onTimeRate - earlyRate)
 
   const compareSegments = [
-    { key: 'early', label: 'เริ่มก่อนแผน', color: '#2d66c6' },
-    { key: 'equal', label: 'ตรงแผน', color: '#2f7f67' },
-    { key: 'late', label: 'เริ่มช้ากว่าแผน', color: '#c04373' }
+    { key: 'early', label: 'เริ่มก่อนแผน', color: '#2f6bff' },
+    { key: 'equal', label: 'ตรงแผน', color: '#19a974' },
+    { key: 'late', label: 'เริ่มช้ากว่าแผน', color: '#ff6b35' }
   ]
 
   const squadMap = new Map()

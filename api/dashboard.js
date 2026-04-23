@@ -542,12 +542,14 @@ export default async function handler(req, res) {
     const jqlCandidates = [
       `project = FEPMF AND status CHANGED TO "S7 - Project Deliverd" AFTER "${windowStartIso}" ORDER BY updated DESC`,
       `project = FEPMF AND status CHANGED TO "S7 - Project Delivered" AFTER "${windowStartIso}" ORDER BY updated DESC`,
-      `project = FEPMF AND status CHANGED TO S7 AFTER "${windowStartIso}" ORDER BY updated DESC`
+      `project = FEPMF AND status CHANGED TO S7 AFTER "${windowStartIso}" ORDER BY updated DESC`,
+      `project = FEPMF AND updated >= "${windowStartIso}" ORDER BY updated DESC`
     ]
 
     for (const jql of jqlCandidates) {
       try {
         const issues = await fetchAllByJql(jql, fields, { expand: ['changelog'] })
+        const hasAnyChangelog = issues.some((issue) => Array.isArray(issue?.changelog?.histories))
         const withTransitions = issues.map((issue) => {
           const histories = issue?.changelog?.histories || []
           const transitions = []
@@ -565,7 +567,31 @@ export default async function handler(req, res) {
           const s7ChangedAt = transitions.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] || ''
           return { ...issue, __s7ChangedAt: s7ChangedAt }
         })
-        const filtered = withTransitions.filter((issue) => issue.__s7ChangedAt)
+        let filtered = withTransitions.filter((issue) => issue.__s7ChangedAt)
+
+        // Fallback: if JQL already matched status-changed issues but changelog isn't expanded,
+        // trust Jira result and use updated as event timestamp.
+        if (!filtered.length && issues.length && !hasAnyChangelog && /status\s+CHANGED\s+TO/i.test(jql)) {
+          filtered = issues
+            .map((issue) => ({ ...issue, __s7ChangedAt: issue?.fields?.updated || '' }))
+            .filter((issue) => {
+              const ts = new Date(issue.__s7ChangedAt || '').getTime()
+              return Number.isFinite(ts) && ts >= cutoff
+            })
+        }
+
+        // Fallback: broad query + changelog parse can still miss transitions in edge cases.
+        // Include items that are currently S7 and updated within window.
+        if (!filtered.length && /updated\s*>=/i.test(jql)) {
+          filtered = issues
+            .filter((issue) => isS7DeliveredStatusName(issue?.fields?.status?.name))
+            .map((issue) => ({ ...issue, __s7ChangedAt: issue?.fields?.updated || '' }))
+            .filter((issue) => {
+              const ts = new Date(issue.__s7ChangedAt || '').getTime()
+              return Number.isFinite(ts) && ts >= cutoff
+            })
+        }
+
         if (filtered.length) return { issues: filtered, windowStartIso }
       } catch (_) {
         // try next JQL candidate
