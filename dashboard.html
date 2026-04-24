@@ -62,10 +62,7 @@
 
     .dash-command-meta {
       min-width: 0;
-      display: grid;
-      grid-template-columns: minmax(260px, 1fr) 170px;
-      gap: 10px;
-      align-items: stretch;
+      display: block;
     }
 
     .dash-snapshot-card {
@@ -74,6 +71,17 @@
       border-radius: 14px;
       overflow: hidden;
       box-shadow: 0 6px 18px rgba(24, 66, 128, 0.08);
+    }
+    .dash-snapshot-unified {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 240px;
+      align-items: stretch;
+      min-height: 190px;
+    }
+    .snapshot-main {
+      min-width: 0;
+      display: grid;
+      grid-template-rows: auto auto 1fr;
     }
 
     .snapshot-title {
@@ -165,6 +173,15 @@
       min-width: 0;
       text-align: center;
       gap: 10px;
+    }
+    .dash-snapshot-unified .dash-pending-card {
+      border: 0;
+      border-left: 1px solid #e2e8f4;
+      border-radius: 0;
+      box-shadow: none;
+      background: linear-gradient(165deg, #ffffff 0%, #f8f5ff 100%);
+      padding: 12px 10px;
+      min-height: 100%;
     }
     .dash-pending-ring {
       --pct: 0;
@@ -2181,7 +2198,11 @@
 
     @media (max-width: 1260px) {
       .dash-command-head { grid-template-columns: 1fr; }
-      .dash-command-meta { grid-template-columns: 1fr; }
+      .dash-snapshot-unified { grid-template-columns: 1fr; }
+      .dash-snapshot-unified .dash-pending-card {
+        border-left: 0;
+        border-top: 1px solid #e2e8f4;
+      }
       .dash-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .dash-insight-row { grid-template-columns: 1fr; }
       .dash-analysis-wrap { min-height: auto; max-height: none; }
@@ -2299,35 +2320,37 @@
           </div>
         </div>
         <div class="dash-command-meta">
-          <article class="dash-snapshot-card">
-            <div class="snapshot-title">Program Snapshot</div>
-            <div class="snapshot-tags">
-              <span class="snapshot-tag status">In monitoring</span>
-              <span class="snapshot-tag">Actual Start Sprint Current</span>
-            </div>
-            <div class="snapshot-stats">
-              <div class="snapshot-stat">
-                <div class="snapshot-value" id="dashSprintValue">-</div>
-                <div class="snapshot-label">Current Sprint</div>
+          <article class="dash-snapshot-card dash-snapshot-unified">
+            <div class="snapshot-main">
+              <div class="snapshot-title">Program Snapshot</div>
+              <div class="snapshot-tags">
+                <span class="snapshot-tag status">In monitoring</span>
+                <span class="snapshot-tag">Actual Start Sprint Current</span>
               </div>
-              <div class="snapshot-stat">
-                <div class="snapshot-value" id="dashDaysValue">-</div>
-                <div class="snapshot-label">Working Days Left</div>
+              <div class="snapshot-stats">
+                <div class="snapshot-stat">
+                  <div class="snapshot-value" id="dashSprintValue">-</div>
+                  <div class="snapshot-label">Current Sprint</div>
+                </div>
+                <div class="snapshot-stat">
+                  <div class="snapshot-value" id="dashDaysValue">-</div>
+                  <div class="snapshot-label">Working Days Left</div>
+                </div>
               </div>
             </div>
-          </article>
-          <article class="dash-pending-card">
-            <div class="dash-pending-ring" id="dashPendingRing">
-              <div class="dash-pending-percent"><span id="dashPendingPercent">0</span><small>%</small></div>
-            </div>
-            <div class="dash-pending-caption">
-              <strong id="dashPendingCount">0</strong> of
-              <strong id="dashPendingTotal">0</strong><br />
-              Pending in Current Sprint
-            </div>
-            <div class="dash-pending-breakdown">
-              <div class="dash-pending-breakdown-title">Status breakdown</div>
-              <div id="dashPendingStatusBento" class="dash-pending-bento"></div>
+            <div class="dash-pending-card snapshot-pending">
+              <div class="dash-pending-ring" id="dashPendingRing">
+                <div class="dash-pending-percent"><span id="dashPendingPercent">0</span><small>%</small></div>
+              </div>
+              <div class="dash-pending-caption">
+                <strong id="dashPendingCount">0</strong> of
+                <strong id="dashPendingTotal">0</strong><br />
+                Pending in Current Sprint
+              </div>
+              <div class="dash-pending-breakdown">
+                <div class="dash-pending-breakdown-title">Status breakdown</div>
+                <div id="dashPendingStatusBento" class="dash-pending-bento"></div>
+              </div>
             </div>
           </article>
         </div>
@@ -2502,7 +2525,7 @@
     </div>
   </div>
 
-  <script src="/dashboard.js?v=20260424g"></script>
+  <script src="/dashboard.js?v=20260424h"></script>
 </body>
 </html>
 
