@@ -775,18 +775,18 @@
       white-space: nowrap;
       letter-spacing: 0.01em;
     }
-    .dash-triple-row {
+    .dash-bento-row {
       --trio-height: 420px;
       display: grid;
-      grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1fr);
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       gap: 12px;
       align-items: stretch;
     }
     .dash-smart-panel {
       padding: 12px;
-      min-height: var(--trio-height);
-      max-height: var(--trio-height);
-      height: var(--trio-height);
+      min-height: var(--trio-height, 420px);
+      max-height: var(--trio-height, 420px);
+      height: var(--trio-height, 420px);
       display: grid;
       grid-template-rows: auto auto minmax(0, 1fr);
       gap: 8px;
@@ -836,9 +836,9 @@
       min-width: 0;
       display: grid;
       gap: 10px;
-      min-height: var(--trio-height);
-      max-height: var(--trio-height);
-      height: var(--trio-height);
+      min-height: var(--trio-height, 420px);
+      max-height: var(--trio-height, 420px);
+      height: var(--trio-height, 420px);
       grid-template-rows: auto auto minmax(0, 1fr);
       overflow: hidden;
     }
@@ -890,37 +890,14 @@
       gap: 6px;
       min-height: 0;
     }
-    .dash-bento-item {
-      border: 1px solid #e4edf8;
-      border-radius: 10px;
-      padding: 8px 10px;
-      background: #fbfdff;
-      display: grid;
-      gap: 4px;
-    }
-    .dash-bento-item-top {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      font-size: 11px;
-      color: #5f7393;
-      font-weight: 700;
-    }
-    .dash-bento-item-key {
+    .dash-bento-list .dash-table { min-width: 760px; }
+    .dash-bento-list .dash-table th,
+    .dash-bento-list .dash-table td { padding: 8px; font-size: 11px; }
+    .dash-bento-list .dash-sort-btn { font-size: 11px; }
+    .dash-bento-list .dash-item-key {
       color: #1f5db3;
       text-decoration: none;
       font-weight: 800;
-      font-size: 12px;
-    }
-    .dash-bento-item-summary {
-      font-size: 12px;
-      color: #1f3553;
-      line-height: 1.3;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
     }
     .dash-smart-group {
       border: 1px solid #dce5f4;
@@ -1192,7 +1169,7 @@
     .dash-main-grid {
       display: grid;
       gap: 12px;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr);
     }
 
     .dash-panel {
@@ -1276,6 +1253,14 @@
       flex-wrap: wrap;
       justify-content: flex-end;
       min-width: 0;
+    }
+    .dash-risk-filter-row {
+      margin-top: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
     }
     .dash-risk-tabs {
       display: inline-flex;
@@ -1836,6 +1821,9 @@
       border-color: #dce9bf;
       background: linear-gradient(165deg, #f9fdea 0%, #f3f9e1 100%);
       box-shadow: 0 10px 18px rgba(101, 141, 15, 0.12);
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      min-height: 0;
     }
     .cab-panel .dash-panel-title {
       color: #2f4d09;
@@ -1846,7 +1834,9 @@
     .cab-list {
       display: grid;
       gap: 7px;
-      max-height: 300px;
+      max-height: none;
+      height: 100%;
+      min-height: 0;
       overflow: auto;
       padding-right: 2px;
     }
@@ -2202,7 +2192,7 @@
       .dash-status-layout { grid-template-columns: 1fr; }
       .dash-pie-wrap { grid-template-columns: 1fr; }
       .dash-pie-left { justify-items: center; }
-      .dash-triple-row { grid-template-columns: 1fr; --trio-height: auto; }
+      .dash-bento-row { grid-template-columns: 1fr; --trio-height: auto; }
       .dash-smart-panel,
       .dash-bento-panel {
         min-height: auto;
@@ -2384,20 +2374,12 @@
       </section>
     </section>
 
-    <section class="dash-triple-row">
-      <article class="dash-panel dash-smart-panel">
-        <div class="dash-smart-header">
-          <h4>Smart Reading: S7 ล่าสุด</h4>
-          <p class="dash-smart-sub">จัดกลุ่มตามวันที่ พร้อมนับจำนวน FEPMF ต่อวัน เพื่อดูภาพรวมงานที่ปิดล่าสุดแบบสั้น กระชับ และอ่านง่าย</p>
-        </div>
-        <p id="dashStatusSummary" class="dash-smart-count">-</p>
-        <ul id="dashStatusRecentList" class="dash-smart-list"></ul>
-      </article>
+    <section class="dash-bento-row">
       <article class="dash-bento-panel">
         <div class="dash-panel-head">
           <div>
             <h3 class="dash-panel-title">FEPMF by Business Partner</h3>
-            <p class="dash-panel-sub">กด Bento เพื่อดู List FEPMF ของ Business Partner นั้น (รวมไม่ระบุ)</p>
+            <p class="dash-panel-sub">กด Bento เพื่อดูตาราง FEPMF ของ Business Partner นั้น (รวมไม่ระบุ)</p>
           </div>
           <div id="dashPartnerTotal" class="dash-chip">0 FEPMF</div>
         </div>
@@ -2408,7 +2390,7 @@
         <div class="dash-panel-head">
           <div>
             <h3 class="dash-panel-title">FEPMF by Business Type</h3>
-            <p class="dash-panel-sub">กด Bento เพื่อดู List FEPMF ของ Business Type นั้น (รวมไม่ระบุ)</p>
+            <p class="dash-panel-sub">กด Bento เพื่อดูตาราง FEPMF ของ Business Type นั้น (รวมไม่ระบุ)</p>
           </div>
           <div id="dashTypeTotal" class="dash-chip">0 FEPMF</div>
         </div>
@@ -2422,12 +2404,11 @@
         <div class="dash-panel-head">
           <div>
             <h3 class="dash-panel-title">ITCM related FEPMF</h3>
-            <p class="dash-panel-sub">แสดงรายการ ITCM โดยแยกแท็บตาม ITCM Status (Group by ITCM Status)</p>
           </div>
-          <div class="dash-risk-head-right">
-            <div id="dashRiskTabs" class="dash-risk-tabs" role="tablist" aria-label="ITCM status tabs"></div>
-            <div id="dashRiskCount" class="cab-count-chip">0 ITCM</div>
-          </div>
+          <div id="dashRiskCount" class="cab-count-chip">0 ITCM</div>
+        </div>
+        <div class="dash-risk-filter-row">
+          <div id="dashRiskTabs" class="dash-risk-tabs" role="tablist" aria-label="ITCM status tabs"></div>
         </div>
         <div id="dashRisk" class="dash-table-wrap"></div>
       </article>
@@ -2440,6 +2421,14 @@
           <div id="dashCabCount" class="cab-count-chip">0 งาน</div>
         </div>
         <div id="dashCab" class="dash-card-list"></div>
+      </article>
+      <article class="dash-panel dash-smart-panel">
+        <div class="dash-smart-header">
+          <h4>Smart Reading: S7 ล่าสุด</h4>
+          <p class="dash-smart-sub">จัดกลุ่มตามวันที่ พร้อมนับจำนวน FEPMF ต่อวัน เพื่อดูภาพรวมงานที่ปิดล่าสุดแบบสั้น กระชับ และอ่านง่าย</p>
+        </div>
+        <p id="dashStatusSummary" class="dash-smart-count">-</p>
+        <ul id="dashStatusRecentList" class="dash-smart-list"></ul>
       </article>
     </section>
 
@@ -2513,7 +2502,7 @@
     </div>
   </div>
 
-  <script src="/dashboard.js?v=20260424f"></script>
+  <script src="/dashboard.js?v=20260424g"></script>
 </body>
 </html>
 

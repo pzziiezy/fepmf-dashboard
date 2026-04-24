@@ -14,7 +14,9 @@
   riskSort: { key: 'itcm', dir: 'asc' },
   tableQuery: '',
   partnerFocus: '',
-  typeFocus: ''
+  typeFocus: '',
+  partnerSort: { key: 'fepmf', dir: 'asc' },
+  typeSort: { key: 'fepmf', dir: 'asc' }
 }
 
 function esc(v) {
@@ -554,12 +556,25 @@ function groupRowsByDimension(rows, accessor) {
     })
 }
 
+function bentoSortValue(row, key) {
+  if (key === 'fepmf') return String(row.parent.key || '').toLowerCase()
+  if (key === 'summary') return String(row.parent.summary || '').toLowerCase()
+  if (key === 'status') return String(row.parent.status || '').toLowerCase()
+  if (key === 'squad') return String(row.parent.squad || '').toLowerCase()
+  if (key === 'cabDate') {
+    const d = safeDate(`${row.parent.cabDate || ''}T00:00:00Z`)
+    return d ? d.getTime() : Number.POSITIVE_INFINITY
+  }
+  return ''
+}
+
 function renderBentoBlock(options) {
   const {
     rows,
     groupAccessor,
     focusKey,
     focusStateKey,
+    sortStateKey,
     totalId,
     gridId,
     listId
@@ -591,23 +606,51 @@ function renderBentoBlock(options) {
   `).join('')
 
   const activeGroup = groups.find((g) => g.label === activeLabel) || groups[0]
+  if (!state[sortStateKey]) state[sortStateKey] = { key: 'fepmf', dir: 'asc' }
+  const sortState = state[sortStateKey]
   const listRows = [...(activeGroup?.rows || [])]
-    .sort((a, b) => String(a.parent.key || '').localeCompare(String(b.parent.key || '')))
+    .sort((a, b) => {
+      const av = bentoSortValue(a, sortState.key)
+      const bv = bentoSortValue(b, sortState.key)
+      if (av < bv) return sortState.dir === 'asc' ? -1 : 1
+      if (av > bv) return sortState.dir === 'asc' ? 1 : -1
+      return String(a.parent.key || '').localeCompare(String(b.parent.key || ''))
+    })
 
   if (!listRows.length) {
     listNode.innerHTML = '<div class="dash-empty">ไม่พบ FEPMF ในหมวดที่เลือก</div>'
     return
   }
 
-  listNode.innerHTML = listRows.map((row) => `
-    <article class="dash-bento-item">
-      <div class="dash-bento-item-top">
-        <a class="dash-bento-item-key" href="${esc(row.parent.browseUrl || '#')}" target="_blank" rel="noopener noreferrer">${esc(row.parent.key || '-')}</a>
-        <span>${esc(row.parent.status || '-')}</span>
-      </div>
-      <div class="dash-bento-item-summary">${esc(row.parent.summary || '-')}</div>
-    </article>
-  `).join('')
+  const sortIcon = (key) => {
+    if (sortState.key !== key) return '↕'
+    return sortState.dir === 'asc' ? '↑' : '↓'
+  }
+
+  listNode.innerHTML = `
+    <table class="dash-table">
+      <thead>
+        <tr>
+          <th><button class="dash-sort-btn ${sortState.key === 'fepmf' ? 'active' : ''}" type="button" data-bento-sort-kind="${esc(sortStateKey)}" data-bento-sort-key="fepmf"><span>FEPMF</span><span class="dash-sort-icon">${sortIcon('fepmf')}</span></button></th>
+          <th><button class="dash-sort-btn ${sortState.key === 'summary' ? 'active' : ''}" type="button" data-bento-sort-kind="${esc(sortStateKey)}" data-bento-sort-key="summary"><span>Summary</span><span class="dash-sort-icon">${sortIcon('summary')}</span></button></th>
+          <th><button class="dash-sort-btn ${sortState.key === 'status' ? 'active' : ''}" type="button" data-bento-sort-kind="${esc(sortStateKey)}" data-bento-sort-key="status"><span>Status</span><span class="dash-sort-icon">${sortIcon('status')}</span></button></th>
+          <th><button class="dash-sort-btn ${sortState.key === 'squad' ? 'active' : ''}" type="button" data-bento-sort-kind="${esc(sortStateKey)}" data-bento-sort-key="squad"><span>Squad</span><span class="dash-sort-icon">${sortIcon('squad')}</span></button></th>
+          <th><button class="dash-sort-btn ${sortState.key === 'cabDate' ? 'active' : ''}" type="button" data-bento-sort-kind="${esc(sortStateKey)}" data-bento-sort-key="cabDate"><span>CAB Date</span><span class="dash-sort-icon">${sortIcon('cabDate')}</span></button></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${listRows.map((row) => `
+          <tr>
+            <td><a class="dash-item-key" href="${esc(row.parent.browseUrl || '#')}" target="_blank" rel="noopener noreferrer">${esc(row.parent.key || '-')}</a></td>
+            <td>${esc(row.parent.summary || '-')}</td>
+            <td>${esc(row.parent.status || '-')}</td>
+            <td>${esc(row.parent.squad || '-')}</td>
+            <td>${esc(formatDate(row.parent.cabDate))}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `
 }
 
 function renderBusinessBentoSections() {
@@ -617,6 +660,7 @@ function renderBusinessBentoSections() {
     groupAccessor: (row) => row.derived.businessPartners || [],
     focusKey: state.partnerFocus,
     focusStateKey: 'partnerFocus',
+    sortStateKey: 'partnerSort',
     totalId: 'dashPartnerTotal',
     gridId: 'dashPartnerBentoGrid',
     listId: 'dashPartnerList'
@@ -626,6 +670,7 @@ function renderBusinessBentoSections() {
     groupAccessor: (row) => row.derived.businessTypes || [],
     focusKey: state.typeFocus,
     focusStateKey: 'typeFocus',
+    sortStateKey: 'typeSort',
     totalId: 'dashTypeTotal',
     gridId: 'dashTypeBentoGrid',
     listId: 'dashTypeList'
@@ -1454,6 +1499,8 @@ function bindEvents() {
     state.tableQuery = ''
     state.partnerFocus = ''
     state.typeFocus = ''
+    state.partnerSort = { key: 'fepmf', dir: 'asc' }
+    state.typeSort = { key: 'fepmf', dir: 'asc' }
     document.getElementById('dashSearch').value = ''
     document.getElementById('dashStatusSearch').value = ''
     document.getElementById('dashCompareSearch').value = ''
@@ -1511,13 +1558,29 @@ function bindEvents() {
   }
   document.addEventListener('click', (event) => {
     const bento = event.target.closest('[data-bento-kind][data-bento-label]')
-    if (!bento) return
-    const kind = bento.getAttribute('data-bento-kind')
-    const label = bento.getAttribute('data-bento-label') || ''
-    if (!kind) return
-    if (kind === 'partnerFocus') state.partnerFocus = label
-    if (kind === 'typeFocus') state.typeFocus = label
-    renderBusinessBentoSections()
+    if (bento) {
+      const kind = bento.getAttribute('data-bento-kind')
+      const label = bento.getAttribute('data-bento-label') || ''
+      if (!kind) return
+      if (kind === 'partnerFocus') state.partnerFocus = label
+      if (kind === 'typeFocus') state.typeFocus = label
+      renderBusinessBentoSections()
+      return
+    }
+    const bentoSort = event.target.closest('[data-bento-sort-kind][data-bento-sort-key]')
+    if (bentoSort) {
+      const kind = bentoSort.getAttribute('data-bento-sort-kind')
+      const key = bentoSort.getAttribute('data-bento-sort-key')
+      if (!kind || !key) return
+      if (!state[kind]) state[kind] = { key: 'fepmf', dir: 'asc' }
+      if (state[kind].key === key) {
+        state[kind].dir = state[kind].dir === 'asc' ? 'desc' : 'asc'
+      } else {
+        state[kind].key = key
+        state[kind].dir = 'asc'
+      }
+      renderBusinessBentoSections()
+    }
   })
   const riskHost = document.getElementById('dashRisk')
   if (riskHost) {
