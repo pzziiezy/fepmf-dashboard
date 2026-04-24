@@ -221,6 +221,7 @@ function renderCurrentSprintPendingMetric() {
   const pendingCountNode = document.getElementById('dashPendingCount')
   const totalNode = document.getElementById('dashPendingTotal')
   const ringNode = document.getElementById('dashPendingRing')
+  const bentoNode = document.getElementById('dashPendingStatusBento')
   if (!percentNode || !pendingCountNode || !totalNode || !ringNode) return
 
   const rows = state.rows || []
@@ -230,18 +231,40 @@ function renderCurrentSprintPendingMetric() {
     pendingCountNode.textContent = '0'
     totalNode.textContent = '0'
     ringNode.style.setProperty('--pct', '0')
+    if (bentoNode) bentoNode.innerHTML = '<span class="dash-pending-empty">No current sprint context</span>'
     return
   }
 
   const currentSprintRows = rows.filter((row) => row.derived.actualNum === currentSprintNum)
+  const pendingRows = currentSprintRows.filter((row) => !isS7Status(row.parent.status))
   const totalCurrent = currentSprintRows.length
-  const pendingCount = currentSprintRows.filter((row) => !isS7Status(row.parent.status)).length
+  const pendingCount = pendingRows.length
   const pct = totalCurrent ? Math.round((pendingCount / totalCurrent) * 100) : 0
 
   percentNode.textContent = String(pct)
   pendingCountNode.textContent = String(pendingCount)
   totalNode.textContent = String(totalCurrent)
   ringNode.style.setProperty('--pct', String(pct))
+
+  if (bentoNode) {
+    if (!pendingRows.length) {
+      bentoNode.innerHTML = '<span class="dash-pending-empty">No pending items</span>'
+    } else {
+      const counts = new Map()
+      for (const row of pendingRows) {
+        const status = row.parent.status || 'Unknown'
+        counts.set(status, (counts.get(status) || 0) + 1)
+      }
+      const statusOrder = state.data?.meta?.statusOrder || []
+      const ordered = [
+        ...statusOrder.filter((s) => counts.has(s)),
+        ...[...counts.keys()].filter((s) => !statusOrder.includes(s)).sort((a, b) => String(a).localeCompare(String(b)))
+      ]
+      bentoNode.innerHTML = ordered.map((status) => `
+        <span class="dash-pending-chip">${esc(status)} <b>${esc(counts.get(status) || 0)}</b></span>
+      `).join('')
+    }
+  }
 }
 
 function renderStatusBars() {
@@ -1578,12 +1601,14 @@ async function load(refresh = false) {
     const pendingCount = document.getElementById('dashPendingCount')
     const pendingTotal = document.getElementById('dashPendingTotal')
     const pendingRing = document.getElementById('dashPendingRing')
+    const pendingBento = document.getElementById('dashPendingStatusBento')
     if (statusCards) statusCards.innerHTML = '<div class="dash-empty">No data</div>'
     if (statusTotal) statusTotal.textContent = '0'
     if (pendingPercent) pendingPercent.textContent = '0'
     if (pendingCount) pendingCount.textContent = '0'
     if (pendingTotal) pendingTotal.textContent = '0'
     if (pendingRing) pendingRing.style.setProperty('--pct', '0')
+    if (pendingBento) pendingBento.innerHTML = '<span class="dash-pending-empty">No data</span>'
     document.getElementById('dashResultInfo').innerHTML = ''
     document.getElementById('dashSync').textContent = 'Load failed'
   }

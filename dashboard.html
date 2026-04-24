@@ -216,6 +216,48 @@
       color: #2e2754;
       font-weight: 800;
     }
+    .dash-pending-breakdown {
+      width: 100%;
+      display: grid;
+      gap: 6px;
+      justify-items: center;
+    }
+    .dash-pending-breakdown-title {
+      font-size: 11px;
+      font-weight: 800;
+      color: #5f5a7b;
+      line-height: 1.2;
+    }
+    .dash-pending-bento {
+      width: 100%;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      justify-content: center;
+    }
+    .dash-pending-chip {
+      border: 1px solid #ddd6fb;
+      border-radius: 999px;
+      background: #f7f3ff;
+      color: #3b2e7a;
+      font-size: 10px;
+      font-weight: 800;
+      line-height: 1;
+      padding: 5px 8px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+    .dash-pending-chip b {
+      font-size: 11px;
+      color: #2a2464;
+    }
+    .dash-pending-empty {
+      font-size: 10px;
+      color: #7d779a;
+      font-weight: 700;
+    }
 
     .dash-kpis {
       display: grid;
@@ -733,10 +775,18 @@
       white-space: nowrap;
       letter-spacing: 0.01em;
     }
+    .dash-triple-row {
+      --trio-height: 420px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1fr);
+      gap: 12px;
+      align-items: stretch;
+    }
     .dash-smart-panel {
       padding: 12px;
-      min-height: 360px;
-      max-height: 420px;
+      min-height: var(--trio-height);
+      max-height: var(--trio-height);
+      height: var(--trio-height);
       display: grid;
       grid-template-rows: auto auto minmax(0, 1fr);
       gap: 8px;
@@ -777,11 +827,6 @@
       gap: 6px;
       list-style: none;
     }
-    .dash-bento-row {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-      gap: 12px;
-    }
     .dash-bento-panel {
       border: 1px solid var(--dash-border);
       border-radius: var(--dash-radius);
@@ -791,6 +836,11 @@
       min-width: 0;
       display: grid;
       gap: 10px;
+      min-height: var(--trio-height);
+      max-height: var(--trio-height);
+      height: var(--trio-height);
+      grid-template-rows: auto auto minmax(0, 1fr);
+      overflow: hidden;
     }
     .dash-bento-grid {
       display: grid;
@@ -833,11 +883,12 @@
       border: 1px solid #deebf7;
       border-radius: 12px;
       background: #fff;
-      max-height: 220px;
+      max-height: 100%;
       overflow: auto;
       padding: 6px;
       display: grid;
       gap: 6px;
+      min-height: 0;
     }
     .dash-bento-item {
       border: 1px solid #e4edf8;
@@ -2151,7 +2202,13 @@
       .dash-status-layout { grid-template-columns: 1fr; }
       .dash-pie-wrap { grid-template-columns: 1fr; }
       .dash-pie-left { justify-items: center; }
-      .dash-bento-row { grid-template-columns: 1fr; }
+      .dash-triple-row { grid-template-columns: 1fr; --trio-height: auto; }
+      .dash-smart-panel,
+      .dash-bento-panel {
+        min-height: auto;
+        max-height: none;
+        height: auto;
+      }
       .dash-main-grid { grid-template-columns: 1fr; }
       .dash-analysis-grid { grid-template-columns: 1fr; }
       .dash-status-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -2278,6 +2335,10 @@
               <strong id="dashPendingTotal">0</strong><br />
               Pending in Current Sprint
             </div>
+            <div class="dash-pending-breakdown">
+              <div class="dash-pending-breakdown-title">Status breakdown</div>
+              <div id="dashPendingStatusBento" class="dash-pending-bento"></div>
+            </div>
           </article>
         </div>
       </div>
@@ -2323,16 +2384,15 @@
       </section>
     </section>
 
-    <section class="dash-panel dash-smart-panel">
-      <div class="dash-smart-header">
-        <h4>Smart Reading: S7 ล่าสุด</h4>
-        <p class="dash-smart-sub">จัดกลุ่มตามวันที่ พร้อมนับจำนวน FEPMF ต่อวัน เพื่อดูภาพรวมงานที่ปิดล่าสุดแบบสั้น กระชับ และอ่านง่าย</p>
-      </div>
-      <p id="dashStatusSummary" class="dash-smart-count">-</p>
-      <ul id="dashStatusRecentList" class="dash-smart-list"></ul>
-    </section>
-
-    <section class="dash-bento-row">
+    <section class="dash-triple-row">
+      <article class="dash-panel dash-smart-panel">
+        <div class="dash-smart-header">
+          <h4>Smart Reading: S7 ล่าสุด</h4>
+          <p class="dash-smart-sub">จัดกลุ่มตามวันที่ พร้อมนับจำนวน FEPMF ต่อวัน เพื่อดูภาพรวมงานที่ปิดล่าสุดแบบสั้น กระชับ และอ่านง่าย</p>
+        </div>
+        <p id="dashStatusSummary" class="dash-smart-count">-</p>
+        <ul id="dashStatusRecentList" class="dash-smart-list"></ul>
+      </article>
       <article class="dash-bento-panel">
         <div class="dash-panel-head">
           <div>
@@ -2453,7 +2513,7 @@
     </div>
   </div>
 
-  <script src="/dashboard.js?v=20260424e"></script>
+  <script src="/dashboard.js?v=20260424f"></script>
 </body>
 </html>
 
