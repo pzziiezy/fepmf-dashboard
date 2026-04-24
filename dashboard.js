@@ -10,7 +10,11 @@
   businessPartners: [],
   statusView: 'bar',
   kpiModalStatus: null,
-  riskItcmTab: 'all'
+  riskItcmTab: 'all',
+  riskSort: { key: 'itcm', dir: 'asc' },
+  tableQuery: '',
+  partnerFocus: '',
+  typeFocus: ''
 }
 
 function esc(v) {
@@ -506,6 +510,105 @@ function renderSmartReading() {
 
   recentList.innerHTML = groupsHtml
 }
+
+function groupRowsByDimension(rows, accessor) {
+  const groups = new Map()
+  for (const row of rows) {
+    const vals = (accessor(row) || []).map((v) => String(v || '').trim()).filter(Boolean)
+    const labels = vals.length ? vals : ['Not specified']
+    for (const label of labels) {
+      if (!groups.has(label)) groups.set(label, [])
+      groups.get(label).push(row)
+    }
+  }
+  return [...groups.entries()]
+    .map(([label, list]) => ({ label, rows: list, count: list.length }))
+    .sort((a, b) => {
+      const aUnspecified = a.label === 'Not specified' ? 1 : 0
+      const bUnspecified = b.label === 'Not specified' ? 1 : 0
+      if (aUnspecified !== bUnspecified) return aUnspecified - bUnspecified
+      return (b.count - a.count) || a.label.localeCompare(b.label)
+    })
+}
+
+function renderBentoBlock(options) {
+  const {
+    rows,
+    groupAccessor,
+    focusKey,
+    focusStateKey,
+    totalId,
+    gridId,
+    listId
+  } = options
+  const totalNode = document.getElementById(totalId)
+  const gridNode = document.getElementById(gridId)
+  const listNode = document.getElementById(listId)
+  if (!totalNode || !gridNode || !listNode) return
+
+  totalNode.textContent = `${rows.length} FEPMF`
+  const groups = groupRowsByDimension(rows, groupAccessor)
+
+  if (!groups.length) {
+    gridNode.innerHTML = '<div class="dash-empty">No data</div>'
+    listNode.innerHTML = '<div class="dash-empty">ไม่พบ FEPMF ในเงื่อนไขนี้</div>'
+    state[focusStateKey] = ''
+    return
+  }
+
+  let activeLabel = focusKey
+  if (!groups.some((g) => g.label === activeLabel)) activeLabel = groups[0].label
+  state[focusStateKey] = activeLabel
+
+  gridNode.innerHTML = groups.map((group) => `
+    <button class="dash-bento-chip ${group.label === activeLabel ? 'active' : ''}" type="button" data-bento-kind="${esc(focusStateKey)}" data-bento-label="${esc(group.label)}">
+      <span class="dash-bento-label">${esc(group.label)}</span>
+      <span class="dash-bento-count">${esc(group.count)}</span>
+    </button>
+  `).join('')
+
+  const activeGroup = groups.find((g) => g.label === activeLabel) || groups[0]
+  const listRows = [...(activeGroup?.rows || [])]
+    .sort((a, b) => String(a.parent.key || '').localeCompare(String(b.parent.key || '')))
+
+  if (!listRows.length) {
+    listNode.innerHTML = '<div class="dash-empty">ไม่พบ FEPMF ในหมวดที่เลือก</div>'
+    return
+  }
+
+  listNode.innerHTML = listRows.map((row) => `
+    <article class="dash-bento-item">
+      <div class="dash-bento-item-top">
+        <a class="dash-bento-item-key" href="${esc(row.parent.browseUrl || '#')}" target="_blank" rel="noopener noreferrer">${esc(row.parent.key || '-')}</a>
+        <span>${esc(row.parent.status || '-')}</span>
+      </div>
+      <div class="dash-bento-item-summary">${esc(row.parent.summary || '-')}</div>
+    </article>
+  `).join('')
+}
+
+function renderBusinessBentoSections() {
+  const rows = state.rows || []
+  renderBentoBlock({
+    rows,
+    groupAccessor: (row) => row.derived.businessPartners || [],
+    focusKey: state.partnerFocus,
+    focusStateKey: 'partnerFocus',
+    totalId: 'dashPartnerTotal',
+    gridId: 'dashPartnerBentoGrid',
+    listId: 'dashPartnerList'
+  })
+  renderBentoBlock({
+    rows,
+    groupAccessor: (row) => row.derived.businessTypes || [],
+    focusKey: state.typeFocus,
+    focusStateKey: 'typeFocus',
+    totalId: 'dashTypeTotal',
+    gridId: 'dashTypeBentoGrid',
+    listId: 'dashTypeList'
+  })
+}
+
 function renderCompareAnalysis() {
   const host = document.getElementById('dashCompareAnalysis')
   const compareMeta = document.getElementById('dashCompareMeta')
@@ -706,6 +809,19 @@ function normalizeItcmStatus(value) {
   return text || 'Unknown'
 }
 
+function riskSortValue(item, key) {
+  if (key === 'itcm') return String(item.key || '').toLowerCase()
+  if (key === 'summary') return String(item.summary || '').toLowerCase()
+  if (key === 'status') return String(item.status || '').toLowerCase()
+  if (key === 'fepmf') return String(item.parentKey || '').toLowerCase()
+  if (key === 'squad') return String(item.squad || '').toLowerCase()
+  if (key === 'cabDate') {
+    const d = safeDate(`${item.cabDate || ''}T00:00:00Z`)
+    return d ? d.getTime() : Number.POSITIVE_INFINITY
+  }
+  return ''
+}
+
 function renderRiskByItcmStatus(rows) {
   const host = document.getElementById('dashRisk')
   const tabsHost = document.getElementById('dashRiskTabs')
@@ -728,7 +844,6 @@ function renderRiskByItcmStatus(rows) {
         parentUrl: row.parent.browseUrl || '#',
         squad: row.parent.squad || '-',
         cabDate: row.parent.cabDate || '',
-        compare: compareLabel(row.derived.compareType),
         progressPercent: Number(row.progressPercent || 0)
       })
     }
@@ -782,23 +897,47 @@ function renderRiskByItcmStatus(rows) {
     return
   }
 
-  const sortedRows = [...tabRows].sort((a, b) => String(a.key || '').localeCompare(String(b.key || '')))
-  host.innerHTML = sortedRows.map((item) => `
-      <article class="dash-item">
-        <div class="dash-item-top">
-          <a class="dash-item-key" href="${esc(item.browseUrl)}" target="_blank" rel="noopener noreferrer">${esc(item.key)}</a>
-          <span class="dash-itcm-pill">${esc(item.status)}</span>
-        </div>
-        <div class="dash-item-summary">${esc(item.summary || '-')}</div>
-        <div class="dash-item-meta">
-          <span>FEPMF: <a href="${esc(item.parentUrl)}" target="_blank" rel="noopener noreferrer">${esc(item.parentKey)}</a></span>
-          <span>Squad: ${esc(item.squad)}</span>
-          <span>CAB: ${esc(formatDate(item.cabDate))}</span>
-          <span>Compare: ${esc(item.compare)}</span>
-        </div>
-        <div class="dash-item-bar"><div style="width:${Math.max(0, Math.min(100, item.progressPercent || 0))}%"></div></div>
-      </article>
-    `).join('')
+  if (!state.riskSort) state.riskSort = { key: 'itcm', dir: 'asc' }
+  const sortedRows = [...tabRows].sort((a, b) => {
+    const av = riskSortValue(a, state.riskSort.key)
+    const bv = riskSortValue(b, state.riskSort.key)
+    if (av < bv) return state.riskSort.dir === 'asc' ? -1 : 1
+    if (av > bv) return state.riskSort.dir === 'asc' ? 1 : -1
+    return String(a.key || '').localeCompare(String(b.key || ''))
+  })
+
+  const sortIcon = (key) => {
+    if (state.riskSort.key !== key) return '↕'
+    return state.riskSort.dir === 'asc' ? '↑' : '↓'
+  }
+
+  host.className = 'dash-table-wrap'
+  host.innerHTML = `
+    <table class="dash-table dash-risk-table">
+      <thead>
+        <tr>
+          <th><button class="dash-sort-btn ${state.riskSort.key === 'itcm' ? 'active' : ''}" type="button" data-risk-sort-key="itcm"><span>ITCM</span><span class="dash-sort-icon">${sortIcon('itcm')}</span></button></th>
+          <th><button class="dash-sort-btn ${state.riskSort.key === 'summary' ? 'active' : ''}" type="button" data-risk-sort-key="summary"><span>Summary</span><span class="dash-sort-icon">${sortIcon('summary')}</span></button></th>
+          <th><button class="dash-sort-btn ${state.riskSort.key === 'status' ? 'active' : ''}" type="button" data-risk-sort-key="status"><span>ITCM Status</span><span class="dash-sort-icon">${sortIcon('status')}</span></button></th>
+          <th><button class="dash-sort-btn ${state.riskSort.key === 'fepmf' ? 'active' : ''}" type="button" data-risk-sort-key="fepmf"><span>FEPMF</span><span class="dash-sort-icon">${sortIcon('fepmf')}</span></button></th>
+          <th><button class="dash-sort-btn ${state.riskSort.key === 'squad' ? 'active' : ''}" type="button" data-risk-sort-key="squad"><span>Squad</span><span class="dash-sort-icon">${sortIcon('squad')}</span></button></th>
+          <th><button class="dash-sort-btn ${state.riskSort.key === 'cabDate' ? 'active' : ''}" type="button" data-risk-sort-key="cabDate"><span>CAB Date</span><span class="dash-sort-icon">${sortIcon('cabDate')}</span></button></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${sortedRows.map((item) => `
+          <tr>
+            <td><a class="dash-item-key" href="${esc(item.browseUrl)}" target="_blank" rel="noopener noreferrer">${esc(item.key)}</a></td>
+            <td>${esc(item.summary || '-')}</td>
+            <td><span class="dash-itcm-pill">${esc(item.status)}</span></td>
+            <td><a class="dash-item-key" href="${esc(item.parentUrl)}" target="_blank" rel="noopener noreferrer">${esc(item.parentKey)}</a></td>
+            <td>${esc(item.squad || '-')}</td>
+            <td>${esc(formatDate(item.cabDate))}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `
 }
 
 function cabDateObj(value) {
@@ -991,12 +1130,21 @@ function closeStatusModal() {
   document.body.classList.remove('modal-open')
 }
 
+function applyTableKeywordFilter(rows) {
+  const terms = String(state.tableQuery || '').trim().toLowerCase().split(/\s+/).filter(Boolean)
+  if (!terms.length) return rows
+  return rows.filter((row) => {
+    const blob = rowBlob(row)
+    return terms.every((term) => blob.includes(term))
+  })
+}
+
 function renderTable() {
   const host = document.getElementById('dashRows')
-  const rows = state.rows || []
+  const rows = applyTableKeywordFilter(state.rows || [])
   if (!state.tableSort) state.tableSort = { key: 'fepmf', dir: 'asc' }
   if (!rows.length) {
-    host.innerHTML = '<tr><td colspan="12" class="dash-empty">No result found</td></tr>'
+    host.innerHTML = '<tr><td colspan="12" class="dash-empty">No table match found</td></tr>'
     updateTableSortHeaders()
     return
   }
@@ -1024,6 +1172,7 @@ function renderHighlights() {
 
 function renderResultSummary() {
   const rows = state.rows || []
+  const tableRows = applyTableKeywordFilter(rows)
   const host = document.getElementById('dashResultInfo')
 
   const withItcm = rows.filter((row) => row.derived.itcmKeys.length).length
@@ -1031,6 +1180,7 @@ function renderResultSummary() {
 
   host.innerHTML = `
     <span class="dash-chip">Results: ${esc(rows.length)}</span>
+    <span class="dash-chip">Table Match: ${esc(tableRows.length)}</span>
     <span class="dash-chip">With ITCM: ${esc(withItcm)}</span>
     <span class="dash-chip">Comparable Sprint: ${esc(comparable)}</span>
   `
@@ -1042,6 +1192,7 @@ function renderAll() {
   renderCurrentSprintPendingMetric()
   renderStatusBars()
   renderSmartReading()
+  renderBusinessBentoSections()
   renderCompareAnalysis()
   renderStatusKpiCards()
   renderHighlights()
@@ -1178,6 +1329,14 @@ function bindEvents() {
     state.query = event.target.value || ''
     renderAll()
   })
+  const tableSearch = document.getElementById('dashTableSearch')
+  if (tableSearch) {
+    tableSearch.addEventListener('input', (event) => {
+      state.tableQuery = event.target.value || ''
+      renderTable()
+      renderResultSummary()
+    })
+  }
 
   document.getElementById('dashStatusAll').addEventListener('change', (event) => {
     if (!event.target.checked) return
@@ -1269,11 +1428,16 @@ function bindEvents() {
     state.compareSelections = []
     state.businessTypes = []
     state.businessPartners = []
+    state.tableQuery = ''
+    state.partnerFocus = ''
+    state.typeFocus = ''
     document.getElementById('dashSearch').value = ''
     document.getElementById('dashStatusSearch').value = ''
     document.getElementById('dashCompareSearch').value = ''
     document.getElementById('dashBusinessTypeSearch').value = ''
     document.getElementById('dashBusinessPartnerSearch').value = ''
+    const tableSearch = document.getElementById('dashTableSearch')
+    if (tableSearch) tableSearch.value = ''
     renderStatusOptions()
     renderCompareOptions()
     renderBusinessFilters()
@@ -1320,6 +1484,33 @@ function bindEvents() {
       if (!btn) return
       state.riskItcmTab = btn.getAttribute('data-tab') || 'all'
       renderHighlights()
+    })
+  }
+  document.addEventListener('click', (event) => {
+    const bento = event.target.closest('[data-bento-kind][data-bento-label]')
+    if (!bento) return
+    const kind = bento.getAttribute('data-bento-kind')
+    const label = bento.getAttribute('data-bento-label') || ''
+    if (!kind) return
+    if (kind === 'partnerFocus') state.partnerFocus = label
+    if (kind === 'typeFocus') state.typeFocus = label
+    renderBusinessBentoSections()
+  })
+  const riskHost = document.getElementById('dashRisk')
+  if (riskHost) {
+    riskHost.addEventListener('click', (event) => {
+      const btn = event.target.closest('[data-risk-sort-key]')
+      if (!btn) return
+      const key = btn.getAttribute('data-risk-sort-key')
+      if (!key) return
+      if (!state.riskSort) state.riskSort = { key: 'itcm', dir: 'asc' }
+      if (state.riskSort.key === key) {
+        state.riskSort.dir = state.riskSort.dir === 'asc' ? 'desc' : 'asc'
+      } else {
+        state.riskSort.key = key
+        state.riskSort.dir = 'asc'
+      }
+      renderRiskByItcmStatus(state.rows || [])
     })
   }
   document.addEventListener('click', (event) => {
