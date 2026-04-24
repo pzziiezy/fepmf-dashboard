@@ -9,7 +9,8 @@
   businessTypes: [],
   businessPartners: [],
   statusView: 'bar',
-  kpiModalStatus: null
+  kpiModalStatus: null,
+  riskItcmTab: 'all'
 }
 
 function esc(v) {
@@ -375,9 +376,7 @@ function renderStatusBars() {
       item.addEventListener('mouseleave', clearFocus)
     })
 
-    meta.innerHTML = rowsByCount.slice(0, 4).map((item) => `
-      <span class="dash-chip">${esc(item.status)}: ${esc(item.count)}</span>
-    `).join('')
+    meta.innerHTML = ''
     return
   }
 
@@ -702,6 +701,96 @@ function renderList(hostId, rows, emptyText) {
   }).join('')
 }
 
+function normalizeItcmStatus(value) {
+  const text = String(value || '').trim()
+  return text || 'Unknown'
+}
+
+function renderRiskByItcmStatus(rows) {
+  const host = document.getElementById('dashRisk')
+  const tabsHost = document.getElementById('dashRiskTabs')
+  const countChip = document.getElementById('dashRiskCount')
+  if (!host || !tabsHost || !countChip) return
+
+  const withItcm = rows.filter((row) => row.derived.itcmKeys.length > 0)
+  if (!withItcm.length) {
+    tabsHost.innerHTML = '<button class="dash-risk-tab active" type="button" data-tab="all">All (0)</button>'
+    countChip.textContent = '0 FEPMF'
+    host.innerHTML = '<div class="dash-empty">ไม่พบ FEPMF ที่มี Child เป็น ITCM ในเงื่อนไขที่เลือก</div>'
+    state.riskItcmTab = 'all'
+    return
+  }
+
+  const statusBuckets = new Map()
+  for (const row of withItcm) {
+    const statuses = [...new Set((row.derived.itcmStatuses || []).map(normalizeItcmStatus))]
+    const useStatuses = statuses.length ? statuses : ['Unknown']
+    for (const status of useStatuses) {
+      if (!statusBuckets.has(status)) statusBuckets.set(status, [])
+      statusBuckets.get(status).push(row)
+    }
+  }
+
+  const orderedStatuses = [...statusBuckets.entries()]
+    .sort((a, b) => (b[1].length - a[1].length) || String(a[0]).localeCompare(String(b[0])))
+    .map(([status]) => status)
+
+  const tabDefs = [
+    { key: 'all', label: 'All', count: withItcm.length },
+    ...orderedStatuses.map((status) => ({ key: status, label: status, count: (statusBuckets.get(status) || []).length }))
+  ]
+
+  if (!tabDefs.some((tab) => tab.key === state.riskItcmTab)) {
+    state.riskItcmTab = 'all'
+  }
+
+  tabsHost.innerHTML = tabDefs.map((tab) => `
+    <button
+      class="dash-risk-tab ${state.riskItcmTab === tab.key ? 'active' : ''}"
+      type="button"
+      data-tab="${esc(tab.key)}"
+      title="${esc(tab.label)}"
+    >${esc(tab.label)} (${esc(tab.count)})</button>
+  `).join('')
+
+  const tabRows = state.riskItcmTab === 'all'
+    ? withItcm
+    : (statusBuckets.get(state.riskItcmTab) || [])
+
+  countChip.textContent = `${tabRows.length} FEPMF`
+  if (!tabRows.length) {
+    host.innerHTML = `<div class="dash-empty">ไม่พบ FEPMF ที่มี ITCM Status: ${esc(state.riskItcmTab)}</div>`
+    return
+  }
+
+  const sortedRows = [...tabRows].sort((a, b) => String(a.parent.key || '').localeCompare(String(b.parent.key || '')))
+  host.innerHTML = sortedRows.map((row) => {
+    const itcmKeys = row.derived.itcmKeys || []
+    const keyText = itcmKeys.length > 2
+      ? `${itcmKeys.slice(0, 2).join(', ')} +${itcmKeys.length - 2}`
+      : (itcmKeys.join(', ') || '-')
+    const statuses = [...new Set((row.derived.itcmStatuses || []).map(normalizeItcmStatus))]
+    const statusText = statuses.join(', ') || 'Unknown'
+    const topStatus = state.riskItcmTab === 'all' ? (statuses[0] || 'Unknown') : state.riskItcmTab
+    return `
+      <article class="dash-item">
+        <div class="dash-item-top">
+          <a class="dash-item-key" href="${esc(row.parent.browseUrl)}" target="_blank" rel="noopener noreferrer">${esc(row.parent.key)}</a>
+          <span class="dash-itcm-pill">${esc(topStatus)}</span>
+        </div>
+        <div class="dash-item-summary">${esc(row.parent.summary || '-')}</div>
+        <div class="dash-item-meta">
+          <span>Squad: ${esc(row.parent.squad || '-')}</span>
+          <span>CAB: ${esc(formatDate(row.parent.cabDate))}</span>
+          <span>ITCM: ${esc(keyText)}</span>
+          <span>ITCM Status: ${esc(statusText)}</span>
+        </div>
+        <div class="dash-item-bar"><div style="width:${Math.max(0, Math.min(100, row.progressPercent || 0))}%"></div></div>
+      </article>
+    `
+  }).join('')
+}
+
 function cabDateObj(value) {
   if (!value) return null
   const d = new Date(`${value}T00:00:00`)
@@ -919,15 +1008,7 @@ function renderTable() {
 
 function renderHighlights() {
   const rows = state.rows || []
-  const riskRows = [...rows]
-    .sort((a, b) => {
-      const scoreA = (a.progressPercent || 0) - (a.linkedCount || 0) * 4
-      const scoreB = (b.progressPercent || 0) - (b.linkedCount || 0) * 4
-      return scoreA - scoreB
-    })
-    .slice(0, 8)
-
-  renderList('dashRisk', riskRows, 'ไม่พบรายการความเสี่ยงในเงื่อนไขที่เลือก')
+  renderRiskByItcmStatus(rows)
   renderUpcomingCabCards(rows)
 }
 
@@ -1220,6 +1301,15 @@ function bindEvents() {
     pieBtn.addEventListener('click', () => {
       state.statusView = 'pie'
       renderStatusBars()
+    })
+  }
+  const riskTabs = document.getElementById('dashRiskTabs')
+  if (riskTabs) {
+    riskTabs.addEventListener('click', (event) => {
+      const btn = event.target.closest('.dash-risk-tab[data-tab]')
+      if (!btn) return
+      state.riskItcmTab = btn.getAttribute('data-tab') || 'all'
+      renderHighlights()
     })
   }
   document.addEventListener('click', (event) => {
