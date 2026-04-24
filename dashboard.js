@@ -712,23 +712,42 @@ function renderRiskByItcmStatus(rows) {
   const countChip = document.getElementById('dashRiskCount')
   if (!host || !tabsHost || !countChip) return
 
-  const withItcm = rows.filter((row) => row.derived.itcmKeys.length > 0)
-  if (!withItcm.length) {
+  const itcmMap = new Map()
+  for (const row of rows) {
+    const items = itcmItems(row)
+    for (const item of items) {
+      const key = String(item?.key || '').trim()
+      if (!key) continue
+      if (itcmMap.has(key)) continue
+      itcmMap.set(key, {
+        key,
+        summary: item?.summary || '',
+        status: normalizeItcmStatus(item?.status),
+        browseUrl: item?.browseUrl || (key ? `https://dgtbigc.atlassian.net/browse/${key}` : '#'),
+        parentKey: row.parent.key || '-',
+        parentUrl: row.parent.browseUrl || '#',
+        squad: row.parent.squad || '-',
+        cabDate: row.parent.cabDate || '',
+        compare: compareLabel(row.derived.compareType),
+        progressPercent: Number(row.progressPercent || 0)
+      })
+    }
+  }
+
+  const allItcms = [...itcmMap.values()]
+  if (!allItcms.length) {
     tabsHost.innerHTML = '<button class="dash-risk-tab active" type="button" data-tab="all">All (0)</button>'
-    countChip.textContent = '0 FEPMF'
-    host.innerHTML = '<div class="dash-empty">ไม่พบ FEPMF ที่มี Child เป็น ITCM ในเงื่อนไขที่เลือก</div>'
+    countChip.textContent = '0 ITCM'
+    host.innerHTML = '<div class="dash-empty">ไม่พบรายการ ITCM ในเงื่อนไขที่เลือก</div>'
     state.riskItcmTab = 'all'
     return
   }
 
   const statusBuckets = new Map()
-  for (const row of withItcm) {
-    const statuses = [...new Set((row.derived.itcmStatuses || []).map(normalizeItcmStatus))]
-    const useStatuses = statuses.length ? statuses : ['Unknown']
-    for (const status of useStatuses) {
-      if (!statusBuckets.has(status)) statusBuckets.set(status, [])
-      statusBuckets.get(status).push(row)
-    }
+  for (const item of allItcms) {
+    const status = item.status || 'Unknown'
+    if (!statusBuckets.has(status)) statusBuckets.set(status, [])
+    statusBuckets.get(status).push(item)
   }
 
   const orderedStatuses = [...statusBuckets.entries()]
@@ -736,7 +755,7 @@ function renderRiskByItcmStatus(rows) {
     .map(([status]) => status)
 
   const tabDefs = [
-    { key: 'all', label: 'All', count: withItcm.length },
+    { key: 'all', label: 'All', count: allItcms.length },
     ...orderedStatuses.map((status) => ({ key: status, label: status, count: (statusBuckets.get(status) || []).length }))
   ]
 
@@ -754,41 +773,32 @@ function renderRiskByItcmStatus(rows) {
   `).join('')
 
   const tabRows = state.riskItcmTab === 'all'
-    ? withItcm
+    ? allItcms
     : (statusBuckets.get(state.riskItcmTab) || [])
 
-  countChip.textContent = `${tabRows.length} FEPMF`
+  countChip.textContent = `${tabRows.length} ITCM`
   if (!tabRows.length) {
-    host.innerHTML = `<div class="dash-empty">ไม่พบ FEPMF ที่มี ITCM Status: ${esc(state.riskItcmTab)}</div>`
+    host.innerHTML = `<div class="dash-empty">ไม่พบรายการ ITCM ที่มีสถานะ: ${esc(state.riskItcmTab)}</div>`
     return
   }
 
-  const sortedRows = [...tabRows].sort((a, b) => String(a.parent.key || '').localeCompare(String(b.parent.key || '')))
-  host.innerHTML = sortedRows.map((row) => {
-    const itcmKeys = row.derived.itcmKeys || []
-    const keyText = itcmKeys.length > 2
-      ? `${itcmKeys.slice(0, 2).join(', ')} +${itcmKeys.length - 2}`
-      : (itcmKeys.join(', ') || '-')
-    const statuses = [...new Set((row.derived.itcmStatuses || []).map(normalizeItcmStatus))]
-    const statusText = statuses.join(', ') || 'Unknown'
-    const topStatus = state.riskItcmTab === 'all' ? (statuses[0] || 'Unknown') : state.riskItcmTab
-    return `
+  const sortedRows = [...tabRows].sort((a, b) => String(a.key || '').localeCompare(String(b.key || '')))
+  host.innerHTML = sortedRows.map((item) => `
       <article class="dash-item">
         <div class="dash-item-top">
-          <a class="dash-item-key" href="${esc(row.parent.browseUrl)}" target="_blank" rel="noopener noreferrer">${esc(row.parent.key)}</a>
-          <span class="dash-itcm-pill">${esc(topStatus)}</span>
+          <a class="dash-item-key" href="${esc(item.browseUrl)}" target="_blank" rel="noopener noreferrer">${esc(item.key)}</a>
+          <span class="dash-itcm-pill">${esc(item.status)}</span>
         </div>
-        <div class="dash-item-summary">${esc(row.parent.summary || '-')}</div>
+        <div class="dash-item-summary">${esc(item.summary || '-')}</div>
         <div class="dash-item-meta">
-          <span>Squad: ${esc(row.parent.squad || '-')}</span>
-          <span>CAB: ${esc(formatDate(row.parent.cabDate))}</span>
-          <span>ITCM: ${esc(keyText)}</span>
-          <span>ITCM Status: ${esc(statusText)}</span>
+          <span>FEPMF: <a href="${esc(item.parentUrl)}" target="_blank" rel="noopener noreferrer">${esc(item.parentKey)}</a></span>
+          <span>Squad: ${esc(item.squad)}</span>
+          <span>CAB: ${esc(formatDate(item.cabDate))}</span>
+          <span>Compare: ${esc(item.compare)}</span>
         </div>
-        <div class="dash-item-bar"><div style="width:${Math.max(0, Math.min(100, row.progressPercent || 0))}%"></div></div>
+        <div class="dash-item-bar"><div style="width:${Math.max(0, Math.min(100, item.progressPercent || 0))}%"></div></div>
       </article>
-    `
-  }).join('')
+    `).join('')
 }
 
 function cabDateObj(value) {
