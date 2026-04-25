@@ -314,14 +314,14 @@ function renderStatusBars() {
 
   if (state.statusView === 'pie') {
     const total = rowsByCount.reduce((sum, item) => sum + item.count, 0) || 1
-    const radius = 70
+    const radius = 72
     const c = 2 * Math.PI * radius
-    const gapPct = 1.5
+    const gapPct = 3.2
 
     let currentPct = 0
     const slices = rowsByCount.map((item, index) => {
       const pct = (item.count / total) * 100
-      const usablePct = Math.max(0.6, pct - gapPct)
+      const usablePct = Math.max(0.8, pct - gapPct)
       const length = (usablePct / 100) * c
       const offset = -((currentPct + gapPct / 2) / 100) * c
       currentPct += pct
@@ -351,23 +351,21 @@ function renderStatusBars() {
                 data-idx="${idx}"
               ></circle>
             `).join('')}
-            <text id="dashPieCenterMain" x="100" y="97" text-anchor="middle"
-                  font-family="Manrope,sans-serif" font-size="28" font-weight="800"
-                  fill="#111827">${total}</text>
-            <text id="dashPieCenterLabel" x="100" y="115" text-anchor="middle"
-                  font-family="Manrope,sans-serif" font-size="9" font-weight="700"
-                  fill="#9ca3af" letter-spacing="0.8">TOTAL FEPMF</text>
           </svg>
+          <div id="dashPieFocus" class="dash-pie-focus">
+            <div class="dash-pie-focus-top">
+              <span id="dashPieFocusMark" class="dash-pie-focus-mark"></span>
+              <span id="dashPieFocusValue">0.0%</span>
+            </div>
+            <div id="dashPieFocusSub" class="dash-pie-focus-sub">-</div>
+          </div>
         </div>
         <div class="dash-pie-legend">
           ${slices.map((slice, idx) => `
             <article class="dash-pie-item" data-idx="${idx}">
-              <div class="dash-pie-swatch" style="background:${slice.color}"></div>
+              <span class="dash-pie-icon" style="border-color:${slice.color};color:${slice.color}">${esc(String(slice.status).slice(0, 2).toUpperCase())}</span>
               <div class="dash-pie-copy">
                 <div class="dash-pie-name">${esc(slice.status)}</div>
-                <div class="dash-pie-bar-wrap">
-                  <div class="dash-pie-bar" style="width:${slice.pct.toFixed(1)}%;background:${slice.color}"></div>
-                </div>
               </div>
               <div class="dash-pie-stat">
                 <div class="dash-pie-value">${slice.pct.toFixed(1)}%</div>
@@ -379,28 +377,23 @@ function renderStatusBars() {
       </div>
     `
 
-    const centerMainEl = host.querySelector('#dashPieCenterMain')
-    const centerLabelEl = host.querySelector('#dashPieCenterLabel')
+    const focusEl = host.querySelector('#dashPieFocus')
+    const focusMarkEl = host.querySelector('#dashPieFocusMark')
+    const focusValueEl = host.querySelector('#dashPieFocusValue')
+    const focusSubEl = host.querySelector('#dashPieFocusSub')
     const segs = host.querySelectorAll('.dash-pie-seg')
     const items = host.querySelectorAll('.dash-pie-item')
 
     const applyFocus = (idx) => {
       const slice = slices[idx]
-      if (!slice) return
-      if (centerMainEl) centerMainEl.textContent = `${slice.pct.toFixed(1)}%`
-      if (centerLabelEl) centerLabelEl.textContent = `${slice.status} · ${slice.count}`
-      segs.forEach((s, i) => {
-        s.classList.toggle('dimmed', i !== idx)
-        s.classList.toggle('active', i === idx)
-      })
-      items.forEach((it, i) => it.classList.toggle('active', i === idx))
+      if (!slice || !focusEl || !focusMarkEl || !focusValueEl || !focusSubEl) return
+      focusMarkEl.style.background = slice.color
+      focusValueEl.textContent = `${slice.pct.toFixed(1)}%`
+      focusSubEl.textContent = `${slice.status} | ${slice.count} FEPMF`
+      focusEl.classList.add('active')
     }
-
     const clearFocus = () => {
-      if (centerMainEl) centerMainEl.textContent = String(total)
-      if (centerLabelEl) centerLabelEl.textContent = 'TOTAL FEPMF'
-      segs.forEach((s) => { s.classList.remove('dimmed', 'active') })
-      items.forEach((it) => it.classList.remove('active'))
+      if (focusEl) focusEl.classList.remove('active')
     }
 
     segs.forEach((seg) => {
@@ -482,8 +475,8 @@ function renderSmartReading() {
   const totalDates = dateKeys.filter((k) => k !== 'unknown').length
   summary.textContent = `ตั้งแต่ ${windowLabel}: ${totalRows} งาน ครอบคลุม ${totalDates} วันที่มีการเปลี่ยนสถานะเป็น S7`
 
-  const greenShades = ['#064e3b', '#065f46', '#047857', '#059669', '#0d9488', '#0e7490']
-  const groupsHtml = dateKeys.map((dateKey) => {
+  const accent = ['#2f74de', '#2aa0bf', '#7b64e2', '#e15893', '#ef8b3a', '#4e9e55']
+  const groupsHtml = dateKeys.map((dateKey, groupIndex) => {
     const items = grouped.get(dateKey) || []
     const byKey = new Map()
     for (const item of items) {
@@ -510,7 +503,7 @@ function renderSmartReading() {
           <span class="dash-smart-count-chip">${uniqueRows.length} FEPMF</span>
         </div>
         <div class="dash-smart-items">
-          ${uniqueRows.map((item) => {
+          ${uniqueRows.map((item, itemIndex) => {
             const url = item.browseUrl || `https://dgtbigc.atlassian.net/browse/${item.key}`
             const squad = item.squad || 'No Squad'
             const updated = safeDate(item.updated)
@@ -518,20 +511,21 @@ function renderSmartReading() {
               ? updated.toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' })
               : '-'
             const summaryText = item.summary || '-'
-            const initials = squad.replace(/\s+/g, '').slice(0, 2).toUpperCase()
-            const squadHash = squad.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
-            const avatarBg = greenShades[squadHash % greenShades.length]
+            const color = accent[(groupIndex + itemIndex) % accent.length]
+            const avatarText = String(squad || item.key || 'F').replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase() || 'F'
             return `
-              <div class="dash-smart-mini">
-                <div class="dash-smart-mini-avatar" style="--avatar-bg:${avatarBg}">${esc(initials)}</div>
-                <div class="dash-smart-mini-meta">
-                  <a class="dash-smart-mini-key" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(item.key)}</a>
-                  <span class="dash-smart-mini-squad">${esc(squad)}</span>
-                  <span class="dash-smart-mini-time">${esc(timeText)}</span>
+              <article class="dash-smart-note" style="--smart-accent:${color}">
+                <span class="dash-smart-avatar">${esc(avatarText)}</span>
+                <div class="dash-smart-note-main">
+                  <div class="dash-smart-note-top">
+                    <a class="dash-smart-mini-key" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(item.key)}</a>
+                    <span class="dash-smart-mini-squad">${esc(squad)}</span>
+                    <span class="dash-smart-mini-time">${esc(timeText)}</span>
+                  </div>
+                  <div class="dash-smart-mini-summary">${esc(summaryText)}</div>
                 </div>
-                <span class="dash-smart-mini-summary">${esc(summaryText)}</span>
-                <a class="dash-smart-mini-open" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Open</a>
-              </div>
+                <a class="dash-smart-open-btn" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Open</a>
+              </article>
             `
           }).join('')}
         </div>
