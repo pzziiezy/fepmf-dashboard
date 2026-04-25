@@ -10,13 +10,20 @@
   businessPartners: [],
   statusView: 'bar',
   kpiModalStatus: null,
+  kpiModalSort: { key: 'fepmf', dir: 'asc' },
   riskItcmTab: 'all',
   riskSort: { key: 'itcm', dir: 'asc' },
   tableQuery: '',
-  partnerFocus: '',
-  typeFocus: '',
+  partnerFocus: 'ALL',
+  typeFocus: 'ALL',
   partnerSort: { key: 'fepmf', dir: 'asc' },
-  typeSort: { key: 'fepmf', dir: 'asc' }
+  typeSort: { key: 'fepmf', dir: 'asc' },
+  bizDateSort: { key: 'evaluate', dir: 'asc' },
+  bizDateQuery: '',
+  smartDateFrom: '',
+  smartDateTo: '',
+  partnerViz: 'pie',
+  typeViz: 'pie'
 }
 
 function esc(v) {
@@ -45,6 +52,23 @@ function dateKeyBkk(value) {
     month: '2-digit',
     day: '2-digit'
   }).format(d)
+}
+
+function todayIsoLocal() {
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = String(now.getMonth() + 1).padStart(2, '0')
+  const d = String(now.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+function firstDayPrevMonthIsoLocal() {
+  const now = new Date()
+  const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+  const y = prevMonthDate.getFullYear()
+  const m = String(prevMonthDate.getMonth() + 1).padStart(2, '0')
+  const d = String(prevMonthDate.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }
 
 function badgeClass(status) {
@@ -95,6 +119,16 @@ function isS7Status(status) {
   return String(status || '').trim().toUpperCase().startsWith('S7')
 }
 
+function isCompletedCurrentSprintStatus(status) {
+  const text = String(status || '').trim().toUpperCase()
+  return text.startsWith('S6') || text.startsWith('S7')
+}
+
+function isCancelledStatus(status) {
+  const text = String(status || '').trim().toUpperCase()
+  return text === 'CANCELLED' || text === 'CANCELED'
+}
+
 function compareLabel(type) {
   if (type === 'equal') return 'Equal'
   if (type === 'early') return 'Actual เร็วกว่า'
@@ -142,6 +176,7 @@ function rowBlob(row) {
     ...row.derived.businessPartners,
     ...row.derived.itcmKeys,
     ...row.derived.itcmStatuses,
+    row.parent.businessDate,
     ...(row.workItems || []).flatMap((item) => [item.key, item.summary, item.status, item.assignee])
   ].join(' ').toLowerCase()
 }
@@ -238,7 +273,7 @@ function renderCurrentSprintPendingMetric() {
   }
 
   const currentSprintRows = rows.filter((row) => row.derived.actualNum === currentSprintNum)
-  const pendingRows = currentSprintRows.filter((row) => !isS7Status(row.parent.status))
+  const pendingRows = currentSprintRows.filter((row) => !isCompletedCurrentSprintStatus(row.parent.status))
   const totalCurrent = currentSprintRows.length
   const pendingCount = pendingRows.length
   const pct = totalCurrent ? Math.round((pendingCount / totalCurrent) * 100) : 0
@@ -267,6 +302,48 @@ function renderCurrentSprintPendingMetric() {
       `).join('')
     }
   }
+}
+
+function hexToRgb(color) {
+  const text = String(color || '').trim()
+  const hex = text.startsWith('#') ? text.slice(1) : text
+  if (!/^[0-9a-f]{6}$/i.test(hex)) return { r: 90, g: 120, b: 170 }
+  return {
+    r: Number.parseInt(hex.slice(0, 2), 16),
+    g: Number.parseInt(hex.slice(2, 4), 16),
+    b: Number.parseInt(hex.slice(4, 6), 16)
+  }
+}
+
+function rgbToHex({ r, g, b }) {
+  const toHex = (v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`
+}
+
+function mixColor(baseColor, targetColor, ratio) {
+  const a = hexToRgb(baseColor)
+  const b = hexToRgb(targetColor)
+  const t = Math.max(0, Math.min(1, Number(ratio) || 0))
+  return rgbToHex({
+    r: a.r + (b.r - a.r) * t,
+    g: a.g + (b.g - a.g) * t,
+    b: a.b + (b.b - a.b) * t
+  })
+}
+
+function polarPoint(cx, cy, radius, angleDeg) {
+  const rad = (angleDeg * Math.PI) / 180
+  return {
+    x: cx + radius * Math.cos(rad),
+    y: cy + radius * Math.sin(rad)
+  }
+}
+
+function pieSlicePath(cx, cy, radius, startDeg, endDeg) {
+  const start = polarPoint(cx, cy, radius, startDeg)
+  const end = polarPoint(cx, cy, radius, endDeg)
+  const largeArc = endDeg - startDeg > 180 ? 1 : 0
+  return `M ${cx} ${cy} L ${start.x.toFixed(2)} ${start.y.toFixed(2)} A ${radius} ${radius} 0 ${largeArc} 1 ${end.x.toFixed(2)} ${end.y.toFixed(2)} Z`
 }
 
 function renderStatusBars() {
@@ -299,14 +376,14 @@ function renderStatusBars() {
   }
 
   const palette = [
-    { bar: 'linear-gradient(180deg,#6eb8ff 0%,#2b72de 100%)', pie: '#2b72de' },
-    { bar: 'linear-gradient(180deg,#79d9d1 0%,#2a93b8 100%)', pie: '#2a93b8' },
-    { bar: 'linear-gradient(180deg,#8ca8ff 0%,#4f69df 100%)', pie: '#4f69df' },
-    { bar: 'linear-gradient(180deg,#ff9cc2 0%,#e35493 100%)', pie: '#e35493' },
-    { bar: 'linear-gradient(180deg,#ffc28f 0%,#f08337 100%)', pie: '#f08337' },
-    { bar: 'linear-gradient(180deg,#b8df89 0%,#62a83b 100%)', pie: '#62a83b' },
-    { bar: 'linear-gradient(180deg,#cfb6ff 0%,#7a5ad8 100%)', pie: '#7a5ad8' },
-    { bar: 'linear-gradient(180deg,#9ec2cb 0%,#4b7987 100%)', pie: '#4b7987' }
+    { bar: 'linear-gradient(180deg,#6eb8ff 0%,#2b72de 100%)', pie: '#8d63d3' },
+    { bar: 'linear-gradient(180deg,#79d9d1 0%,#2a93b8 100%)', pie: '#f2c55f' },
+    { bar: 'linear-gradient(180deg,#8ca8ff 0%,#4f69df 100%)', pie: '#52c3e4' },
+    { bar: 'linear-gradient(180deg,#ff9cc2 0%,#e35493 100%)', pie: '#46ad6a' },
+    { bar: 'linear-gradient(180deg,#ffc28f 0%,#f08337 100%)', pie: '#e95f99' },
+    { bar: 'linear-gradient(180deg,#b8df89 0%,#62a83b 100%)', pie: '#7095ff' },
+    { bar: 'linear-gradient(180deg,#cfb6ff 0%,#7a5ad8 100%)', pie: '#f09041' },
+    { bar: 'linear-gradient(180deg,#9ec2cb 0%,#4b7987 100%)', pie: '#5a8f9c' }
   ]
 
   const rowsByCount = [...orderedStatuses]
@@ -314,42 +391,63 @@ function renderStatusBars() {
 
   if (state.statusView === 'pie') {
     const total = rowsByCount.reduce((sum, item) => sum + item.count, 0) || 1
-    const radius = 72
-    const c = 2 * Math.PI * radius
-    const gapPct = 3.2
-
-    let currentPct = 0
+    const cx = 130
+    const cy = 124
+    const radius = 92
+    const depth = 10
+    const gapDeg = 2.2
+    let start = -100
     const slices = rowsByCount.map((item, index) => {
       const pct = (item.count / total) * 100
-      const usablePct = Math.max(0.8, pct - gapPct)
-      const length = (usablePct / 100) * c
-      const offset = -((currentPct + gapPct / 2) / 100) * c
-      currentPct += pct
+      const sweepRaw = (pct / 100) * 360
+      const sweep = Math.max(3.8, sweepRaw - gapDeg)
+      const end = start + sweep
+      const mid = start + sweep / 2
+      const explode = 5.5
+      const shift = polarPoint(0, 0, explode, mid)
+      const color = palette[index % palette.length].pie
+      const sideColor = mixColor(color, '#0b1a35', 0.27)
+      const hiColor = mixColor(color, '#ffffff', 0.22)
+      const loColor = mixColor(color, '#0b1a35', 0.1)
+      const path = pieSlicePath(cx, cy, radius, start, end)
+      const gradId = `dashStatusPieGrad${index}`
+      start += sweepRaw
       return {
         ...item,
         pct,
-        color: palette[index % palette.length].pie,
-        length,
-        offset
+        color,
+        sideColor,
+        path,
+        gradId,
+        dx: shift.x,
+        dy: shift.y,
+        hiColor,
+        loColor
       }
     })
 
     host.innerHTML = `
       <div class="dash-pie-wrap">
         <div class="dash-pie-left">
-          <svg class="dash-pie-svg" viewBox="0 0 200 200" aria-label="Status pie chart">
-            <circle class="dash-pie-ring-bg" cx="100" cy="100" r="${radius}"></circle>
+          <svg class="dash-pie-svg" viewBox="0 0 260 250" aria-label="Status pie chart">
+            <defs>
+              ${slices.map((slice) => `
+                <linearGradient id="${slice.gradId}" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="${slice.hiColor}" />
+                  <stop offset="55%" stop-color="${slice.color}" />
+                  <stop offset="100%" stop-color="${slice.loColor}" />
+                </linearGradient>
+              `).join('')}
+              <filter id="dashPieDrop" x="-30%" y="-30%" width="160%" height="180%">
+                <feDropShadow dx="0" dy="8" stdDeviation="5" flood-color="#1f3e78" flood-opacity="0.24"/>
+              </filter>
+            </defs>
+            <ellipse class="dash-pie-shadow" cx="${cx}" cy="${cy + depth + 22}" rx="${radius + 16}" ry="22"></ellipse>
             ${slices.map((slice, idx) => `
-              <circle
-                class="dash-pie-seg"
-                cx="100"
-                cy="100"
-                r="${radius}"
-                stroke="${slice.color}"
-                stroke-dasharray="${slice.length.toFixed(2)} ${c.toFixed(2)}"
-                stroke-dashoffset="${slice.offset.toFixed(2)}"
-                data-idx="${idx}"
-              ></circle>
+              <g class="dash-pie-slice" data-idx="${idx}" transform="translate(${slice.dx.toFixed(2)} ${slice.dy.toFixed(2)})">
+                <path class="dash-pie-slice-side" d="${slice.path}" transform="translate(0 ${depth})" fill="${slice.sideColor}"></path>
+                <path class="dash-pie-slice-top" d="${slice.path}" fill="url(#${slice.gradId})" filter="url(#dashPieDrop)"></path>
+              </g>
             `).join('')}
           </svg>
           <div id="dashPieFocus" class="dash-pie-focus">
@@ -377,31 +475,55 @@ function renderStatusBars() {
       </div>
     `
 
+    const pieLeftEl = host.querySelector('.dash-pie-left')
     const focusEl = host.querySelector('#dashPieFocus')
     const focusMarkEl = host.querySelector('#dashPieFocusMark')
     const focusValueEl = host.querySelector('#dashPieFocusValue')
     const focusSubEl = host.querySelector('#dashPieFocusSub')
-    const segs = host.querySelectorAll('.dash-pie-seg')
+    const segs = host.querySelectorAll('.dash-pie-slice')
     const items = host.querySelectorAll('.dash-pie-item')
 
-    const applyFocus = (idx) => {
+    const positionFocus = (clientX, clientY) => {
+      if (!focusEl || !pieLeftEl || !Number.isFinite(clientX) || !Number.isFinite(clientY)) return
+      const rect = pieLeftEl.getBoundingClientRect()
+      const w = focusEl.offsetWidth || 140
+      const h = focusEl.offsetHeight || 42
+      const pad = 8
+      let x = clientX - rect.left + 12
+      let y = clientY - rect.top - h - 12
+      if (x + w > rect.width - pad) x = rect.width - w - pad
+      if (x < pad) x = pad
+      if (y < pad) y = clientY - rect.top + 14
+      if (y + h > rect.height - pad) y = rect.height - h - pad
+      focusEl.style.left = `${x}px`
+      focusEl.style.top = `${y}px`
+    }
+
+    const applyFocus = (idx, event) => {
       const slice = slices[idx]
       if (!slice || !focusEl || !focusMarkEl || !focusValueEl || !focusSubEl) return
       focusMarkEl.style.background = slice.color
       focusValueEl.textContent = `${slice.pct.toFixed(1)}%`
       focusSubEl.textContent = `${slice.status} | ${slice.count} FEPMF`
       focusEl.classList.add('active')
+      if (event) positionFocus(event.clientX, event.clientY)
     }
     const clearFocus = () => {
       if (focusEl) focusEl.classList.remove('active')
     }
 
     segs.forEach((seg) => {
-      seg.addEventListener('mouseenter', () => applyFocus(Number(seg.getAttribute('data-idx'))))
+      seg.addEventListener('mouseenter', (event) => applyFocus(Number(seg.getAttribute('data-idx')), event))
+      seg.addEventListener('mousemove', (event) => {
+        applyFocus(Number(seg.getAttribute('data-idx')), event)
+      })
       seg.addEventListener('mouseleave', clearFocus)
     })
     items.forEach((item) => {
-      item.addEventListener('mouseenter', () => applyFocus(Number(item.getAttribute('data-idx'))))
+      item.addEventListener('mouseenter', (event) => applyFocus(Number(item.getAttribute('data-idx')), event))
+      item.addEventListener('mousemove', (event) => {
+        applyFocus(Number(item.getAttribute('data-idx')), event)
+      })
       item.addEventListener('mouseleave', clearFocus)
     })
 
@@ -449,16 +571,51 @@ function renderStatusBars() {
 function renderSmartReading() {
   const summary = document.getElementById('dashStatusSummary')
   const recentList = document.getElementById('dashStatusRecentList')
-  if (!summary || !recentList) return
+  const fromNode = document.getElementById('dashSmartDateFrom')
+  const toNode = document.getElementById('dashSmartDateTo')
+  const bpCountNode = document.getElementById('dashSmartBpCount')
+  const typeCountNode = document.getElementById('dashSmartTypeCount')
+  if (!summary || !recentList || !fromNode || !toNode) return
 
-  const windowStart = state.data?.summary?.deliveredRecentWindowStart
-  const windowLabel = windowStart
-    ? new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${windowStart}T00:00:00Z`))
-    : 'ช่วงที่กำหนด'
+  const defaultFrom = firstDayPrevMonthIsoLocal()
+  const defaultTo = todayIsoLocal()
+  if (!state.smartDateFrom) state.smartDateFrom = defaultFrom
+  if (!state.smartDateTo) state.smartDateTo = defaultTo
+  if (!fromNode.value) fromNode.value = state.smartDateFrom
+  if (!toNode.value) toNode.value = state.smartDateTo
 
-  const recent = (state.data?.deliveredRecent || []).filter((item) => item?.key)
+  const fromIso = String(state.smartDateFrom || fromNode.value || defaultFrom)
+  const toIso = String(state.smartDateTo || toNode.value || defaultTo)
+  const rangeStart = fromIso <= toIso ? fromIso : toIso
+  const rangeEnd = fromIso <= toIso ? toIso : fromIso
+
+  const allDelivered = (state.data?.deliveredRecent || []).filter((item) => item?.key)
+  const recent = allDelivered.filter((item) => {
+    const d = dateKeyBkk(item.updated)
+    return d && d >= rangeStart && d <= rangeEnd
+  })
+
+  const rowByParentKey = new Map((state.rows || []).map((row) => [String(row.parent.key || ''), row]))
+  const uniqueDeliveredKeys = [...new Set(recent.map((item) => String(item.key || '').trim()).filter(Boolean))]
+  const bpSet = new Set()
+  const typeSet = new Set()
+  for (const key of uniqueDeliveredKeys) {
+    const row = rowByParentKey.get(key)
+    const partners = normalizeMultiValues(row?.derived?.businessPartners || row?.parent?.businessPartner || [])
+    const types = normalizeMultiValues(row?.derived?.businessTypes || row?.parent?.businessType || [])
+    for (const partner of (partners.length ? partners : ['Not specified'])) bpSet.add(String(partner))
+    for (const type of (types.length ? types : ['Not specified'])) typeSet.add(String(type))
+  }
+  if (bpCountNode) bpCountNode.textContent = String(bpSet.size || 0)
+  if (typeCountNode) typeCountNode.textContent = String(typeSet.size || 0)
+
+  const fromLabel = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })
+    .format(new Date(`${rangeStart}T00:00:00Z`))
+  const toLabel = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' })
+    .format(new Date(`${rangeEnd}T00:00:00Z`))
+
   if (!recent.length) {
-    summary.textContent = `ตั้งแต่ ${windowLabel}: ไม่พบงานที่เปลี่ยนเป็น S7`
+    summary.textContent = `${fromLabel} - ${toLabel}: ไม่พบงานที่เปลี่ยนเป็น S7`
     recentList.innerHTML = '<li>ยังไม่มีรายการ FEPMF ที่เข้าเงื่อนไขในช่วงเวลานี้</li>'
     return
   }
@@ -473,7 +630,7 @@ function renderSmartReading() {
   const dateKeys = [...grouped.keys()].sort((a, b) => String(b).localeCompare(String(a)))
   const totalRows = recent.length
   const totalDates = dateKeys.filter((k) => k !== 'unknown').length
-  summary.textContent = `ตั้งแต่ ${windowLabel}: ${totalRows} งาน ครอบคลุม ${totalDates} วันที่มีการเปลี่ยนสถานะเป็น S7`
+  summary.textContent = `${fromLabel} - ${toLabel}: ${totalRows} งาน ครอบคลุม ${totalDates} วันที่มีการเปลี่ยนสถานะเป็น S7`
 
   const accent = ['#2f74de', '#2aa0bf', '#7b64e2', '#e15893', '#ef8b3a', '#4e9e55']
   const groupsHtml = dateKeys.map((dateKey, groupIndex) => {
@@ -568,6 +725,135 @@ function bentoSortValue(row, key) {
   return ''
 }
 
+function bentoCategorySlices(groups, totalRows) {
+  const palette = ['#4ea0f5', '#ec4f90', '#24bf6b', '#9a9cf2', '#f8ab1f', '#5a6be2', '#23a8bf', '#c85395', '#7dba43', '#3d8fd4']
+  const total = totalRows || 1
+  return (groups || []).map((group, idx) => {
+    const count = Number(group?.count || 0)
+    const pct = (count / total) * 100
+    return { label: String(group?.label || '-'), count, pct, color: palette[idx % palette.length] }
+  }).filter((x) => x.count > 0)
+}
+
+function renderBentoPie(groups, totalRows, hostId, totalId, focusLabel, dimensionLabel) {
+  const host = document.getElementById(hostId)
+  const totalNode = document.getElementById(totalId)
+  if (!host) return
+  if (totalNode) totalNode.textContent = `${totalRows} FEPMF`
+
+  if (!groups.length) {
+    host.innerHTML = '<div class="dash-empty">No data</div>'
+    return
+  }
+
+  const slicesRaw = bentoCategorySlices(groups, totalRows)
+    .sort((a, b) => b.count - a.count)
+  const slices = slicesRaw.slice(0, 5)
+  const radius = 52
+  const c = 2 * Math.PI * radius
+  const gapPct = 5.6
+  let currentPct = 0
+  const palette = ['#49a2f6', '#ea4f92', '#f3aa1f', '#9ea0f4', '#24be6a']
+  const ringSlices = slices.map((slice, idx) => {
+    const pct = slice.pct
+    const usablePct = Math.max(2.4, pct - gapPct)
+    const length = (usablePct / 100) * c
+    const offset = -((currentPct + (gapPct / 2)) / 100) * c
+    currentPct += pct
+    return { ...slice, color: palette[idx % palette.length], length, offset }
+  })
+  const subtitle = String(dimensionLabel || '').toLowerCase().includes('partner')
+    ? 'partners in total'
+    : 'types in total'
+
+  host.innerHTML = `
+    <div class="dash-bento-donut-shell">
+      <svg class="dash-bento-pie-svg donut-pro" viewBox="0 0 180 180" aria-label="Bento category pie chart">
+        <circle class="dash-bento-pie-bg" cx="90" cy="90" r="${radius}"></circle>
+        ${ringSlices.map((slice) => `
+          <circle
+            class="dash-bento-pie-seg"
+            cx="90"
+            cy="90"
+            r="${radius}"
+            stroke="${slice.color}"
+            stroke-dasharray="${slice.length.toFixed(2)} ${c.toFixed(2)}"
+            stroke-dashoffset="${slice.offset.toFixed(2)}"
+          ></circle>
+        `).join('')}
+      </svg>
+      <div class="dash-bento-pie-center">
+        <strong>${totalRows}</strong>
+        <span>${esc(subtitle)}</span>
+      </div>
+    </div>
+  `
+}
+
+function renderBentoHorizontalBars(groups, totalRows, hostId, totalId) {
+  const host = document.getElementById(hostId)
+  const totalNode = document.getElementById(totalId)
+  if (!host) return
+  if (totalNode) totalNode.textContent = `${totalRows} FEPMF`
+  if (!groups.length) {
+    host.innerHTML = '<div class="dash-empty">No data</div>'
+    return
+  }
+  const slices = bentoCategorySlices(groups, totalRows).sort((a, b) => b.count - a.count).slice(0, 6)
+  host.innerHTML = `
+    <div class="dash-bento-hbars">
+      ${slices.map((slice) => `
+        <div class="dash-bento-hrow">
+          <div class="dash-bento-hmeta">
+            <span class="dash-bento-hlab">${esc(slice.label)}</span>
+            <span class="dash-bento-hval">${Math.round(slice.pct)}% (${slice.count})</span>
+          </div>
+          <div class="dash-bento-htrack">
+            <span class="dash-bento-hfill" style="width:${slice.pct.toFixed(2)}%;background:${slice.color}"></span>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `
+}
+
+function renderBentoVerticalBars(groups, totalRows, hostId, totalId) {
+  const host = document.getElementById(hostId)
+  const totalNode = document.getElementById(totalId)
+  if (!host) return
+  if (totalNode) totalNode.textContent = `${totalRows} FEPMF`
+  if (!groups.length) {
+    host.innerHTML = '<div class="dash-empty">No data</div>'
+    return
+  }
+  const slices = bentoCategorySlices(groups, totalRows).sort((a, b) => b.count - a.count).slice(0, 6)
+  const maxCount = Math.max(...slices.map((s) => s.count), 1)
+  host.innerHTML = `
+    <div class="dash-bento-vbars">
+      ${slices.map((slice) => {
+        const h = Math.max(8, Math.round((slice.count / maxCount) * 100))
+        return `
+          <div class="dash-bento-vcol">
+            <div class="dash-bento-vval">${slice.count}</div>
+            <div class="dash-bento-vtrack">
+              <span class="dash-bento-vfill" style="height:${h}%;background:${slice.color}"></span>
+            </div>
+            <div class="dash-bento-vlab">${esc(slice.label)}</div>
+            <div class="dash-bento-vpct">${Math.round(slice.pct)}%</div>
+          </div>
+        `
+      }).join('')}
+    </div>
+  `
+}
+
+function renderBentoViz(groups, totalRows, hostId, totalId, focusLabel, vizMode, dimensionLabel) {
+  const mode = String(vizMode || 'pie')
+  if (mode === 'hbar') return renderBentoHorizontalBars(groups, totalRows, hostId, totalId)
+  if (mode === 'vbar') return renderBentoVerticalBars(groups, totalRows, hostId, totalId)
+  return renderBentoPie(groups, totalRows, hostId, totalId, focusLabel, dimensionLabel)
+}
+
 function renderBentoBlock(options) {
   const {
     rows,
@@ -577,7 +863,11 @@ function renderBentoBlock(options) {
     sortStateKey,
     totalId,
     gridId,
-    listId
+    listId,
+    pieHostId,
+    pieTotalId,
+    vizMode,
+    dimensionLabel
   } = options
   const totalNode = document.getElementById(totalId)
   const gridNode = document.getElementById(gridId)
@@ -585,16 +875,20 @@ function renderBentoBlock(options) {
   if (!totalNode || !gridNode || !listNode) return
 
   totalNode.textContent = `${rows.length} FEPMF`
-  const groups = groupRowsByDimension(rows, groupAccessor)
+  const groups = [
+    { label: 'ALL', rows: [...rows], count: rows.length },
+    ...groupRowsByDimension(rows, groupAccessor).filter((g) => g.label !== 'ALL')
+  ]
 
   if (!groups.length) {
     gridNode.innerHTML = '<div class="dash-empty">No data</div>'
     listNode.innerHTML = '<div class="dash-empty">ไม่พบ FEPMF ในเงื่อนไขนี้</div>'
-    state[focusStateKey] = ''
+    state[focusStateKey] = 'ALL'
+    renderBentoViz([], rows.length, pieHostId, pieTotalId, 'ALL', vizMode, dimensionLabel)
     return
   }
 
-  let activeLabel = focusKey
+  let activeLabel = focusKey || 'ALL'
   if (!groups.some((g) => g.label === activeLabel)) activeLabel = groups[0].label
   state[focusStateKey] = activeLabel
 
@@ -606,6 +900,7 @@ function renderBentoBlock(options) {
   `).join('')
 
   const activeGroup = groups.find((g) => g.label === activeLabel) || groups[0]
+  const chartGroups = groups.filter((g) => g.label !== 'ALL')
   if (!state[sortStateKey]) state[sortStateKey] = { key: 'fepmf', dir: 'asc' }
   const sortState = state[sortStateKey]
   const listRows = [...(activeGroup?.rows || [])]
@@ -619,6 +914,7 @@ function renderBentoBlock(options) {
 
   if (!listRows.length) {
     listNode.innerHTML = '<div class="dash-empty">ไม่พบ FEPMF ในหมวดที่เลือก</div>'
+    renderBentoViz(chartGroups, rows.length, pieHostId, pieTotalId, activeLabel, vizMode, dimensionLabel)
     return
   }
 
@@ -628,7 +924,7 @@ function renderBentoBlock(options) {
   }
 
   listNode.innerHTML = `
-    <table class="dash-table">
+    <table class="dash-table dash-bento-table">
       <thead>
         <tr>
           <th><button class="dash-sort-btn ${sortState.key === 'fepmf' ? 'active' : ''}" type="button" data-bento-sort-kind="${esc(sortStateKey)}" data-bento-sort-key="fepmf"><span>FEPMF</span><span class="dash-sort-icon">${sortIcon('fepmf')}</span></button></th>
@@ -651,9 +947,21 @@ function renderBentoBlock(options) {
       </tbody>
     </table>
   `
+  renderBentoViz(chartGroups, rows.length, pieHostId, pieTotalId, activeLabel, vizMode, dimensionLabel)
 }
 
 function renderBusinessBentoSections() {
+  const setActiveView = (id, active) => {
+    const node = document.getElementById(id)
+    if (node) node.classList.toggle('active', !!active)
+  }
+  setActiveView('dashPartnerViewPie', state.partnerViz === 'pie')
+  setActiveView('dashPartnerViewHBar', state.partnerViz === 'hbar')
+  setActiveView('dashPartnerViewVBar', state.partnerViz === 'vbar')
+  setActiveView('dashTypeViewPie', state.typeViz === 'pie')
+  setActiveView('dashTypeViewHBar', state.typeViz === 'hbar')
+  setActiveView('dashTypeViewVBar', state.typeViz === 'vbar')
+
   const rows = state.rows || []
   renderBentoBlock({
     rows,
@@ -663,7 +971,11 @@ function renderBusinessBentoSections() {
     sortStateKey: 'partnerSort',
     totalId: 'dashPartnerTotal',
     gridId: 'dashPartnerBentoGrid',
-    listId: 'dashPartnerList'
+    listId: 'dashPartnerList',
+    pieHostId: 'dashPartnerPie',
+    pieTotalId: 'dashPartnerPieTotal',
+    vizMode: state.partnerViz,
+    dimensionLabel: 'Business Partner'
   })
   renderBentoBlock({
     rows,
@@ -673,7 +985,11 @@ function renderBusinessBentoSections() {
     sortStateKey: 'typeSort',
     totalId: 'dashTypeTotal',
     gridId: 'dashTypeBentoGrid',
-    listId: 'dashTypeList'
+    listId: 'dashTypeList',
+    pieHostId: 'dashTypePie',
+    pieTotalId: 'dashTypePieTotal',
+    vizMode: state.typeViz,
+    dimensionLabel: 'Business Type'
   })
 }
 
@@ -737,12 +1053,12 @@ function renderCompareAnalysis() {
       share: comparable ? Math.round((list.length / comparable) * 100) : 0,
       segments
     }
-  }).sort((a, b) => b.n - a.n || String(a.squad).localeCompare(String(b.squad))).slice(0, 10)
+  }).sort((a, b) => b.n - a.n || String(a.squad).localeCompare(String(b.squad)))
 
   const metricCards = [
-    { key: 'ตรงแผน', value: `${onTimeRate}%`, detail: `${onTime}/${comparable}`, meaning: 'เริ่มงานตรงกับ Estimate Sprint', help: 'ค่ายิ่งสูงยิ่งดี' },
-    { key: 'เริ่มก่อนแผน', value: `${earlyRate}%`, detail: `${early}/${comparable}`, meaning: 'เริ่มงานเร็วกว่าที่ประเมินไว้', help: 'ดีเมื่อไม่กระทบ dependency' },
-    { key: 'เริ่มช้ากว่าแผน', value: `${lateRate}%`, detail: `${late}/${comparable}`, meaning: 'สัดส่วนงานที่เริ่มช้ากว่า Estimate Sprint', help: 'ตัวชี้วัดความเสี่ยงหลัก', risk: true }
+    { key: 'ตรงแผน', value: `${onTimeRate}%`, detail: `${onTime}/${comparable}`, meaning: 'เริ่มงานตรงกับ Estimate Sprint' },
+    { key: 'เริ่มก่อนแผน', value: `${earlyRate}%`, detail: `${early}/${comparable}`, meaning: 'เริ่มงานเร็วกว่าที่ประเมินไว้' },
+    { key: 'เริ่มช้ากว่าแผน', value: `${lateRate}%`, detail: `${late}/${comparable}`, meaning: 'สัดส่วนงานที่เริ่มช้ากว่า Estimate Sprint', risk: true }
   ]
 
   host.innerHTML = `
@@ -754,15 +1070,13 @@ function renderCompareAnalysis() {
             <div class="v">${m.value}</div>
             <div class="s">${m.detail}</div>
             <div class="m">${m.meaning}</div>
-            <div class="h">${m.help}</div>
           </article>
         `).join('')}
       </div>
 
       <div class="exec-viz-grid">
         <article class="exec-viz-card benchmark-card" style="grid-column:1 / -1;">
-          <h4>Squad Benchmark: Mix Compare ของ Comparable FEPMF</h4>
-          <p class="viz-desc">1 Squad = 1 Bar จากค่า Compare จริง (เริ่มก่อนแผน / ตรงแผน / เริ่มช้ากว่าแผน) โดยใช้เฉพาะ FEPMF ที่มี Estimate และ Actual และไม่รวม No Squad</p>
+          <h4>Squad Benchmark</h4>
           <div class="exec-squad-list">
             ${squadMix.map((s) => `
               <div class="sq-row">
@@ -835,8 +1149,12 @@ function renderStatusKpiCards() {
         <div class="dash-status-kpi-name">${esc(status)} Tasks</div>
         <div class="dash-status-kpi-note">${share}% ของ FEPMF ทั้งหมด</div>
         <button class="dash-status-kpi-cta" type="button" data-status="${esc(status)}" aria-label="Explore ${esc(status)} status">
-          <span>Explore</span>
-          <span class="dash-status-kpi-cta-dot">→</span>
+          <span class="dash-status-kpi-eye" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="img" focusable="false">
+              <path d="M2 12s3.8-6 10-6 10 6 10 6-3.8 6-10 6-10-6-10-6z"></path>
+              <circle cx="12" cy="12" r="3.2"></circle>
+            </svg>
+          </span>
         </button>
       </article>
     `
@@ -1014,6 +1332,21 @@ function cabDateObj(value) {
   return Number.isNaN(d.getTime()) ? null : d
 }
 
+function businessDateObj(value) {
+  if (!value) return null
+  const d = new Date(`${value}T00:00:00`)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
+function evaluateBusinessDate(dateObj, today) {
+  if (!dateObj) return { text: 'No Business Date', cls: '' }
+  const msDay = 24 * 60 * 60 * 1000
+  const diff = Math.round((dateObj.getTime() - today.getTime()) / msDay)
+  if (diff > 0) return { text: `เหลือ ${diff} วัน`, cls: 'upcoming' }
+  if (diff < 0) return { text: `เกิน ${Math.abs(diff)} วัน`, cls: 'overdue' }
+  return { text: 'ครบกำหนดวันนี้', cls: 'today' }
+}
+
 function renderUpcomingCabCards(rows) {
   const host = document.getElementById('dashCab')
   const sub = document.getElementById('dashCabSub')
@@ -1021,29 +1354,28 @@ function renderUpcomingCabCards(rows) {
   if (!host) return
   host.className = 'cab-list'
 
-  const now = new Date()
-  now.setHours(0, 0, 0, 0)
-  const windowDays = 21
-  const end = new Date(now)
-  end.setDate(end.getDate() + windowDays)
-
   const candidates = rows
     .filter((row) => !isS7Status(row.parent.status))
     .map((row) => ({ row, cab: cabDateObj(row.parent.cabDate) }))
-    .filter((x) => x.cab && x.cab >= now && x.cab <= end)
-    .sort((a, b) => a.cab - b.cab)
+    .sort((a, b) => {
+      if (a.cab && b.cab) return a.cab - b.cab
+      if (a.cab && !b.cab) return -1
+      if (!a.cab && b.cab) return 1
+      return String(a.row.parent.key || '').localeCompare(String(b.row.parent.key || ''))
+    })
 
-  if (sub) sub.textContent = `งานไม่ใช่ S7 ที่ CAB Date ภายใน ${windowDays} วันจากวันนี้`
+  if (sub) {
+    sub.textContent = ''
+    sub.style.display = 'none'
+  }
   if (countChip) countChip.textContent = `${candidates.length} งาน`
 
   if (!candidates.length) {
-    host.innerHTML = '<div class="dash-empty">ไม่พบงาน non-S7 ที่มี CAB Date ในช่วงเร็ว ๆ นี้</div>'
+    host.innerHTML = '<div class="dash-empty">ไม่พบงานที่เข้าเงื่อนไข</div>'
     return
   }
 
-  const maxItems = 10
-  const view = candidates.slice(0, maxItems)
-  host.innerHTML = view.map(({ row, cab }, idx) => {
+  host.innerHTML = candidates.map(({ row, cab }, idx) => {
     const dateText = cab
       ? cab.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
       : '-'
@@ -1052,7 +1384,6 @@ function renderUpcomingCabCards(rows) {
     const url = row.parent.browseUrl || '#'
     const itcm = row.derived.itcmKeys[0] || '-'
     const status = row.parent.status || '-'
-    const compare = compareLabel(row.derived.compareType)
     const width = Math.min(100, 60 + ((idx % 4) * 12))
     return `
       <article class="cab-item">
@@ -1070,13 +1401,116 @@ function renderUpcomingCabCards(rows) {
             <span>Squad: ${esc(row.parent.squad || '-')}</span>
             <span>CAB: ${esc(dateText)}</span>
             <span>ITCM: ${esc(itcm)}</span>
-            <span>Compare: ${esc(compare)}</span>
           </div>
           <div class="cab-line"><span style="width:${width}%"></span></div>
         </div>
       </article>
     `
   }).join('')
+}
+
+function renderBusinessDateSorting(rows) {
+  const host = document.getElementById('dashBusinessDateRows')
+  const countChip = document.getElementById('dashBusinessDateCount')
+  const searchNode = document.getElementById('dashBusinessDateSearch')
+  if (!host) return
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const scopedRows = (rows || []).filter((row) => !isS7Status(row.parent.status) && !isCancelledStatus(row.parent.status))
+  const mapped = scopedRows.map((row) => {
+    const businessDate = row.parent.businessDate || ''
+    const bd = businessDateObj(businessDate)
+    const bp = normalizeMultiValues(row.parent.businessPartner || []).join(', ') || '-'
+    const bt = normalizeMultiValues(row.parent.businessType || []).join(', ') || '-'
+    const evalInfo = evaluateBusinessDate(bd, today)
+    const diffDays = bd ? Math.round((bd.getTime() - today.getTime()) / (24 * 60 * 60 * 1000)) : Number.POSITIVE_INFINITY
+    return {
+      row,
+      businessDate,
+      bd,
+      bp,
+      bt,
+      evalInfo,
+      diffDays
+    }
+  })
+
+  const query = String(state.bizDateQuery || '').trim().toLowerCase()
+  const filtered = !query ? mapped : mapped.filter((item) => {
+    const blob = [
+      item.row.parent.key,
+      item.row.parent.summary,
+      item.bp,
+      item.bt,
+      item.row.parent.assignee,
+      item.row.parent.status,
+      item.businessDate,
+      item.evalInfo.text
+    ].join(' ').toLowerCase()
+    return query.split(/\s+/).filter(Boolean).every((term) => blob.includes(term))
+  })
+
+  if (!state.bizDateSort) state.bizDateSort = { key: 'evaluate', dir: 'asc' }
+  const sort = state.bizDateSort
+  const sortValue = (item, key) => {
+    if (key === 'evaluate') return Number.isFinite(item.diffDays) ? item.diffDays : Number.POSITIVE_INFINITY
+    if (key === 'status') return String(item.row.parent.status || '').toLowerCase()
+    if (key === 'fepmf') return String(item.row.parent.key || '').toLowerCase()
+    if (key === 'summary') return String(item.row.parent.summary || '').toLowerCase()
+    if (key === 'businessPartner') return String(item.bp || '').toLowerCase()
+    if (key === 'businessType') return String(item.bt || '').toLowerCase()
+    if (key === 'assignee') return String(item.row.parent.assignee || '').toLowerCase()
+    return ''
+  }
+  const sorted = [...filtered].sort((a, b) => {
+    const av = sortValue(a, sort.key)
+    const bv = sortValue(b, sort.key)
+    if (av < bv) return sort.dir === 'asc' ? -1 : 1
+    if (av > bv) return sort.dir === 'asc' ? 1 : -1
+    return String(a.row.parent.key || '').localeCompare(String(b.row.parent.key || ''))
+  })
+  const sortIcon = (key) => {
+    if (sort.key !== key) return '↕'
+    return sort.dir === 'asc' ? '↑' : '↓'
+  }
+
+  if (countChip) countChip.textContent = `${sorted.length} FEPMF`
+  if (searchNode && searchNode.value !== state.bizDateQuery) searchNode.value = state.bizDateQuery
+  if (!sorted.length) {
+    host.innerHTML = '<div class="dash-empty">ไม่พบ FEPMF สำหรับการจัดเรียง Business Date</div>'
+    return
+  }
+
+  host.innerHTML = `
+    <table class="dash-table dash-bizdate-table">
+      <thead>
+        <tr>
+          <th><button class="dash-sort-btn ${sort.key === 'evaluate' ? 'active' : ''}" type="button" data-biz-sort-key="evaluate"><span>Evaluate</span><span class="dash-sort-icon">${sortIcon('evaluate')}</span></button></th>
+          <th><button class="dash-sort-btn ${sort.key === 'status' ? 'active' : ''}" type="button" data-biz-sort-key="status"><span>Status</span><span class="dash-sort-icon">${sortIcon('status')}</span></button></th>
+          <th><button class="dash-sort-btn ${sort.key === 'fepmf' ? 'active' : ''}" type="button" data-biz-sort-key="fepmf"><span>FEPMF</span><span class="dash-sort-icon">${sortIcon('fepmf')}</span></button></th>
+          <th><button class="dash-sort-btn ${sort.key === 'summary' ? 'active' : ''}" type="button" data-biz-sort-key="summary"><span>Summary</span><span class="dash-sort-icon">${sortIcon('summary')}</span></button></th>
+          <th><button class="dash-sort-btn ${sort.key === 'businessPartner' ? 'active' : ''}" type="button" data-biz-sort-key="businessPartner"><span>Business Partner</span><span class="dash-sort-icon">${sortIcon('businessPartner')}</span></button></th>
+          <th><button class="dash-sort-btn ${sort.key === 'businessType' ? 'active' : ''}" type="button" data-biz-sort-key="businessType"><span>Business Type</span><span class="dash-sort-icon">${sortIcon('businessType')}</span></button></th>
+          <th><button class="dash-sort-btn ${sort.key === 'assignee' ? 'active' : ''}" type="button" data-biz-sort-key="assignee"><span>Assignee</span><span class="dash-sort-icon">${sortIcon('assignee')}</span></button></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${sorted.map(({ row, bp, bt, evalInfo, businessDate }) => `
+          <tr>
+            <td><span class="dash-eval-pill ${esc(evalInfo.cls)}">${esc(evalInfo.text)}${businessDate ? ` (${esc(formatDate(businessDate))})` : ''}</span></td>
+            <td><span class="${badgeClass(row.parent.status)}">${esc(row.parent.status || '-')}</span></td>
+            <td><a class="dash-item-key" href="${esc(row.parent.browseUrl || '#')}" target="_blank" rel="noopener noreferrer">${esc(row.parent.key || '-')}</a></td>
+            <td>${esc(row.parent.summary || '-')}</td>
+            <td title="${esc(bp)}">${esc(bp)}</td>
+            <td title="${esc(bt)}">${esc(bt)}</td>
+            <td>${esc(row.parent.assignee || '-')}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `
 }
 
 function compareClass(type) {
@@ -1163,21 +1597,43 @@ function renderStatusModalRows(status) {
   const modalRows = document.getElementById('dashStatusModalRows')
   const modalStatus = document.getElementById('dashStatusModalStatus')
   const modalCount = document.getElementById('dashStatusModalCount')
-  if (!modalRows || !modalStatus || !modalCount) return
+  const modalHead = document.getElementById('dashStatusModalHead')
+  if (!modalRows || !modalStatus || !modalCount || !modalHead) return
 
   const filtered = (state.rows || [])
     .filter((row) => String(row.parent.status || 'Unknown') === String(status || ''))
-    .sort((a, b) => String(a.parent.key || '').localeCompare(String(b.parent.key || '')))
 
   modalStatus.textContent = status || '-'
   modalCount.textContent = `${filtered.length} รายการ`
 
   if (!filtered.length) {
     modalRows.innerHTML = '<tr><td colspan="12" class="dash-empty">No result found</td></tr>'
+    modalHead.querySelectorAll('[data-modal-sort-key]').forEach((btn) => {
+      btn.classList.remove('active')
+      const icon = btn.querySelector('.dash-sort-icon')
+      if (icon) icon.textContent = '↕'
+    })
     return
   }
 
-  modalRows.innerHTML = filtered.map(tableRowMarkup).join('')
+  if (!state.kpiModalSort) state.kpiModalSort = { key: 'fepmf', dir: 'asc' }
+  const sorted = [...filtered].sort((a, b) => {
+    const av = tableSortValue(a, state.kpiModalSort.key)
+    const bv = tableSortValue(b, state.kpiModalSort.key)
+    if (av < bv) return state.kpiModalSort.dir === 'asc' ? -1 : 1
+    if (av > bv) return state.kpiModalSort.dir === 'asc' ? 1 : -1
+    return String(a.parent.key || '').localeCompare(String(b.parent.key || ''))
+  })
+
+  modalRows.innerHTML = sorted.map(tableRowMarkup).join('')
+
+  modalHead.querySelectorAll('[data-modal-sort-key]').forEach((btn) => {
+    const key = btn.getAttribute('data-modal-sort-key')
+    const active = key === state.kpiModalSort.key
+    btn.classList.toggle('active', active)
+    const icon = btn.querySelector('.dash-sort-icon')
+    if (icon) icon.textContent = active ? (state.kpiModalSort.dir === 'asc' ? '↑' : '↓') : '↕'
+  })
 }
 
 function openStatusModal(status) {
@@ -1233,15 +1689,17 @@ function renderTable() {
 }
 
 function renderHighlights() {
-  const rows = state.rows || []
+  const rows = (state.rows || []).filter((row) => !isCancelledStatus(row.parent.status))
   renderRiskByItcmStatus(rows)
   renderUpcomingCabCards(rows)
+  renderBusinessDateSorting(rows)
 }
 
 function renderResultSummary() {
   const rows = state.rows || []
   const tableRows = applyTableKeywordFilter(rows)
   const host = document.getElementById('dashResultInfo')
+  if (!host) return
 
   const withItcm = rows.filter((row) => row.derived.itcmKeys.length).length
   const comparable = rows.filter((row) => row.derived.compareType !== 'na').length
@@ -1405,6 +1863,41 @@ function bindEvents() {
       renderResultSummary()
     })
   }
+  const smartFrom = document.getElementById('dashSmartDateFrom')
+  const smartTo = document.getElementById('dashSmartDateTo')
+  if (smartFrom) {
+    smartFrom.addEventListener('change', (event) => {
+      state.smartDateFrom = String(event.target.value || '').trim() || firstDayPrevMonthIsoLocal()
+      renderSmartReading()
+    })
+  }
+  if (smartTo) {
+    smartTo.addEventListener('change', (event) => {
+      state.smartDateTo = String(event.target.value || '').trim() || todayIsoLocal()
+      renderSmartReading()
+    })
+  }
+  const bizDateSearch = document.getElementById('dashBusinessDateSearch')
+  if (bizDateSearch) {
+    bizDateSearch.addEventListener('input', (event) => {
+      state.bizDateQuery = String(event.target.value || '')
+      renderBusinessDateSorting(state.rows || [])
+    })
+  }
+  const bindVizSwitch = (id, mode, stateKey) => {
+    const node = document.getElementById(id)
+    if (!node) return
+    node.addEventListener('click', () => {
+      state[stateKey] = mode
+      renderBusinessBentoSections()
+    })
+  }
+  bindVizSwitch('dashPartnerViewPie', 'pie', 'partnerViz')
+  bindVizSwitch('dashPartnerViewHBar', 'hbar', 'partnerViz')
+  bindVizSwitch('dashPartnerViewVBar', 'vbar', 'partnerViz')
+  bindVizSwitch('dashTypeViewPie', 'pie', 'typeViz')
+  bindVizSwitch('dashTypeViewHBar', 'hbar', 'typeViz')
+  bindVizSwitch('dashTypeViewVBar', 'vbar', 'typeViz')
 
   document.getElementById('dashStatusAll').addEventListener('change', (event) => {
     if (!event.target.checked) return
@@ -1497,10 +1990,16 @@ function bindEvents() {
     state.businessTypes = []
     state.businessPartners = []
     state.tableQuery = ''
-    state.partnerFocus = ''
-    state.typeFocus = ''
+    state.partnerFocus = 'ALL'
+    state.typeFocus = 'ALL'
+    state.partnerViz = 'pie'
+    state.typeViz = 'pie'
     state.partnerSort = { key: 'fepmf', dir: 'asc' }
     state.typeSort = { key: 'fepmf', dir: 'asc' }
+    state.bizDateSort = { key: 'evaluate', dir: 'asc' }
+    state.bizDateQuery = ''
+    state.smartDateFrom = firstDayPrevMonthIsoLocal()
+    state.smartDateTo = todayIsoLocal()
     document.getElementById('dashSearch').value = ''
     document.getElementById('dashStatusSearch').value = ''
     document.getElementById('dashCompareSearch').value = ''
@@ -1508,6 +2007,11 @@ function bindEvents() {
     document.getElementById('dashBusinessPartnerSearch').value = ''
     const tableSearch = document.getElementById('dashTableSearch')
     if (tableSearch) tableSearch.value = ''
+    if (bizDateSearch) bizDateSearch.value = ''
+    const smartFrom = document.getElementById('dashSmartDateFrom')
+    const smartTo = document.getElementById('dashSmartDateTo')
+    if (smartFrom) smartFrom.value = state.smartDateFrom
+    if (smartTo) smartTo.value = state.smartDateTo
     renderStatusOptions()
     renderCompareOptions()
     renderBusinessFilters()
@@ -1599,6 +2103,40 @@ function bindEvents() {
       renderRiskByItcmStatus(state.rows || [])
     })
   }
+  const bizDateHost = document.getElementById('dashBusinessDateRows')
+  if (bizDateHost) {
+    bizDateHost.addEventListener('click', (event) => {
+      const btn = event.target.closest('[data-biz-sort-key]')
+      if (!btn) return
+      const key = btn.getAttribute('data-biz-sort-key')
+      if (!key) return
+      if (!state.bizDateSort) state.bizDateSort = { key: 'evaluate', dir: 'asc' }
+      if (state.bizDateSort.key === key) {
+        state.bizDateSort.dir = state.bizDateSort.dir === 'asc' ? 'desc' : 'asc'
+      } else {
+        state.bizDateSort.key = key
+        state.bizDateSort.dir = 'asc'
+      }
+      renderBusinessDateSorting(state.rows || [])
+    })
+  }
+  const modalHead = document.getElementById('dashStatusModalHead')
+  if (modalHead) {
+    modalHead.addEventListener('click', (event) => {
+      const btn = event.target.closest('[data-modal-sort-key]')
+      if (!btn) return
+      const key = btn.getAttribute('data-modal-sort-key')
+      if (!key) return
+      if (!state.kpiModalSort) state.kpiModalSort = { key: 'fepmf', dir: 'asc' }
+      if (state.kpiModalSort.key === key) {
+        state.kpiModalSort.dir = state.kpiModalSort.dir === 'asc' ? 'desc' : 'asc'
+      } else {
+        state.kpiModalSort.key = key
+        state.kpiModalSort.dir = 'asc'
+      }
+      if (state.kpiModalStatus) renderStatusModalRows(state.kpiModalStatus)
+    })
+  }
   document.addEventListener('click', (event) => {
     const cta = event.target.closest('.dash-status-kpi-cta[data-status]')
     if (cta) {
@@ -1657,6 +2195,10 @@ async function load(refresh = false) {
     document.getElementById('dashRows').innerHTML = `<tr><td colspan="12" class="dash-empty">Failed to load data: ${esc(error.message || error)}</td></tr>`
     document.getElementById('dashRisk').innerHTML = '<div class="dash-empty">No data</div>'
     document.getElementById('dashCab').innerHTML = '<div class="dash-empty">No data</div>'
+    const bizHost = document.getElementById('dashBusinessDateRows')
+    const bizCount = document.getElementById('dashBusinessDateCount')
+    if (bizHost) bizHost.innerHTML = '<div class="dash-empty">No data</div>'
+    if (bizCount) bizCount.textContent = '0 FEPMF'
     document.getElementById('dashCompareAnalysis').innerHTML = '<div class="dash-empty">No data</div>'
     const statusCards = document.getElementById('dashStatusKpiCards')
     const statusTotal = document.getElementById('dashStatusTotal')
@@ -1672,7 +2214,8 @@ async function load(refresh = false) {
     if (pendingTotal) pendingTotal.textContent = '0'
     if (pendingRing) pendingRing.style.setProperty('--pct', '0')
     if (pendingBento) pendingBento.innerHTML = '<span class="dash-pending-empty">No data</span>'
-    document.getElementById('dashResultInfo').innerHTML = ''
+    const resultInfo = document.getElementById('dashResultInfo')
+    if (resultInfo) resultInfo.innerHTML = ''
     document.getElementById('dashSync').textContent = 'Load failed'
   }
 }

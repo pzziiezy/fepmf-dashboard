@@ -72,6 +72,22 @@ export default async function handler(req, res) {
       .map((f) => f.id)
   }
 
+  function dateFieldIds(fields, snippets) {
+    return (fields || [])
+      .filter((f) => {
+        const schemaType = lower(f?.schema?.type)
+        const customType = lower(f?.schema?.custom)
+        const isDateLike = schemaType === 'date'
+          || customType.includes('datepicker')
+          || customType.includes('datetime')
+        if (!isDateLike) return false
+        const name = normalizeFieldName(f?.name)
+        const id = normalizeFieldName(f?.id)
+        return (snippets || []).some((s) => name.includes(s) || id.includes(s))
+      })
+      .map((f) => f.id)
+  }
+
   function parseNumberLike(v) {
     if (v == null) return null
     if (typeof v === 'number') return v
@@ -319,6 +335,21 @@ export default async function handler(req, res) {
     return ''
   }
 
+  function getBusinessDate(issue, businessDateFieldIds = []) {
+    for (const value of getFieldValues(issue, businessDateFieldIds)) {
+      const raw = Array.isArray(value) ? value[0] : value
+      const iso = toIsoDate(raw)
+      if (iso) return iso
+      if (typeof raw === 'object' && raw) {
+        const isoObj = toIsoDate(raw.value || raw.name || raw.startDate || raw.date)
+        if (isoObj) return isoObj
+      }
+      const text = String(raw || '').trim()
+      if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text
+    }
+    return ''
+  }
+
   function valueToStrings(value) {
     if (value == null) return []
     if (Array.isArray(value)) return uniq(value.flatMap(valueToStrings))
@@ -363,6 +394,7 @@ export default async function handler(req, res) {
       squad: inferSquad(issue, cfg.squadFieldIds),
       businessType: getNamedFieldValues(issue, cfg.businessTypeFieldIds),
       businessPartner: getNamedFieldValues(issue, cfg.businessPartnerFieldIds),
+      businessDate: getBusinessDate(issue, cfg.businessDateFieldIds),
       estimateSprint: getEstimateSprint(issue, cfg.estimateSprintFieldIds),
       actualStartSprint: getActualStartSprint(issue, cfg.actualStartSprintFieldIds),
       labels,
@@ -576,23 +608,22 @@ export default async function handler(req, res) {
     const fields = ['summary', 'status', 'updated']
     const now = new Date()
     const windowStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1, 0, 0, 0))
-    const cutoff = windowStart.getTime()
     const windowStartIso = windowStart.toISOString().slice(0, 10)
     const changedToS7Jql = [
       `project = FEPMF AND (`,
-      `status CHANGED TO "S7 - Project Deliverd" AFTER "${windowStartIso}"`,
-      `OR status CHANGED TO "S7 - Project Delivered" AFTER "${windowStartIso}"`,
-      `OR status CHANGED TO "S7" AFTER "${windowStartIso}"`,
+      `status CHANGED TO "S7 - Project Deliverd"`,
+      `OR status CHANGED TO "S7 - Project Delivered"`,
+      `OR status CHANGED TO "S7"`,
       `) ORDER BY updated DESC`
     ].join(' ')
     const wasS7Jql = [
       `project = FEPMF AND (`,
-      `status WAS "S7 - Project Deliverd" AFTER "${windowStartIso}"`,
-      `OR status WAS "S7 - Project Delivered" AFTER "${windowStartIso}"`,
-      `OR status WAS "S7" AFTER "${windowStartIso}"`,
+      `status WAS "S7 - Project Deliverd"`,
+      `OR status WAS "S7 - Project Delivered"`,
+      `OR status WAS "S7"`,
       `) ORDER BY updated DESC`
     ].join(' ')
-    const fallbackJql = `project = FEPMF AND updated >= "${windowStartIso}" ORDER BY updated DESC`
+    const fallbackJql = `project = FEPMF AND status in ("S7 - Project Deliverd","S7 - Project Delivered","S7") ORDER BY updated DESC`
     const concurrency = 15
 
     function findLatestS7Transition(histories = []) {
@@ -603,7 +634,7 @@ export default async function handler(req, res) {
           if (lower(item?.field) !== 'status') continue
           if (!isS7DeliveredStatusName(item?.toString || item?.to)) continue
           const ts = new Date(created).getTime()
-          if (!Number.isFinite(ts) || ts < cutoff) continue
+          if (!Number.isFinite(ts)) continue
           transitions.push(created)
         }
       }
@@ -652,7 +683,7 @@ export default async function handler(req, res) {
         .filter((issue) => {
           if (!issue.__s7ChangedAt) return false
           const ts = new Date(issue.__s7ChangedAt).getTime()
-          return Number.isFinite(ts) && ts >= cutoff
+          return Number.isFinite(ts)
         })
 
       // Final fallback: if transition history is unavailable, use currently-S7 issues updated in window.
@@ -662,7 +693,7 @@ export default async function handler(req, res) {
           .map((issue) => ({ ...issue, __s7ChangedAt: issue?.fields?.updated || '' }))
           .filter((issue) => {
             const ts = new Date(issue.__s7ChangedAt || '').getTime()
-            return Number.isFinite(ts) && ts >= cutoff
+            return Number.isFinite(ts)
           })
       }
 
@@ -698,6 +729,11 @@ export default async function handler(req, res) {
     const businessPartnerFieldIds = uniq([
       ...exactFieldIds(fieldCatalog, ['Business Partner']),
       ...fuzzyFieldIds(fieldCatalog, ['business partner']).slice(0, 6)
+    ])
+
+    const businessDateFieldIds = uniq([
+      ...exactFieldIds(fieldCatalog, ['Business Plan Date', 'Business Date']),
+      ...dateFieldIds(fieldCatalog, ['business plan date', 'business date', 'biz date', 'business due']).slice(0, 12)
     ])
 
     const estimateSprintFieldIds = uniq([
@@ -744,6 +780,7 @@ export default async function handler(req, res) {
       ...squadFieldIds,
       ...businessTypeFieldIds,
       ...businessPartnerFieldIds,
+      ...businessDateFieldIds,
       ...estimateSprintFieldIds,
       ...actualStartSprintFieldIds,
       ...childFieldIds,
@@ -757,6 +794,7 @@ export default async function handler(req, res) {
       squadFieldIds,
       businessTypeFieldIds,
       businessPartnerFieldIds,
+      businessDateFieldIds,
       estimateSprintFieldIds,
       actualStartSprintFieldIds
     }
@@ -826,7 +864,8 @@ export default async function handler(req, res) {
       return {
         parent: {
           ...parent,
-          cabDate: parent.dueDate || ''
+          cabDate: parent.dueDate || '',
+          businessDate: parent.businessDate || ''
         },
         linkedCount: children.length,
         progressPercent,
@@ -912,7 +951,11 @@ export default async function handler(req, res) {
           squads: uniq(parents.map((x) => x.parent.squad)).filter((x) => KNOWN_SQUADS.includes(x)),
           businessTypes: uniq(parents.flatMap((x) => x.parent.businessType || [])).sort(),
           businessPartners: uniq(parents.flatMap((x) => x.parent.businessPartner || [])).sort(),
-          cabDates: uniq(parents.map((x) => x.parent.cabDate)).filter(Boolean).sort()
+          cabDates: uniq(parents.map((x) => x.parent.cabDate)).filter(Boolean).sort(),
+          businessDates: uniq(parents.map((x) => x.parent.businessDate)).filter(Boolean).sort()
+        },
+        fields: {
+          businessDateFieldIds
         }
       },
       parents
